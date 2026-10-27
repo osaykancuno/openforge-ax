@@ -727,7 +727,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(t.update({ hits: 1, nearestM: 0.5, visibleFrac: 0.9, source: "depth" }).state).to.equal("clear");
     });
 
-    it("distance: the minimum of the last five frames, rounded to 10 cm; the message says it", () => {
+    it("distance: the minimum of the last five frames, rounded to 10 cm (1 cm under 20 cm); nearM is exact", () => {
       const t = OB.createObstacleTracker();
       t.update(hit(0.42));
       t.update(hit(0.41));
@@ -735,9 +735,11 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(r.state).to.equal("blocked");
       expect(r.distanceM).to.equal(0.4);
       expect(r.message).to.equal("Something is in my way (about 40 cm ahead).");
-      r = t.update(hit(0.12));
-      expect(r.distanceM).to.equal(0.1);
-      expect(r.message).to.match(/about 10 cm ahead/);
+      expect(r.nearM).to.equal(0.41);
+      r = t.update(hit(0.123));
+      expect(r.distanceM).to.equal(0.12);
+      expect(r.nearM).to.equal(0.123);
+      expect(r.message).to.match(/about 12 cm ahead/);
       for (let i = 0; i < 5; i++) r = t.update(hit(0.5));
       expect(r.distanceM).to.equal(0.5);
     });
@@ -861,7 +863,8 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       rigs.push(r);
       return r;
     }
-    const blockedUpdate = { state: "blocked", distanceM: 0.3, message: "Something is in my way (about 30 cm ahead)." };
+    // an obstacle right at the stop distance: forward is held at once (a farther one is driven up to, see below)
+    const blockedUpdate = { state: "blocked", distanceM: 0.04, nearM: 0.04, message: "Something is in my way (about 4 cm ahead)." };
     const clearUpdate = { state: "clear", distanceM: null, message: "" };
     const msgs = (ctl, role) => ctl.view.ai.messages.filter((m) => m.role === role).map((m) => m.text);
     const wheels = (r) => r.ctl.snapshot.wheels;
@@ -1150,7 +1153,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(stick(wheels(r))).to.equal(false);
       expect(r.ctl.snapshot.link).to.equal(D.LINK.ARMED);
       expect(r.ctl.view.ai.state).to.equal("interrupted");
-      expect(msgs(r.ctl, "notice")).to.include(blockedUpdate.message);
+      expect(msgs(r.ctl, "notice")).to.include(AC.STOP_TEXT);
       await r.frames(60000);
       expect(stick(wheels(r))).to.equal(false);
       // edge (play area 0.2 m)
@@ -1166,6 +1169,116 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(r.ctl.snapshot.link).to.equal(D.LINK.ARMED);
     });
 
+    it("an obstacle 40 cm ahead: the Rover drives on and stops about 5 cm before it, then only turns and back move it", async () => {
+      for (const speed of [undefined, "fast"]) {
+        const r = await rig();
+        await r.place();
+        if (speed) await r.ctl.say("fast", { source: "voice" });
+        await r.ctl.say("forward 3 s", { source: "voice" });
+        const start = r.ctl.pose.z;
+        const gap0 = 0.4;
+        let gap = gap0;
+        // the depth tracker reports every 66 ms, with the distance the Rover has closed since placing
+        for (let t = 0; t < 4000; t += 66) {
+          gap = gap0 - (r.ctl.pose.z - start);
+          r.ctl.obstacle({ state: "blocked", distanceM: Math.round(gap * 100) / 100, nearM: gap, message: "x" });
+          await r.frames(66);
+        }
+        gap = gap0 - (r.ctl.pose.z - start);
+        expect(gap, `final gap (${speed || "default"} speed)`).to.be.within(0.03, 0.08);
+        expect(stick(wheels(r))).to.equal(false);
+        expect(r.ctl.view.ai.state).to.equal("interrupted");
+        expect(msgs(r.ctl, "notice")).to.include(AC.STOP_TEXT);
+        expect(r.ctl.view.sensing).to.deep.equal({ level: "blocked", text: AC.STOP_TEXT });
+        expect(r.ctl.snapshot.link).to.equal(D.LINK.ARMED);
+        // forward again is refused; backing up works
+        await r.ctl.say("forward 1 s", { source: "voice" });
+        await r.frames(600);
+        expect(gap0 - (r.ctl.pose.z - start)).to.be.at.least(0.03);
+        await r.ctl.say("back 1 s", { source: "voice" });
+        await r.frames(400);
+        expect(r.ctl.snapshot.wheels[0]).to.be.lessThan(0);
+      }
+    });
+
+    it("an obstacle farther than the stop distance only informs: forward plans run, sensing says 'ahead'", async () => {
+      const r = await rig();
+      await r.place();
+      r.ctl.obstacle({ state: "blocked", distanceM: 0.5, nearM: 0.5, message: "Something is in my way (about 50 cm ahead)." });
+      expect(r.ctl.view.sensing).to.deep.equal({ level: "ahead", text: "Something is in my way (about 50 cm ahead)." });
+      await r.ctl.say("forward 1 s", { source: "voice" });
+      await r.frames(300);
+      expect(stick(wheels(r))).to.equal(true);
+      // a blocked result without any distance stops at once
+      r.ctl.obstacle({ state: "blocked", distanceM: null, message: "x" });
+      await r.clock.advance(40);
+      expect(stick(wheels(r))).to.equal(false);
+    });
+
+    it("hold-to-drive: a held chip keeps moving past one lease, release stops at once, STOP ends it, latched does nothing", async () => {
+      const r = await rig();
+      expect(r.ctl.press("forward")).to.equal(false); // not placed: nothing to drive
+      await r.place();
+      expect(r.ctl.press("sideways")).to.equal(false);
+      expect(r.ctl.press("forward")).to.equal(true);
+      await r.frames(2000); // five times a lease: it is renewed while held
+      expect(stick(wheels(r))).to.equal(true);
+      const z = r.ctl.pose.z;
+      expect(z).to.be.greaterThan(0.1);
+      r.ctl.release();
+      await r.clock.advance(40);
+      expect(stick(wheels(r))).to.equal(false);
+      await r.frames(1000);
+      expect(r.ctl.pose.z).to.be.below(z + 0.03); // it stopped where the finger lifted (one tick of slew)
+      // turning on the spot
+      expect(r.ctl.press("left")).to.equal(true);
+      await r.frames(500);
+      expect(r.ctl.pose.yaw).to.be.greaterThan(0.05);
+      // STOP ends a hold and latches; a press while latched does nothing
+      await r.ctl.stop("Stopped by you.");
+      await r.frames(1000);
+      expect(stick(wheels(r))).to.equal(false);
+      expect(r.ctl.press("forward")).to.equal(false);
+      await r.frames(500);
+      expect(stick(wheels(r))).to.equal(false);
+    });
+
+    it("hold-to-drive: a frozen page stops by itself within one lease; a running plan ends; an obstacle stops it 5 cm before", async () => {
+      // the renewals stop (the page froze): the lease runs out
+      let r = await rig();
+      await r.place();
+      r.ctl.press("forward");
+      await r.frames(300);
+      r.ctl.hold("test: freeze"); // stops renewing like a dead page would, and holds
+      await r.frames(AC.HOLD_LEASE_MS + 100);
+      expect(stick(wheels(r))).to.equal(false);
+      // pressing takes over from a plan
+      r = await rig();
+      await r.place();
+      await r.ctl.say("back 3 s", { source: "voice" });
+      await r.frames(300);
+      expect(r.ctl.view.ai.state).to.equal("running");
+      r.ctl.press("left");
+      expect(r.ctl.view.ai.state).to.not.equal("running");
+      r.ctl.release();
+      // an obstacle 30 cm ahead while holding forward: it stops about 5 cm before and stays stopped while held
+      r = await rig();
+      await r.place();
+      const start = r.ctl.pose.z;
+      r.ctl.press("forward");
+      for (let t = 0; t < 4000; t += 66) {
+        const gap = 0.3 - (r.ctl.pose.z - start);
+        r.ctl.obstacle({ state: "blocked", distanceM: Math.round(gap * 100) / 100, nearM: gap, message: "x" });
+        await r.frames(66);
+      }
+      expect(0.3 - (r.ctl.pose.z - start)).to.be.within(0.03, 0.08);
+      expect(stick(wheels(r))).to.equal(false);
+      expect(r.ctl.view.notice).to.equal(AC.STOP_TEXT); // no plan was running: the controller says it itself
+      expect(r.ctl.press("forward")).to.equal(false); // pressing again does not push into it
+      expect(r.ctl.press("back")).to.equal(true);
+      r.ctl.release();
+    });
+
     it("the default play area is 3 m and says so", async () => {
       const r = await rig();
       expect(r.ctl.view.radius).to.equal(3);
@@ -1179,13 +1292,14 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       await r.ctl.say("back 3 s", { source: "voice" });
       await r.frames(300);
       r.ctl.obstacle(blockedUpdate);
+      expect(r.ctl.view.sensing.level).to.equal("blocked");
       await r.frames(300);
       expect(r.ctl.view.ai.state).to.equal("running");
       expect(stick(wheels(r))).to.equal(true);
       await r.ctl.chip("left"); // a turn is fine while blocked
       await r.frames(300);
       expect(r.ctl.view.ai.state).to.equal("running");
-      expect(r.ctl.view.sensing.level).to.equal("blocked");
+      expect(r.ctl.view.sensing.level).to.equal("ahead"); // it backed away from it: room to drive forward again
       r.ctl.obstacle(clearUpdate);
       expect(r.ctl.view.sensing.level).to.equal("clear");
     });
@@ -1197,7 +1311,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       r.ctl.obstacle(blockedUpdate);
       await r.ctl.say("forward 2 s", { source: "voice" });
       expect(r.ctl.view.ai.plan).to.equal(null);
-      expect(msgs(r.ctl, "pilot").join(" ")).to.contain("about 30 cm ahead");
+      expect(msgs(r.ctl, "pilot").join(" ")).to.contain("about 4 cm ahead");
       await r.ctl.say("turn left 45 then back 1 s", { source: "voice" });
       await r.frames(500);
       expect(stick(wheels(r))).to.equal(true);
@@ -1211,7 +1325,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       await r.frames(2500);
       expect(stick(wheels(r))).to.equal(false);
       expect(r.ctl.view.ai.state).to.equal("interrupted");
-      expect(msgs(r.ctl, "notice")).to.include(blockedUpdate.message);
+      expect(msgs(r.ctl, "notice")).to.include(AC.STOP_TEXT);
       expect(r.ctl.snapshot.link).to.equal(D.LINK.ARMED);
       expect(r.ctl.pose.z).to.equal(0);
       await r.ctl.say("back 1 s", { source: "voice" });

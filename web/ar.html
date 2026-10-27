@@ -107,14 +107,14 @@
       <ol class="ar-steps">
         <li>Allow the camera when asked.</li>
         <li>Point at the floor, then tap to put the Rover down.</li>
-        <li>Press the mic and say <span class="pl-mono">forward</span>, <span class="pl-mono">turn left</span> or <span class="pl-mono">spin</span>.</li>
+        <li>Press the mic and say <span class="pl-mono">forward</span>, <span class="pl-mono">turn left</span> or <span class="pl-mono">spin</span>. Or tap a button for a short move, and hold it to keep moving.</li>
       </ol>
       <label class="pl-check ar-look"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
       <p class="pl-small" id="arLookNote">Off by default. Turning it on downloads the object-finding model once (up to about 19 MB) and runs it on your phone. Nothing leaves the phone.</p>
-      <p class="pl-small" id="arVoiceNote">Voice: your browser's speech service turns your words into text. In Chrome the audio may be processed on Google's servers; in Safari, Apple's. Camera pictures never leave this phone.</p>
+      <p class="pl-small" id="arVoiceNote">Voice: tap <b>Enable microphone</b> before you start. Inside AR the browser cannot show its question, so it has to be asked here. Your browser's speech service turns your words into text. In Chrome the audio may be processed on Google's servers; in Safari, Apple's. Camera pictures never leave this phone.</p>
       <div class="pl-row pl-wrap">
         <button class="pl-btn pl-primary" id="arStartBtn" type="button">Start</button>
-        <button class="pl-btn" id="arVoiceBtn" type="button" hidden>Enable voice</button>
+        <button class="pl-btn" id="arVoiceBtn" type="button" hidden>Enable microphone</button>
       </div>
       <p class="pl-msg" id="arStartMsg" role="status" aria-live="polite"></p>
     </section>

@@ -90,7 +90,7 @@ body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-
 .ar-privacy { margin: 6px 0 0; font-size: 12px; line-height: 1.35; }
 .ar-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .ar-chips::-webkit-scrollbar { display: none; }
-.ar-chips .pl-btn { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; font-size: 14px; }
+.ar-chips .pl-btn { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; font-size: 14px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* held down to drive: no text selection, no callout */
 
 /* ---------------------------------------------------------------- STOP: always on screen, big, red, thumb reach */
 .ar-stop {

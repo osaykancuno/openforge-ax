@@ -298,13 +298,21 @@ or chips through the same AI Pilot, built-in parser and drive loop as `pilot.htm
 
 - Only placing the Rover (a tap on the floor, or the **Place the Rover here** button for keyboard and screen-reader
   users) or the **ARM** button arms it, and only from a real tap or key press. Voice, chips and object requests never arm.
-- STOP, Esc, voice "stop" (also "halt", "freeze", "brake", "abort"), the page going to the background, the page being
-  closed and the AR session ending all latch it; nothing resumes until ARM.
-- A blurred AR session, an obstacle ahead or the edge of the 3 m play area **hold** it: the wheels go to zero within
-  one tick, the plan ends, the Rover stays armed.
+- STOP, Esc, voice "stop" anywhere in a sentence (also "halt", "freeze", "brake", "abort"), the page going to the
+  background, the page being closed and the AR session ending all latch it; nothing resumes until ARM.
+- A blurred AR session, an obstacle 5 cm ahead or the edge of the 3 m play area **hold** it: the wheels go to zero
+  within one tick, the plan ends, the Rover stays armed.
+- **Buttons:** a tap on Forward, Back, Left or Right is a short move; **holding** one keeps the Rover moving until the
+  finger lifts (leases of 0.4 s renewed while held, through the same obstacle and edge checks; a frozen page stops by
+  itself within one lease). Voice also reads "left", "right" and "spin" alone, like the buttons.
+- **Microphone:** the browser's permission question is not shown inside AR, so the start card has **Enable
+  microphone** (it shows "Microphone on" once allowed). Inside AR, without the permission, the mic button says
+  "Microphone off" and explains instead of asking.
 - **Obstacles** (AR mode, phones with the ARCore Depth API): the phone's depth is read along the twin's forward
-  corridor (60 cm ahead, Rover width, 5–26 cm above the floor). Three frames with hits block forward drives ("Something is
-  in my way (about 30 cm ahead)."); turns and backing up still work; eight clear frames unblock. Without depth a forward
+  corridor (60 cm ahead, Rover width, 5–26 cm above the floor). An obstacle seen there is tracked after three frames
+  ("Obstacle about 30 cm ahead"); the Rover drives on and stops about **5 cm** before it (it starts stopping 0.2 s of
+  travel earlier, so the stop ends at the gap at any speed; between depth frames the odometry counts the distance
+  closed). Then forward is refused; turns and backing up still work; eight clear frames unblock. Without depth a forward
   hit-test ray is used. When the corridor is out of view the chip says so and nothing is blocked. Most phones (a Galaxy
   S24 too) have no depth sensor and estimate depth from motion, which reads a plain floor several per cent short: every
   evaluation calibrates that error on the floor beside and behind the Rover, and a surface counts only when it stands

@@ -15,7 +15,7 @@ import { createDriveLoop, LINK } from "../pilot/drive-loop.js";
 import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
 import { createAiPilot } from "../pilot/ai/ai-pilot.js";
 import { cleanSay } from "../pilot/ai/tools.js";
-import { stepPose, wheelsFromState } from "../pilot/twin-pose.js";
+import { VMAX, stepPose, wheelsFromState } from "../pilot/twin-pose.js";
 import { CHIPS, chipText } from "./chips.js";
 import { createArParser } from "./ar-parse.js";
 import { edgeAhead, isForwardStep, isForwardWheels } from "./obstacle.js";
@@ -23,6 +23,19 @@ import { edgeAhead, isForwardStep, isForwardWheels } from "./obstacle.js";
 export const STATES = { READY: "ready", STARTING: "starting", PLACING: "placing", ARMED: "armed", LATCHED: "latched" };
 export const CAMERA_SENSING = "Obstacle sensing needs Android Chrome AR";
 const MAX_SAY = 500;
+// Obstacles: the Rover drives up to them and stops STOP_GAP_M before (front bumper to the surface). It starts stopping
+// BRAKE_S of travel earlier: the drive loop's stop and the bridge's slew, plus one depth frame of delay.
+export const STOP_GAP_M = 0.05;
+export const BRAKE_S = 0.2;
+export const STOP_TEXT = `I stopped about ${Math.round(STOP_GAP_M * 100)} cm before something in my way. I can turn or back up.`;
+const stopAt = (v) => STOP_GAP_M + Math.max(0, v) * BRAKE_S;
+/** Nearer than this, even a full-speed start would end inside the gap: sensing says "blocked" (and the page's chip turns red). */
+export const NEAR_STOP_M = stopAt(VMAX);
+// Hold-to-drive (a direction chip held down): short leases through the same guarded loop as a plan, renewed while the
+// finger stays down. Release, STOP, an obstacle or the edge end it; a frozen page ends it by itself within one lease.
+export const HOLD_LEASE_MS = 400;
+export const HOLD_RENEW_MS = 150;
+const HOLD_STICK = { forward: [0, 1], back: [0, -1], left: [-0.6, 0], right: [0.6, 0] }; // x = turn (negative = left), y = forward
 const STOP_WORDS = /\b(stop|halt|freeze|brake|abort)\b/i; // anywhere in the sentence: "ok stop" stops at once
 const BLUR_MESSAGE = "AR is paused (something is on top of the camera view), so I stopped moving.";
 const EMPTY_AI = Object.freeze({ state: "idle", running: false, busy: false, messages: [], plan: null, progress: null });
@@ -59,6 +72,8 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   let ai = null;
   let snap = null; // latest drive-loop snapshot
   let obst = null; // latest obstacle tracker result
+  let obstPose = null; // the odometry pose when that result was measured
+  let pressing = null; // hold-to-drive: { dir, timer } while a chip is held down
   let seek = null; // an object-seeking helper with cancel(), set by the page
   let placed = false;
   let ending = false;
@@ -82,13 +97,27 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     pose.z = 0;
     pose.yaw = 0;
   };
-  const isBlocked = () => mode === "xr" && !!obst && obst.state === "blocked";
+  /** Metres from the bumper to the obstacle now: the measured distance minus what the Rover drove since. Infinity: none. */
+  const obstacleAhead = () => {
+    if (mode !== "xr" || !obst || obst.state !== "blocked") return Infinity;
+    const p = obstPose || pose;
+    const driven = (pose.x - p.x) * Math.sin(p.yaw) + (pose.z - p.z) * Math.cos(p.yaw);
+    return obst.nearM - driven;
+  };
+  /** Blocked = too close to drive forward at speed v (m/s): the stop would end nearer than STOP_GAP_M. */
+  const isBlocked = (v = 0) => obstacleAhead() <= stopAt(v);
+  const forwardSpeed = () => {
+    if (!snap || snap.body !== ROVER) return 0;
+    const [l, r] = wheelsFromState(snap.state, ROVER);
+    return ((l + r) / 2000) * VMAX;
+  };
   const edgeText = () => `I'm at the edge of my ${+playRadius.toFixed(2)} m play area.`;
 
   function sensing() {
     if (mode === "camera") return { level: "off", text: CAMERA_SENSING };
     if (!obst) return { level: "off", text: "" };
-    const text = obst.state === "clear" ? "Obstacle sensing: clear" : obst.message || "";
+    if (obst.state === "blocked" && !isBlocked(VMAX)) return { level: "ahead", text: obst.message || "" }; // seen, still room to drive
+    const text = obst.state === "clear" ? "Obstacle sensing: clear" : obst.state === "blocked" ? STOP_TEXT : obst.message || "";
     return { level: obst.state, text };
   }
   function hint() {
@@ -120,7 +149,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         if (prop === "holdFor") {
           return (ms, x = 0, y = 1) => {
             if (y > 0) {
-              if (isBlocked()) return api.hold(obst.message), false;
+              if (isBlocked(y * VMAX)) return api.hold(STOP_TEXT), false;
               if (edgeAhead(pose, playRadius) < 0.01) return api.hold(edgeText()), false;
             }
             return target.holdFor(ms, x, y);
@@ -130,6 +159,22 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         return Reflect.get(target, prop, target);
       },
     });
+  }
+
+  /** Ends hold-to-drive renewals (the wheels are zeroed by whoever called this). */
+  function releaseHold() {
+    if (!pressing) return;
+    clock.clearInterval(pressing.timer);
+    pressing = null;
+  }
+
+  /** Holds a forward move that would end nearer than STOP_GAP_M to the obstacle ahead. */
+  function checkObstacle() {
+    if (state !== STATES.ARMED || !loop || !Number.isFinite(obstacleAhead())) return;
+    const step = ai && ai.running ? (ai.view.progress || {}).step : null;
+    const wheelsFwd = isForwardWheels(loop.snapshot.wheels);
+    if (!wheelsFwd && !isForwardStep(step)) return;
+    if (isBlocked(wheelsFwd ? forwardSpeed() : 0)) api.hold(STOP_TEXT);
   }
 
   function onLoop(s) {
@@ -214,7 +259,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       const mine = createDriveLoop({ transport, clock, onChange: onLoop });
       loop = mine;
       guarded = guard(mine);
-      const arParse = parse || createArParser({ getBlocked: () => (isBlocked() ? { distanceM: obst.distanceM, message: obst.message } : null), getMode: () => mode, extensions });
+      const arParse = parse || createArParser({ getBlocked: () => (isBlocked() ? { distanceM: Math.max(0, obstacleAhead()), message: STOP_TEXT } : null), getMode: () => mode, extensions });
       ai = createAi({ getLoop: () => guarded, getBodyKey: () => "rover", getMode: () => "twin", getModel: () => null, parse: arParse, clock, onChange: () => emit() });
       emit();
       await mine.connect();
@@ -325,8 +370,47 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       );
     },
 
+    /**
+     * Hold-to-drive: "forward" | "back" | "left" | "right" while a chip is held down. ARMED only; it ends a running plan
+     * (you took the controls) and moves in HOLD_LEASE_MS leases through the guarded loop (obstacle stop, play-area edge).
+     * Returns false when it cannot move (not armed, blocked: the reason is shown).
+     */
+    press(dir) {
+      releaseHold();
+      const xy = typeof dir === "string" && Object.hasOwn(HOLD_STICK, dir) ? HOLD_STICK[dir] : null;
+      if (!xy || !guarded || state !== STATES.ARMED) return false;
+      if (ai && ai.running) ai.takeover("You took the controls.");
+      if (seek && typeof seek.cancel === "function") {
+        try {
+          seek.cancel("takeover");
+        } catch {}
+      }
+      notice = "";
+      const lease = () => {
+        if (state === STATES.ARMED && guarded && guarded.holdFor(HOLD_LEASE_MS, xy[0], xy[1])) return true;
+        releaseHold();
+        return false;
+      };
+      if (!lease()) {
+        emit();
+        return false;
+      }
+      pressing = { dir, timer: clock.setInterval(lease, HOLD_RENEW_MS) };
+      emit();
+      return true;
+    },
+
+    /** The finger left the chip: the wheels stop at once. */
+    release() {
+      if (!pressing) return;
+      releaseHold();
+      if (loop) loop.setHeld(false);
+      emit();
+    },
+
     /** STOP, in this order: the AI first (it zeroes the wheels in the same call), then any seeking, then the drive loop. */
     stop(reason = "Stopped by you.") {
+      releaseHold();
       notice = "";
       if (ai) ai.cancel("stop");
       if (seek && typeof seek.cancel === "function") {
@@ -345,20 +429,26 @@ export function createArController({ clock = realTimers, makeTransport = null, v
 
     /** Interrupts the plan and zeroes the wheels, but the Rover STAYS armed (an obstacle, the edge, AR paused). */
     hold(reason) {
+      releaseHold();
       notice = cleanSay(String(reason), 200);
       if (ai) ai.cancel(notice);
       if (loop) loop.setHeld(false);
       emit();
     },
 
-    /** The tracker's latest result. Blocked + moving (or about to move) forward = hold. The camera view has no sensing. */
+    /**
+     * The tracker's latest result. An obstacle ahead lets the Rover drive on until it is STOP_GAP_M away (with the braking
+     * distance at its speed added); then a forward move is held. A blocked result without a distance stops at once. The
+     * camera view has no sensing.
+     */
     obstacle(update) {
       if (mode !== "xr") return;
-      obst = update && typeof update === "object" ? { state: update.state, distanceM: update.distanceM ?? null, message: String(update.message || "") } : null;
-      if (isBlocked() && state === STATES.ARMED && loop) {
-        const step = ai && ai.running ? (ai.view.progress || {}).step : null;
-        if (isForwardWheels(loop.snapshot.wheels) || isForwardStep(step)) api.hold(obst.message);
-      }
+      if (update && typeof update === "object") {
+        const near = Number.isFinite(update.nearM) ? update.nearM : Number.isFinite(update.distanceM) ? update.distanceM : 0;
+        obst = { state: update.state, distanceM: update.distanceM ?? null, nearM: near, message: String(update.message || "") };
+        obstPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
+      } else obst = null;
+      checkObstacle();
       emit();
     },
 
@@ -369,6 +459,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         const [l, r] = wheelsFromState(snap.state, ROVER);
         out.clamped = stepPose(pose, l, r, Math.min(dt, 0.1), { radius: playRadius });
         if (out.clamped) api.hold(edgeText());
+        else checkObstacle(); // between depth frames too: the odometry says how much nearer it is now
       }
       out.x = pose.x;
       out.z = pose.z;
@@ -387,6 +478,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     async ended(reason = "AR closed") {
       if (!loop || ending) return;
       ending = true;
+      releaseHold();
       const l = loop;
       try {
         await api.stop(reason);

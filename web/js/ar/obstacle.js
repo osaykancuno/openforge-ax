@@ -199,7 +199,8 @@ const fin = (v, d) => (typeof v === "number" && Number.isFinite(v) ? v : d);
  * update(x) -> { state: "clear" | "blocked" | "blind" | "off", distanceM, message }.
  * Blocked after ENTER consecutive frames with obstacle; clear again after CLEAR consecutive clear frames (a weak return
  * nearer than where the obstacle appeared + CLEAR_EXTRA is not clear). While blocked, frames that cannot see the corridor
- * change nothing. The distance is the minimum over the last 5 obstacle frames, from the bumper, rounded to 10 cm.
+ * change nothing. distanceM is the minimum over the last 5 obstacle frames, from the bumper, rounded to 10 cm (1 cm under
+ * 20 cm); nearM is the nearest of the last 3 obstacle frames, not rounded: the controller stops the Rover on it.
  */
 export function createObstacleTracker() {
   let blocked = false;
@@ -209,8 +210,9 @@ export function createObstacleTracker() {
   let recent = [];
   const clearResult = () => ({ state: "clear", distanceM: null, message: "" });
   const blockedResult = () => {
-    const d = Math.round(Math.min(...recent) * 10) / 10;
-    return { state: "blocked", distanceM: d, message: `Something is in my way (about ${Math.round(d * 100)} cm ahead).` };
+    const m = Math.min(...recent);
+    const d = m < 0.2 ? Math.round(m * 100) / 100 : Math.round(m * 10) / 10;
+    return { state: "blocked", distanceM: d, nearM: Math.min(...recent.slice(-3)), message: `Something is in my way (about ${Math.round(d * 100)} cm ahead).` };
   };
   const api = {
     update(u) {

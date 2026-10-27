@@ -166,6 +166,26 @@ describe("AR page: css/ar.css", () => {
     for (const m of css.matchAll(/[^{}]*:xr-overlay[^{]*\{/g)) expect(m[0].trim().split(",").length, m[0]).to.equal(1);
   });
 
+  it("the microphone is enabled on the start card, never asked for inside AR (its prompt would be invisible there)", () => {
+    expect(html).to.match(/id="arVoiceBtn"[^>]*>Enable microphone</);
+    expect(html).to.match(/id="arVoiceNote">Voice: tap <b>Enable microphone<\/b> before you start/);
+    expect(arJs).to.match(/navigator\.permissions\.query\(\{ name: "microphone" \}\)/);
+    // in AR, a missing permission is explained, not asked for: listen() is not called
+    const mic = arJs.slice(arJs.indexOf('$("arMic").addEventListener("click"'), arJs.indexOf("controller.listen();"));
+    expect(mic).to.match(/if \(micMissing\(\) && [^)]*\)\) \{[\s\S]*?micNote = MIC_OFF_NOTE;[\s\S]*?return;/);
+    expect(arJs).to.match(/MIC_OFF_NOTE = "Voice needs the microphone, and the browser cannot ask for it inside AR\. Tap Exit, then Enable microphone\."/);
+  });
+
+  it("direction chips: a tap is the short move, a hold drives until the finger lifts, a long press opens no menu", () => {
+    expect(arJs).to.match(/HOLDABLE = new Set\(\["forward", "back", "left", "right"\]\)/);
+    expect(arJs).to.match(/held = controller\.press\(c\.id\)/);
+    expect(arJs).to.match(/for \(const t of \["pointerup", "pointercancel", "lostpointercapture"\]\) b\.addEventListener\(t, lift\)/);
+    expect(arJs).to.match(/if \(held\) controller\.release\(\)/);
+    expect(arJs).to.match(/addEventListener\("contextmenu", \(e\) => e\.preventDefault\(\)\)/);
+    expect(arJs).to.match(/if \(!e\.isTrusted \|\| e\.button > 0\) return;/);
+    expect(css).to.match(/\.ar-chips \.pl-btn \{[^}]*-webkit-touch-callout: none/);
+  });
+
   it("keeps the middle of the screen clear: that is where the floor ring and the Rover are", () => {
     // the HUD is a <section>: the site's 72 px section padding must not apply, and it sits at the bottom of its row
     expect(css).to.match(/\.ar-hud\s*\{[^}]*align-self:\s*end[^}]*padding:\s*0[;\s]/);

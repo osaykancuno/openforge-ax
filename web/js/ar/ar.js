@@ -15,7 +15,7 @@ import { applyTwinState } from "../pilot/twin-pose.js";
 import { createWakeLock } from "../pilot/sensors.js";
 import { $, chip, el } from "../pilot/ui.js";
 import { probeAr } from "./ar-caps.js";
-import { createArController } from "./ar-controller.js";
+import { NEAR_STOP_M, STOP_GAP_M, createArController } from "./ar-controller.js";
 import { CHIPS } from "./chips.js";
 import { CAMERA_VIEW, createArView } from "./ar-view.js";
 import { createSeek } from "./seek.js";
@@ -173,7 +173,7 @@ function pushObstacle() {
   const z = w ? zoneHit(zones, w) : { hit: false };
   if (z.hit && !(u && u.state === "blocked" && Number.isFinite(u.distanceM) && u.distanceM <= z.distanceM)) {
     const d = Math.round(z.distanceM * 10) / 10;
-    u = { state: "blocked", distanceM: d, message: `Something is in my way (about ${Math.round(d * 100)} cm ahead): the ${displayName(z.label)}.` };
+    u = { state: "blocked", distanceM: d, nearM: z.distanceM, message: `Something is in my way (about ${Math.round(d * 100)} cm ahead): the ${displayName(z.label)}.` };
     zoneBlocked = true;
   } else if (zoneBlocked && !z.hit) {
     zoneBlocked = false;
@@ -374,8 +374,12 @@ function obstacleText(u) {
   switch (u.state) {
     case "clear":
       return ["Path clear", "ok"];
-    case "blocked":
-      return [String(u.message || "Something is in my way.").replace(/\.$/, ""), "bad"];
+    case "blocked": {
+      const near = Number.isFinite(u.nearM) ? u.nearM : 0;
+      // seen but still room: the Rover drives on and stops STOP_GAP_M before it
+      if (near > NEAR_STOP_M) return [`Obstacle about ${Math.round((u.distanceM ?? near) * 100)} cm ahead`, "warn"];
+      return [`Stopped ${Math.round(STOP_GAP_M * 100)} cm before an obstacle`, "bad"];
+    }
     case "blind":
       return ["Point the phone at the Rover", "warn"];
     default:
@@ -391,18 +395,52 @@ function showObstacle() {
   const was = lastObstacleTone;
   lastObstacleTone = tone;
   if (!LIVE.has(stateName())) return;
-  if (tone === "bad") announce("Something is in my way. I can turn or back up.", true);
+  if (tone === "bad") announce(`I stopped ${Math.round(STOP_GAP_M * 100)} centimetres before something in my way. I can turn or back up.`, true);
   else if (was === "bad" && tone === "ok") announce("Path clear.");
 }
+
+// The microphone permission. The browser asks with a prompt that is not shown inside AR, so it is asked on the start
+// card (Enable microphone); inside AR the mic button does not ask, it says what to do. "unknown": no Permissions API
+// (Safari): the mic button then just tries.
+let micState = "unknown"; // "granted" | "prompt" | "denied" | "unknown"
+let micNote = "";
+const MIC_OFF_NOTE = "Voice needs the microphone, and the browser cannot ask for it inside AR. Tap Exit, then Enable microphone.";
+async function watchMic() {
+  try {
+    const st = await navigator.permissions.query({ name: "microphone" });
+    micState = st.state;
+    st.onchange = () => {
+      micState = st.state;
+      if (micState === "granted") micNote = "";
+      showMicPermission();
+      showMic();
+    };
+  } catch {} // no Permissions API, or no "microphone" in it
+  showMicPermission();
+  showMic();
+}
+/** The start card's microphone button says where the permission stands. */
+function showMicPermission() {
+  const b = $("arVoiceBtn");
+  if (micState === "granted") {
+    b.textContent = "Microphone on";
+    b.setAttribute("aria-disabled", "true");
+  } else {
+    b.textContent = micState === "denied" ? "Microphone blocked" : "Enable microphone";
+    b.removeAttribute("aria-disabled");
+  }
+}
+const micMissing = () => micState === "prompt" || micState === "denied";
 
 function showMic() {
   const listening = Boolean(model.listening ?? mic.listening);
   const mb = $("arMic");
   mb.setAttribute("aria-pressed", String(listening));
-  setText($("arMicText"), !voice.supported ? "Voice is not available" : listening ? "Listening… tap to stop" : "Tap to talk");
+  setText($("arMicText"), !voice.supported ? "Voice is not available" : listening ? "Listening… tap to stop" : micMissing() ? "Microphone off" : "Tap to talk");
   mb.disabled = !voice.supported || !LIVE.has(stateName());
   const priv = $("arPrivacy");
-  if (model.voiceNote) setText(priv, model.voiceNote);
+  if (micNote) setText(priv, micNote);
+  else if (model.voiceNote) setText(priv, model.voiceNote);
   else if (!voice.supported) setText(priv, "Your browser has no speech recognition. Chrome on Android and Safari on iPhone have it. The quick buttons work everywhere.");
   else setText(priv, "Your browser's speech service hears the mic (Google in Chrome, Apple in Safari).");
 }
@@ -593,14 +631,17 @@ if (view && controller) {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       s.getTracks().forEach((t) => t.stop());
-      b.textContent = "Voice is ready";
-      $("arStartMsg").textContent = "Voice is ready.";
+      micState = "granted";
+      micNote = "";
+      $("arStartMsg").textContent = "Microphone on. Voice is ready.";
+      $("arStartMsg").dataset.tone = "";
     } catch {
-      b.textContent = "Voice was not allowed";
-      b.removeAttribute("aria-disabled");
-      $("arStartMsg").textContent = "Voice was not allowed. You can still use the quick buttons.";
+      micState = "denied";
+      $("arStartMsg").textContent = "The microphone was not allowed. In Chrome: tap the icon left of the address, then Permissions, then Microphone. The buttons work without it.";
+      $("arStartMsg").dataset.tone = "bad";
     }
-    $("arStartMsg").dataset.tone = "";
+    showMicPermission();
+    showMic();
   });
 
   const stop = (why) => controller.stop(why);
@@ -633,17 +674,60 @@ if (view && controller) {
   $("arExit").addEventListener("click", () => view.exit("Closed"));
   $("arPlaceBtn").addEventListener("click", (e) => e.isTrusted && view.placeHere()); // a tap without a pointer: same path, same rules
   $("arMic").addEventListener("click", () => {
+    if (micMissing() && !(model.listening ?? mic.listening)) {
+      // the browser's question would be invisible inside AR: say what to do instead of asking
+      micNote = MIC_OFF_NOTE;
+      showMic();
+      announce(MIC_OFF_NOTE);
+      return;
+    }
+    micNote = "";
     controller.listen(); // starts listening for one sentence, or stops when it already listens
   });
 
+  // A tap is the chip's short move; holding Forward, Back, Left or Right keeps the Rover moving until the finger lifts
+  // (controller.press / release: short leases, the same obstacle and edge guards).
   const chips = $("arChips");
+  const HOLDABLE = new Set(["forward", "back", "left", "right"]);
+  const HOLD_START_MS = 250;
   for (const c of CHIPS) {
-    chips.append(el("button", { class: "pl-btn", type: "button", "data-chip": c.id, text: c.label, onclick: () => controller.chip(c.id) }));
+    const b = el("button", { class: "pl-btn", type: "button", "data-chip": c.id, text: c.label });
+    let timer = null;
+    let held = false; // a hold happened: the click that follows the lift is not a tap
+    b.addEventListener("click", () => {
+      if (held) {
+        held = false;
+        return;
+      }
+      controller.chip(c.id);
+    });
+    if (HOLDABLE.has(c.id)) {
+      const lift = () => {
+        clearTimeout(timer);
+        timer = null;
+        if (held) controller.release();
+      };
+      b.addEventListener("pointerdown", (e) => {
+        if (!e.isTrusted || e.button > 0) return;
+        held = false;
+        try {
+          b.setPointerCapture(e.pointerId);
+        } catch {}
+        timer = setTimeout(() => {
+          timer = null;
+          held = controller.press(c.id);
+        }, HOLD_START_MS);
+      });
+      for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(t, lift);
+      b.addEventListener("contextmenu", (e) => e.preventDefault()); // a long press must not open the phone's menu
+    }
+    chips.append(b);
   }
 }
 
 showCard();
 render();
+if (caps.voice) watchMic();
 
 if (DEBUG && view) {
   // inside the overlay: in AR it is the only part of the page on screen
