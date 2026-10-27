@@ -10,7 +10,7 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 function init(level, seed) {
   const r = prng(seed * 41 + level.length);
   const s = { level, seed, t: 0, liftA: 0, liftB: 0, swing: 0, x: 0, z: 0, heading: 0, scuffs: 0, scuffing: false, hold: 0, done: false, success: false, reason: null, progress: 0, metrics: {} };
-  s.goalZ = level === "step" ? 0.04 : 0.5;
+  s.goalZ = level === "step" ? 0.03 : 0.5; // one natural step (swing 0 → 20°) moves the body 3.5 cm
   if (level === "rotate") s.goal = (r() < 0.5 ? 90 : -90) * RAD;
   return s;
 }
@@ -26,7 +26,9 @@ function step(s, a, dt = DT) {
   if (!downA && !downB) return finish(s, false, "body_dropped");
   const moving = Math.abs(d) > 1e-9;
   const scuff = downA && downB && moving;
-  if (scuff && !s.scuffing) s.scuffs++;
+  // one scuff per drag: a finger pausing on the slider for a moment (< 0.3 s) is still the same scuff
+  if (scuff && !s.scuffing && !(s.t - s.scuffAt < 0.3)) s.scuffs++;
+  if (scuff) s.scuffAt = s.t; // the readout explains it for a while: a scuff itself lasts only as long as the swing
   s.scuffing = scuff;
   if (moving && !scuff) {
     // A grounded: its feet sweep back by +d, the body goes forward. B grounded: B's swing is −d, so the sign flips.
@@ -67,7 +69,7 @@ export const mission = {
   id: "spider",
   dt: DT,
   levels: [
-    { id: "step", title: "One tripod step", goal: "Lift one tripod, swing, put it down: move the body 4 cm forward without dropping it or scuffing more than 4 times.", pass: 60, maxSteps: 40 * 30 },
+    { id: "step", title: "One tripod step", goal: "Lift one tripod, swing, put it down: move the body 3 cm forward without dropping it or scuffing more than 4 times. Start by lifting tripod B.", pass: 60, maxSteps: 40 * 30 },
     { id: "walk", title: "Walk straight 50 cm", goal: "Repeat the tripod cycle: lift B, swing +, lower B, lift A, swing −, lower A …", pass: 60, maxSteps: 90 * 30 },
     { id: "rotate", title: "Rotate in place", goal: "Same cycle, but the swing turns the body: face the marked heading (±8°) with all six feet down.", pass: 60, maxSteps: 60 * 30 },
   ],
@@ -88,6 +90,7 @@ export const mission = {
     const out = [`Tripod A ${st(s.liftA)} · B ${st(s.liftB)}`, `swing ${Math.round(s.swing)}°`, `scuffs ${s.scuffs}`];
     if (s.level === "rotate") out.push(`heading ${Math.round(s.heading / RAD)}° (goal ${Math.round(s.goal / RAD)}°)`);
     else out.push(`${(s.z * 100).toFixed(1)} / ${s.goalZ * 100} cm`);
+    if (s.scuffAt != null && s.t - s.scuffAt < 2.5) out.push("feet scuffing: lift a tripod before you swing"); // why nothing moves
     return out.join(" · ");
   },
   solve(level, seed) {

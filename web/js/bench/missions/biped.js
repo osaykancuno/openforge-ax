@@ -1,9 +1,12 @@
 // Biped balance missions (Replicant small humanoid, AX-1 Walker). Quasi-static lab model: rigid links with point
 // masses, joints slew at 90°/s, and the robot falls when its centre of mass (COM) stays outside the support polygon
-// (the foot or feet on the ground) for more than 0.2 s. No dynamics, no walking: this is the balance lesson only.
+// (the foot or feet on the ground) for more than FALL_S. No dynamics, no walking: this is the balance lesson only.
 import { DT, RAD, prng, clamp, approach, q, num, replay, standardScore, runPolicy, hold } from "./common.js";
 
 const SLEW = 90; // deg/s
+// time the COM may spend outside the feet before the robot falls: long enough for a person moving one slider at a
+// time to see the warning and correct with another (a squat needs a dozen alternating moves of ~10°)
+const FALL_S = 0.8;
 
 /** Geometry → pose → COM and support polygon. Units m, deg. x forward, lat toward the right foot, y up. */
 export function solveBody(g, p) {
@@ -65,27 +68,35 @@ export function makeBipedMission({ id, geometry, name = "robot", arms = false })
     s.t += dt;
     s.out = b.margin < 0 ? s.out + dt : 0;
     s.metrics.marginMm = Math.round(b.margin * 1000);
-    if (s.out > 0.2) return finish(s, false, "fell_over");
+    if (s.out > FALL_S) return finish(s, false, "fell_over");
     const len = b.support.x1 - b.support.x0;
     if (s.level === "lean") {
       const front = (b.com.x - b.support.x0) / len; // 0 = heel, 1 = toe
-      s.metrics.comPct = Math.round(front * 100);
+      s.metrics.comPct = Math.floor(front * 100); // shown rounded toward "not yet": 70 % on screen always passes
       s.progress = Math.max(s.progress, clamp((front - 0.35) / 0.35, 0, 1) * 0.9);
       s.hold = hold(s.hold, front >= 0.7 && b.margin > 0 && !b.lifted, dt);
       if (s.hold >= 1.5) finish(s, true, "leaning");
     } else if (s.level === "squat") {
       const ratio = b.hip.y / b.stand;
-      s.metrics.hipPct = Math.round(ratio * 100);
+      s.metrics.hipPct = Math.ceil(ratio * 100);
       s.progress = Math.max(s.progress, clamp((1 - ratio) / 0.3, 0, 1) * 0.9);
       s.hold = hold(s.hold, ratio <= 0.7 && b.margin > 0 && !b.lifted, dt);
       if (s.hold >= 1) finish(s, true, "squatting");
     } else {
-      s.metrics.liftCm = +(b.footLift * 100).toFixed(1);
+      s.metrics.liftCm = Math.floor(b.footLift * 1000) / 10;
       s.progress = Math.max(s.progress, clamp(b.footLift / 0.03, 0, 1) * 0.6 + clamp(s.pose.shift / 10, 0, 1) * 0.3);
       s.hold = hold(s.hold, b.footLift >= 0.03 && b.margin > 0, dt);
       if (s.hold >= 2) finish(s, true, "one_foot");
     }
     return s;
+  }
+
+  /** The way back over the feet: the side the COM left by, and the slider that moves it back (one with room left). */
+  function tipHint(b, p) {
+    const { com, support: sp } = b;
+    if (com.x < sp.x0) return p.ankle < RANGE.ankle[1] - 2 ? "backward: ankle + (or hip pitch +)" : "backward: hip pitch +";
+    if (com.x > sp.x1) return p.ankle > RANGE.ankle[0] + 2 ? "forward: ankle − (or hip pitch −)" : "forward: hip pitch −";
+    return com.lat > sp.lat1 ? "right: weight shift −" : b.lifted ? "left: weight shift + or lower the left foot" : "left: weight shift +";
   }
 
   function finish(s, ok, reason) {
@@ -129,6 +140,7 @@ export function makeBipedMission({ id, geometry, name = "robot", arms = false })
       if (s.level === "lean") out.push(`COM at ${s.metrics.comPct ?? 0} % of the foot length (goal ≥ 70 %)`);
       if (s.level === "squat") out.push(`hips at ${s.metrics.hipPct ?? 100} % of standing height (goal ≤ 70 %)`);
       if (s.level === "shift") out.push(`left foot ${s.metrics.liftCm ?? 0} cm up (goal ≥ 3)`);
+      if (b.margin < 0) out.unshift(`TIPPING ${tipHint(b, s.pose)}`); // which slider brings it back, first
       return out.join(" · ");
     },
     solve(level, seed) {

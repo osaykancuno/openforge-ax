@@ -320,12 +320,16 @@ export function renderChrome(active) {
   const burger = nav.querySelector(".burger");
   const links = nav.querySelector(".links");
   burger.onclick = () => burger.setAttribute("aria-expanded", String(links.classList.toggle("open")));
+  const fold = () => (links.classList.remove("open"), burger.setAttribute("aria-expanded", "false"));
   links.addEventListener("keydown", (e) => { // Escape closes the folded menu and returns to its button
     if (e.key !== "Escape" || !links.classList.contains("open")) return;
-    links.classList.remove("open");
-    burger.setAttribute("aria-expanded", "false");
+    fold();
     burger.focus();
   });
+  // a picked link folds the menu: an in-page link (#faq) shows what it opened, and Back (the page restored from the
+  // back/forward cache as it left) does not come back to a menu still covering the page
+  links.addEventListener("click", (e) => e.target.closest("a") && fold());
+  addEventListener("pageshow", fold);
   nav.querySelector("#mintNav").before(soundsButton(), musicButton(), themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
   const btn = nav.querySelector("#connectBtn");
   btn.onclick = () => connect();

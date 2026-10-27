@@ -352,10 +352,19 @@ export function createMissionRunner({ robotId, view = null, scenes = null, getRi
     for (const id of Object.keys(ui.held || {})) ui.held[id] = false;
     controls.querySelectorAll("[data-held].down").forEach((b) => b.classList.remove("down"));
   }
-  // disabled controls ignore input (aria-disabled keeps them focusable and readable)
+  // disabled controls ignore input (aria-disabled keeps them focusable and readable); the visitor sees why, not only
+  // a screen reader: a tap on a robot control before Start used to do nothing at all on screen
   function onClickGuard(e) {
     const b = e.target.closest?.("button[aria-disabled=true]");
-    if (b && controls.contains(b)) e.stopImmediatePropagation(), e.preventDefault(), speak("Press Start first.");
+    if (!b || !controls.contains(b)) return;
+    e.stopImmediatePropagation(), e.preventDefault();
+    speak("Press Start first.");
+    if (session?.done) return void (start.classList.remove("nudge"), void start.offsetWidth, start.classList.add("nudge"));
+    result.textContent = "Press Start first: the controls drive the robot during a run.";
+    result.className = "bn-result";
+    start.classList.remove("nudge");
+    void start.offsetWidth; // restart the animation on every tap
+    start.classList.add("nudge");
   }
   document.addEventListener("keydown", onKeyDown);
   document.addEventListener("keyup", onKeyUp);
@@ -384,6 +393,7 @@ export function createMissionRunner({ robotId, view = null, scenes = null, getRi
     if (view) previewTest(selLevel), renderControls(lv, state, demo);
     const script = demo ? m.solve(lv.id, seed) : null;
     session = { lv, state, actions: [], acc: 0, done: false, demo, script, last: null, lastRead: 0, seed };
+    start.classList.remove("nudge");
     start.textContent = demo ? "Stop demo" : "Stop";
     result.textContent = demo ? "Demo: the scripted solution (not counted)." : "";
     result.className = "bn-result";

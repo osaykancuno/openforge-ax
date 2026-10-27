@@ -48,10 +48,10 @@ function perimDist(s, x, y) {
 
 function step(s, a, dt = DT) {
   if (s.done) return s;
-  s.msg = "";
+  if (s.t - (s.msgAt ?? -9) > 2.5) s.msg = ""; // a refusal stays on screen long enough to read
   const home = a?.home;
   if (home && !s.homing) {
-    if (home === "z" && !(s.homed.x && s.homed.y)) s.msg = "Home X and Y first: Z homes at the bed centre.";
+    if (home === "z" && !(s.homed.x && s.homed.y)) (s.msg = "Home X and Y first: Z homes at the bed centre."), (s.msgAt = s.t);
     else if (["x", "y", "z"].includes(home)) s.homing = home;
   }
   if (a?.gotoZ && s.homed.z && !s.homing) s.z = 0.2; // G1 Z0.2 (nominal first-layer height)
@@ -75,7 +75,7 @@ function step(s, a, dt = DT) {
     }
   } else {
     const jx = num(a?.jx, -1, 1, 0), jy = num(a?.jy, -1, 1, 0), jz = num(a?.jz, -1, 1, 0);
-    if ((jx && !s.homed.x) || (jy && !s.homed.y) || (jz && !s.homed.z)) s.msg = "Must home axis first.";
+    if ((jx && !s.homed.x) || (jy && !s.homed.y) || (jz && !s.homed.z)) (s.msg = "Must home axis first."), (s.msgAt = s.t);
     if (s.homed.x) s.x = clamp(s.x + jx * XY_SPEED * dt, 0, BED);
     if (s.homed.y) s.y = clamp(s.y + jy * XY_SPEED * dt, 0, BED);
     if (s.homed.z) s.z = clamp(s.z + jz * Z_SPEED * dt, -1, 200);

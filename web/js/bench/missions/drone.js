@@ -126,18 +126,23 @@ export const mission = {
     { id: "yaw", title: "Yaw 90°", goal: "Turn to the marked heading (±5°) using only the CW/CCW speed difference, and stay in the air.", pass: 60, maxSteps: 40 * 30 },
     { id: "ring", title: "Fly through the ring", goal: "Turn, tilt and climb so the drone passes through the ring from the near side.", pass: 60, maxSteps: 60 * 30 },
   ],
+  // Hover teaches the raw throttle. Yaw and ring fly with altitude hold, like most camera drones: the slider asks for a
+  // climb speed and the flight controller sets the throttle (raw throttle there sent people to the ceiling in 2 s).
   controls: [
-    { type: "slider", id: "thr", label: "Throttle", min: 0, max: 100, step: 0.5, unit: "%", keys: { dec: "s", inc: "w" } },
+    { type: "slider", id: "thr", levels: ["hover"], label: "Throttle", min: 0, max: 100, step: 0.5, unit: "%", keys: { dec: "s", inc: "w" } },
+    { type: "slider", id: "climb", levels: ["yaw", "ring"], label: "Climb speed (altitude hold)", min: -0.6, max: 0.6, step: 0.05, unit: "m/s", value: 0, keys: { dec: "s", inc: "w" }, keyStep: 0.1 },
     { type: "pad", id: "stick", label: "Stick", buttons: [
       { id: "yawL", label: "Yaw left", key: "q" }, { id: "fwd", label: "Forward", key: "ArrowUp" }, { id: "yawR", label: "Yaw right", key: "e" },
       { id: "left", label: "Left", key: "ArrowLeft" }, { id: "back", label: "Back", key: "ArrowDown" }, { id: "right", label: "Right", key: "ArrowRight" },
     ] },
   ],
-  uiDefaults: (s) => ({ thr: q(s.level === "hover" ? 0 : s.hoverThr * 100, 1) }),
-  toAction(ui) {
+  uiDefaults: (s) => (s.level === "hover" ? { thr: 0 } : { climb: 0 }),
+  toAction(ui, s) {
     const h = ui.held || {};
+    // altitude hold: a speed loop around the hover throttle (the recorded action is still a plain throttle)
+    const held = s && s.level !== "hover" ? clamp(s.hoverThr + 0.3 * ((ui.climb ?? 0) - s.vy), 0, 1) : null;
     return {
-      thr: q((ui.thr ?? 0) / 100),
+      thr: q(held ?? (ui.thr ?? 0) / 100),
       yaw: (h.yawL ? 1 : 0) - (h.yawR ? 1 : 0),
       pitch: q(((h.fwd ? 1 : 0) - (h.back ? 1 : 0)) * 0.6),
       roll: q(((h.right ? 1 : 0) - (h.left ? 1 : 0)) * 0.6),

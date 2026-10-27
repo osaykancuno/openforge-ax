@@ -259,11 +259,14 @@ const fromHash = () => {
 };
 addEventListener("hashchange", fromHash);
 fromHash();
-// coming back with the browser's Back button restores a clean, running lab
+// coming back with the browser's Back button restores a clean, running lab: the page comes back from the
+// back/forward cache exactly as it left, camera still flown into the station, so put the whole ring back in view
 addEventListener("pageshow", () => {
   navigating = false;
   $("fade").classList.remove("on");
   status("");
+  view?.hover(null); // a tap on a phone sends mouseenter but never mouseleave: drop the lifted station
+  if (!open) view?.reset(0);
   view?.resume();
 });
 

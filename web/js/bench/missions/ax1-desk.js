@@ -23,7 +23,9 @@ export function pointOf(j) {
 function init(level, seed) {
   const r = prng(seed * 71 + level.length);
   const s = { level, seed, t: 0, j: { torso: 0, pan: 0, tilt: 0, rsh: 0, rel: 20, lsh: 0, lel: 20 }, hold: 0, done: false, success: false, reason: null, progress: 0, metrics: {} };
-  if (level === "look") s.target = { az: Math.round(-80 + r() * 160), el: Math.round(-10 + r() * 35) };
+  // never a target the head already looks at: that layout passed with no input at all
+  if (level === "look") do s.target = { az: Math.round(-80 + r() * 160), el: Math.round(-10 + r() * 35) };
+  while (angleBetween(gazeOf(s.j), s.target) < 20);
   if (level === "wave") (s.swings = 0), (s.elbowSide = "low");
   if (level === "point") {
     const azs = [-70, 0, 70].map((a) => a + Math.round((r() - 0.5) * 30));

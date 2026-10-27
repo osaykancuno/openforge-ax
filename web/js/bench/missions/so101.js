@@ -33,6 +33,20 @@ function init(level, seed) {
   return s;
 }
 
+/** The farthest reachable point on the straight line from a reachable tip toward `to` (bisection), as joint angles. */
+function reachToward(from, to, roll, grip) {
+  let best = ik(from, roll, grip);
+  if (!best) return null;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 12; i++) {
+    const k = (lo + hi) / 2;
+    const j = ik({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, z: from.z + (to.z - from.z) * k }, roll, grip);
+    if (j) (best = j), (lo = k);
+    else hi = k;
+  }
+  return best;
+}
+
 /** Height a falling cube lands at: on top of another resting cube if mostly over it, else the table. */
 function supportZ(s, i) {
   const c = s.cubes[i];
@@ -143,10 +157,14 @@ export const mission = {
     const { tip } = fk(s.joints);
     return { tx: q(tip.x * 100, 1), ty: q(-tip.y * 100, 1), tz: q(tip.z * 100, 1), j0: s.joints[0], j1: s.joints[1], j2: s.joints[2], j3: s.joints[3], j4: s.joints[4], grip: s.joints[5] };
   },
-  /** UI values → joint targets. Returns null when the IK target is out of reach (the UI keeps the last command). */
-  toAction(ui) {
+  /**
+   * UI values → joint targets. A tip out of reach (about a third of the slider box) goes as far as the arm can along the
+   * way there, so the arm always follows the sliders; null only when even the current tip has no IK solution.
+   */
+  toAction(ui, s) {
     if (ui.mode === "joints") return [ui.j0, ui.j1, ui.j2, ui.j3, ui.j4, ui.grip].map((v) => q(v, 1));
-    const j = ik({ x: ui.tx / 100, y: -ui.ty / 100, z: ui.tz / 100 }, ui.j4 ?? 0, ui.grip);
+    const want = { x: ui.tx / 100, y: -ui.ty / 100, z: ui.tz / 100 };
+    const j = ik(want, ui.j4 ?? 0, ui.grip) ?? (s ? reachToward(fk(s.joints).tip, want, ui.j4 ?? 0, ui.grip) : null);
     return j ? j.map((v) => q(v, 1)) : null;
   },
   init,

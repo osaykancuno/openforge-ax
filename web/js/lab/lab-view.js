@@ -233,7 +233,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     const dir = p.clone().setY(0).normalize();
     moveTo(p.clone().add(dir.multiplyScalar(4.4)).add(new THREE.Vector3(0, 2.6, 0)), p.clone().add(new THREE.Vector3(0, it.top * 0.55, 0)));
   }
-  const reset = () => moveTo(home.pos.clone(), home.look.clone());
+  const reset = (ms) => moveTo(home.pos.clone(), home.look.clone(), ms); // ms 0: snap back, no fly-out
 
   // ---------------------------------------------------------------- input
   const ray = new THREE.Raycaster();
