@@ -3,7 +3,7 @@
 // Two kinds of run: the Synth Arm "Energy Cell" (arm-sim) and the lab trials of every Workbench robot (/lab/*).
 //   node scripts/proving-server.mjs            (reads web/deployment.json; env overrides below)
 // Env: DEPLOYMENT_FILE (default web/deployment.json), SIM_ATTESTER_KEY, PROVING_RPC_URL, PORT=8787, FLUSH_SECONDS=60, PUBLIC_URL, ALLOWED_ORIGIN, DATA_DIR, ADMIN_TOKEN,
-//      TRUST_PROXY=true behind a TLS proxy. Outside the local chain ALLOWED_ORIGIN is required, and attesting needs an
+//      TRUST_PROXY=true behind a TLS proxy, OPENSEA_API_KEY (+ OPENSEA_SLUG, default from openseaDropUrl) for GET /market. Outside the local chain ALLOWED_ORIGIN is required, and attesting needs an
 //      https PUBLIC_URL (it is written on-chain in every batch).
 // Without SIM_ATTESTER_KEY (outside the local chain) it runs in verify-only mode: missions, verification, storage
 // and leaderboard all work; on-chain attestation needs an address with the isSimAttester role.
@@ -17,6 +17,8 @@ import { Contract, JsonRpcProvider, Wallet, getAddress, hexlify, keccak256, toUt
 import { readFile } from "node:fs/promises";
 import { ownerVerifier, netOf } from "./lib/signatures.mjs";
 import { hostAllowed, hostsOf, isLoopbackHost } from "./world/core.mjs";
+import { createMarketProxy } from "./lib/market-proxy.mjs";
+import { slugOf } from "../web/js/market/market-data.js";
 import { createTrials } from "./lib/trials.mjs";
 import { replay, score, validateActions, SIM_ID, MISSION, FPS } from "../web/js/sim/arm-sim.js";
 import { FORMAT, buildEpisode, canonicalize, runTypedData } from "../web/js/sim/episode.js";
@@ -63,6 +65,8 @@ const provider = new JsonRpcProvider(rpcUrl, dep.chainId, { staticNetwork: true 
 const realChainId = Number((await provider.getNetwork()).chainId);
 if (realChainId !== dep.chainId) throw new Error(`RPC chain ${realChainId} != deployment chain ${dep.chainId}`);
 for (const d of ["episodes", "results", "batches"]) mkdirSync(join(DATA, d), { recursive: true });
+// the Market page's floor price and listing figures: OpenSea's stats, with the key kept here (optional)
+const market = createMarketProxy({ apiKey: env.OPENSEA_API_KEY || "", slug: env.OPENSEA_SLUG || slugOf(dep.openseaDropUrl) });
 
 // before the collection is deployed the server runs pilot trials only (pre-mint ranking, nothing on-chain)
 const TRIALS_ONLY = !/^0x[0-9a-fA-F]{40}$/.test(dep.agents || "") || /^0x0{40}$/.test(dep.agents);
@@ -549,6 +553,11 @@ const server = createServer(async (req, res) => {
     if (req.method === "OPTIONS") return json(res, 204, {});
     if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true, sim: SIM_ID, labSim: LAB_SIM_ID, chainId: dep.chainId, attesting: Boolean(attester), trialsOnly: TRIALS_ONLY, pending: pending.length });
     if (req.method === "GET" && url.pathname === "/stats") return json(res, 200, stats(), { "cache-control": "public, max-age=60" });
+    if (req.method === "GET" && url.pathname === "/market") {
+      if (rateLimited(`market:${clientIp(req)}`, 60, 60)) return fail(res, 429, "too many requests");
+      const { status, body } = await market.get();
+      return json(res, status, body, status === 200 ? { "cache-control": "public, max-age=60" } : {});
+    }
     // pilot trials (pre-mint ranking, any wallet)
     if (req.method === "GET" && url.pathname === "/trial/challenge") return json(res, ...trials.challenge(clientIp(req), url.searchParams.get("wallet")));
     if (req.method === "POST" && url.pathname === "/trial/episodes") {

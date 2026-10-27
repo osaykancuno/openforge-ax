@@ -130,6 +130,7 @@ async function main() {
     renderer: await renderer.getAddress(),
     reputation: await rep.getAddress(),
     accountImplementation: await impl.getAddress(),
+    seaDrop: SEADROP,
     fromBlock: deployBlock,
     ...(env.PROVING_API ? { provingApi: env.PROVING_API } : {}),
     ...(env.WORLD_WS ? { worldWs: env.WORLD_WS } : {}),

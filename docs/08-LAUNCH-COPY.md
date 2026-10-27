@@ -1,5 +1,7 @@
 # Launch copy (ready to paste)
 
+> Superseded for the launch by [17-LAUNCH-PLAN.md](17-LAUNCH-PLAN.md) (positioning, calendar, assets) and [18-FEASIBILITY.md](18-FEASIBILITY.md). Rule: no component prices in public copy.
+
 Voice and rules: `docs/14-AX1-BRAND.md`. Never promise returns; never call a body "working" before it is filmed on real hardware.
 Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 
@@ -38,10 +40,10 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 
 ## Pinned thread (8 posts)
 
-1. A $10,000 robot is impressive. We wanted to know how far a phone and about $100 of parts get you. Meet AX-1: open, CC0, phone-brained. 🧵 [hero video]
+1. A robot needs a brain with senses, power and a connection. You already carry one. Meet AX-1: open, CC0, phone-brained. 🧵 [hero video]
 2. A smartphone is already a camera, a motion sensor, a computer and a Bluetooth radio. So the phone is AX-1's head. A small ESP32 board drives the motors and servos.
 3. Credit where it's due: the phone-as-robot-brain idea comes from research like UCLA's PhoneBot and the OpenBot project. AX-1 is our own design, with our own open files.
-4. One brain, three bodies: Rover (~$100–115 without the phone), Desk (~$150–170) and Walker (~$250–270, a long-term community build). Only what is built gets called built.
+4. One brain, three bodies: Rover (wheels and a head), Desk (a neck and two arms) and Walker (a long-term community build). Only what is built gets called built.
 5. Honest status: the firmware is experimental and untested on hardware until our first build. Until then, drive AX-1's 3D twin in your browser. [clip, labelled TWIN]
 6. iPhone note: Safari has no Web Bluetooth, so iPhones drive the twin. Android Chrome and desktop Chrome can pair with a real robot.
 7. The lab is free, no wallet needed: Workbench (take 11 robots apart in 3D), missions with levels, the Codex, the Phone Brain app. [link]
@@ -62,7 +64,7 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 
 > Meet AX-1: a robot with a phone for a brain.
 >
-> OpenForge Lab is open: take robots apart in 3D, play their missions in the browser, and follow the open build of AX-1, from about $100 in parts plus the phone you already have.
+> OpenForge Lab is open: take robots apart in 3D, play their missions in the browser, and follow the open build of AX-1, a robot whose brain is the phone you already have.
 >
 > 1,024 OpenForge agents on Ethereum are the lab's members and its on-chain record. Allowlist 0.01 ETH · public 0.015 ETH · max 3 per wallet · CC0. No promise of returns.
 > Mint only on OpenSea: [link]

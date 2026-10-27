@@ -424,6 +424,8 @@ body.still .lab-label, body.still .lab-label span, body.still .lab-fade { transi
 #panelClose { min-width: 40px; min-height: 40px; }
 .lab-panel-body:focus-visible { outline-offset: -2px; }
 .lab-panel-body h4 { font: 700 14px var(--display); margin: 6px 0 8px; }
+.lab-panel-body .tag { margin-right: 6px; padding: 1px 7px; font-size: 10px; color: var(--accent-ink); vertical-align: 1px; white-space: nowrap; }
+.lab-panel-body h4[id] { margin-top: 18px; font-size: 16px; }
 @media (max-width: 760px) {
   /* a compact HUD (about a third of the screen) leaves the ring the room it needs; home.js falls back to the list
      when large text still leaves too little */
@@ -510,14 +512,26 @@ body.no-gl.lab-list .lab-stations { grid-template-columns: repeat(auto-fit, minm
 .codex-count { font: 600 12px var(--mono); color: var(--muted); min-width: 3.2em; text-align: center; }
 .codex-nav .btn[aria-disabled="true"], .codex-try .btn[aria-disabled="true"] { opacity: .4; cursor: default; }
 .codex-page.turning { opacity: .75; }
+.codex-page.on-paper.turning { opacity: 0; transition: opacity .18s; } /* the text leaves with the turning leaf */
+.codex-page.on-paper { overflow: hidden; } /* printed paper never scrolls: codex.js fits the text to the page */
+/* the reading lens (codex.js): a round loupe over the printed page, twice as large; clicks pass through to the page */
+.codex-lens { position: fixed; left: 0; top: 0; z-index: 40; width: 240px; height: 240px; border-radius: 50%; overflow: hidden; pointer-events: none;
+  background: #fbf8f2; box-shadow: 0 0 0 2px #23211e, 0 0 0 7px rgba(251, 248, 242, .9), 0 0 0 8px rgba(35, 33, 30, .25), 0 22px 44px -14px rgba(0, 0, 0, .5); will-change: transform; }
+.codex-lens::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 1.5px solid #b4472f; border-radius: 50%; } /* the click point */
+.codex-lens-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.codex-lens .codex-page { transition: none; opacity: 1; }
+body.codex-lensing .codex-page.on-paper, body.codex-lensing .codex-page.on-paper * { cursor: none; }
 .codex-page.on-paper {
   /* the text is printed on the book's left page: real paper, so the paper palette in both themes */
   --ink: #23211e; --ink-2: #3d3a35; --muted: #6b655c; --line: #d8cfbf; --line-2: #c6bba8; --card: #fbf8f2; --paper: #f4efe6;
   --accent-ink: #9e3d28; --control: #857c6e; --focus: #b4472f;
-  color-scheme: light; scrollbar-color: #c6bba8 transparent; /* a pencil-thin, paper-coloured scrollbar */
+  color-scheme: light;
   color: var(--ink); background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 6px 8px; backface-visibility: hidden;
 }
-.codex-page.on-paper .btn { background: transparent; color: var(--ink); border-color: var(--ink); }
+.codex-page.on-paper .btn { background: transparent; color: var(--ink); border-color: var(--ink); font-size: calc(13px * var(--fit, 1)); min-height: calc(36px * var(--fit, 1)); padding: calc(6px * var(--fit, 1)) calc(13px * var(--fit, 1)); }
+.codex-page.on-paper .codex-status:empty { min-height: 0; margin: 0; } /* no reserved line on paper: room for the text */
+.codex-page.on-paper .codex-try-label, .codex-page.on-paper .kicker { font-size: calc(11px * var(--fit, 1)); }
+.codex-page.on-paper .codex-try .row, .codex-page.on-paper .codex-end { gap: calc(8px * var(--fit, 1)); }
 .codex-page.on-paper .btn:hover { background: var(--ink); color: var(--paper); }
 .codex-page.on-paper .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .codex-back { position: absolute; z-index: 25; left: 16px; top: 76px; }
@@ -594,3 +608,56 @@ html:has(body.app) { scroll-padding-top: 0; } /* the nav no longer sticks over t
 /* app pages use wide screens: content up to 1640 px (nav and footer follow, so the edges line up) */
 body.app .wrap { width: min(1640px, 100% - 40px); }
 body.app > main.legal { padding-inline: max(20px, calc((100% - 1180px) / 2)) !important; } /* long text keeps a readable measure */
+
+/* ---------- Market (market.html): the collection in numbers */
+.mk-head .mk-cta { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; align-self: center; }
+.mk-body { padding: 4px 4px 12px 0; }
+.mk section:not(.panel) { padding: 0; border-bottom: 0; } /* not the marketing-page section rhythm */
+.mk-kpis { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.mk-kpis li { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; min-width: 0; }
+.mk-kpis small { display: block; color: var(--muted); font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .1em; }
+.mk-kpis b { display: block; margin: 4px 0 2px; font: 750 21px/1.15 var(--display); color: var(--ink); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.mk-kpis span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.mk-kpis[aria-busy="true"] b { opacity: .45; }
+.mk-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
+.mk-grid .panel { margin-top: 14px; }
+.mk-side { display: grid; gap: 0; min-width: 0; }
+.mk-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.mk-panel-head h2 { margin: 0; }
+.mk-filter { display: flex; gap: 6px; }
+.mk-list { margin-top: 12px; overflow-x: auto; }
+.mk-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mk-table th { text-align: left; color: var(--muted); font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .1em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.mk-table td { padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.mk-table tr:last-child td { border-bottom: 0; }
+.mk-table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+.mk-table .mono, .mk-top .mono { font-family: var(--mono); font-size: 12px; }
+.mk-table a, .mk-rarest a { color: var(--accent-ink); }
+.mk-kind { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line-2); font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.mk-kind.k-sale { border-color: var(--sage); color: var(--ink); background: color-mix(in srgb, var(--sage) 16%, transparent); }
+.mk-kind.k-mint { border-color: var(--sun); }
+.mk-foot { margin: 10px 0 0; }
+.mk-bars, .mk-rarest, .mk-top, .mk-buckets { list-style: none; margin: 8px 0 0; padding: 0; }
+.mk-bars li { display: grid; grid-template-columns: minmax(92px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+.mk-bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-bar { height: 8px; border-radius: 999px; background: var(--paper-2); overflow: hidden; }
+.mk-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.mk-bar-v { font: 600 11.5px var(--mono); color: var(--ink-2); white-space: nowrap; }
+.mk-grid h3 { margin: 16px 0 4px; font-size: 14px; }
+.mk-rarest li, .mk-top li { padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+.mk-rarest li:last-child, .mk-top li:last-child { border-bottom: 0; }
+.mk-rank { display: inline-block; min-width: 2.6em; font: 650 12px var(--mono); color: var(--accent-ink); }
+.mk-buckets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mk-buckets li { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; }
+.mk-buckets b { display: block; font: 750 18px var(--display); }
+.mk-buckets span { display: block; font-size: 12px; color: var(--ink-2); }
+.mk-buckets small { color: var(--muted); font: 600 11px var(--mono); }
+.mk-disclaimer { margin: 16px 0 0; max-width: 100ch; }
+@media (max-width: 960px) { .mk-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .mk-head .mk-cta { margin-left: 0; width: 100%; }
+  .mk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mk-kpis li { padding: 10px 12px; }
+  .mk-kpis b { font-size: 18px; }
+  .mk-table th:nth-child(4), .mk-table td:nth-child(4) { display: none; } /* phones: agent, event, price, when */
+}

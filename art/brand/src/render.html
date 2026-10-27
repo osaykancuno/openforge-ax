@@ -100,13 +100,13 @@ const builders = {
   lockup() { // 1200 × 300
     art.style.cssText = "width:1200px;height:300px";
     el(markSVG({ size: 220, bg: null }), "left:40px;top:40px");
-    el(`<div class="word">OpenForge <b>AX</b></div><div class="fig" style="margin-top:14px">A phone for a brain. Open for everything else.</div>`, "left:290px;top:92px");
+    el(`<div class="word">OpenForge <b>AX</b></div><div class="fig" style="margin-top:14px">Your phone is the brain. Open for everything else.</div>`, "left:290px;top:92px");
   },
   featured() { // 600 × 400
     art.style.cssText = "width:600px;height:400px";
     art.classList.add("grid");
     scene3d({ x: -10, y: 20, w: 360, h: 370, items: [{ id: "ax1-rover", rotY: -0.65, pose: { head_pan: 18, head_tilt: -8 }, look: [0.6, -0.1] }], elev: 0.45 });
-    el(`<div class="fig">FIG. 01 · <b>AX-1</b></div><h1 class="h" style="font-size:38px;margin:12px 0 12px">A phone<br>for a brain.</h1><p class="p" style="font-size:14.5px">Open for everything else.</p>`, "left:340px;top:96px;width:240px");
+    el(`<div class="fig">FIG. 01 · <b>AX-1</b></div><h1 class="h" style="font-size:38px;margin:12px 0 12px">Your phone<br><em>is the brain.</em></h1><p class="p" style="font-size:14.5px">An open robotics lab. CC0.</p>`, "left:340px;top:96px;width:240px");
     el(`<div class="fig">1,024 agents · CC0</div>`, "left:340px;bottom:40px");
   },
   banner() { // 1400 × 350, key content inside the central 700 px
@@ -121,7 +121,7 @@ const builders = {
       ],
     });
     void camera; void canvas;
-    const labels = [["Rover", "~$100–115"], ["Desk", "~$150–170"], ["Walker", "roadmap"]];
+    const labels = [["Rover", "wheels + head"], ["Desk", "neck + two arms"], ["Walker", "roadmap"]];
     [497, 700, 903].forEach((x, i) => el(`<div class="lbl" style="left:${x}px;top:290px">${labels[i][0]}<span>${labels[i][1]}</span></div>`));
     el(`<div class="fig">FIG. 01 · <b>AX-1</b> · three bodies, one phone brain</div>`, "left:360px;top:22px");
     el(`<div class="word" style="font-size:40px">OpenForge <b>AX</b></div>`, "left:48px;top:150px");
@@ -146,7 +146,7 @@ const builders = {
         { id: "ax1-walker", x: 0.34, rotY: -0.5, look: [-0.5, 0] },
       ],
     });
-    el(`<div class="fig">FIG. 01 · <b>AX-1</b></div><h1 class="h" style="font-size:60px;margin-top:14px">A phone for a brain.<br><em>Open for everything else.</em></h1>`, "left:300px;top:150px;width:520px");
+    el(`<div class="fig">FIG. 01 · <b>AX-1</b></div><h1 class="h" style="font-size:60px;margin-top:14px">Your phone<br><em>is the brain.</em></h1><div class="fig" style="margin-top:16px">An open robotics lab · CC0</div>`, "left:300px;top:150px;width:520px");
   },
 };
 

@@ -14,6 +14,7 @@ import { GESTURES, POSES } from "./motions.js";
 import { createAiPilot } from "./ai/ai-pilot.js";
 import { loadConfig, renderChrome } from "../chain.js";
 import { mountAiPanel } from "./ai/ai-panel.js";
+import { createVoiceInput } from "./ai/voice.js";
 
 const caps = capabilities();
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -535,6 +536,27 @@ function init() {
   wireSafety();
   ai = createAiPilot({ getLoop: () => loop, getBodyKey: () => bodyKey, getMode: () => mode, clock: realTimers, getModel: () => aiClient, onChange: (v) => aiPanel && aiPanel.render(v) });
   aiPanel = mountAiPanel({ ai, storage: safeStorage(), setModel: (client) => (aiClient = client), origin: location.origin });
+  // voice: one spoken request becomes the same text request as the box (same plan card, same safety rules)
+  const voice = createVoiceInput({ lang: navigator.language || "en-US" });
+  if (voice.supported) {
+    const mic = $("aiVoice");
+    mic.hidden = false;
+    $("aiVoiceNote").hidden = false;
+    mic.addEventListener("click", () => {
+      if (voice.listening) return voice.stop();
+      voice.start(
+        (text) => {
+          $("aiInput").value = text;
+          $("aiForm").requestSubmit();
+        },
+        (state) => {
+          mic.setAttribute("aria-pressed", String(state === "listening"));
+          mic.textContent = state === "listening" ? "Listening…" : "Speak";
+          if (state.startsWith("error:")) $("aiStatus").textContent = state === "error:not-allowed" ? "Microphone blocked: allow it in the browser to speak a request." : "Voice did not catch that. Try again, or type it.";
+        }
+      );
+    });
+  }
   $("startTwin").addEventListener("click", () => start(false));
   $("startRobot").addEventListener("click", () => start(true));
   $("linkBtn").addEventListener("click", onConnect);

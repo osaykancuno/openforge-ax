@@ -1,4 +1,3 @@
-import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome, connect, onWallet, ownedBy, tokenMeta, ipfs, attr, isDeployed, esc } from "./chain.js";
 
 await loadConfig();
@@ -27,7 +26,7 @@ async function show(s) {
     return;
   }
   if (!ids.length) {
-    state.innerHTML = `<p>This wallet has no agents yet. The lab works without one.</p><a class="btn primary magenta" href="${CONFIG.openseaDropUrl}" target="_blank" rel="noopener">Mint on OpenSea</a>`;
+    state.innerHTML = `<p>This wallet has no agents yet. The lab works without one.</p><a class="btn primary magenta" href="market.html">See the market</a>`;
     return;
   }
   state.style.display = "none";

@@ -19,7 +19,6 @@
 <!--preload-->
 <link rel="modulepreload" href="js/home.js">
 <link rel="modulepreload" href="js/lab/lab-view.js">
-<link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/traits-data.js">
 <link rel="modulepreload" href="vendor/three/three.module.min.js">
@@ -28,6 +27,7 @@
 <link rel="modulepreload" href="js/theme.js">
 <link rel="modulepreload" href="js/ambient.js">
 <link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
@@ -51,7 +51,7 @@
   <div class="lab-hud">
     <div class="kicker">FIG. 00 · <b>OpenForge Lab</b> · CC0</div>
     <h1>Build a robot.<br><em>Your phone is the brain.</em></h1>
-    <p class="lead">Meet <b>AX-1</b>. Learn how robots work in 3D, test them in your browser, then build one for about $100 in parts, plus the phone you already own. Free, open source, no wallet or sign-up.</p>
+    <p class="lead">Meet <b>AX-1</b>. Learn how robots work in 3D, test them in your browser, then build one with open parts and the phone you already own. Free, open source, no wallet or sign-up.</p>
     <ol class="lab-steps" aria-label="How the lab works"><li>Learn</li><li>Test</li><li>Build</li><li>Pilot</li></ol>
     <div class="cta"><a class="btn primary" href="pilot.html">Try the Phone Brain</a><a class="btn" href="bench.html">Open the Workbench</a><button class="btn ghost" data-open="lore" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">What is an agent (NFT)?</button><button class="btn ghost" data-open="guide" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">FAQ</button></div>
     <p class="lead small" style="font-size:13px;margin:12px 0 0">Optional: 1,024 NFT agents are the lab's membership and logbook. The lab works without one.</p>
@@ -80,7 +80,7 @@
         <ol class="steps">
           <li><b>Learn.</b> Open the <a href="bench.html">Workbench</a>: every robot explained in clickable 3D stages. Take it apart, see its sensors and its brain.</li>
           <li><b>Test.</b> Play each robot's missions in the browser. Three levels each, scored by an honest lab sim.</li>
-          <li><b>Build.</b> Pick an AX-1 body: Rover (about $100–115), Desk (about $150–170) or Walker (a community build). Parts list, wiring and firmware are all open.</li>
+          <li><b>Build.</b> Pick an AX-1 body: Rover (wheels and a head), Desk (a neck and two arms) or Walker (a community build). Parts list, wiring and firmware are all open.</li>
           <li><b>Pilot.</b> Open the <a href="pilot.html">Phone Brain</a> on your phone. No robot yet? It drives AX-1's 3D twin.</li>
         </ol>
         <div class="kicker">FIG. 02 · <b>Meet AX-1</b></div>
@@ -90,6 +90,16 @@
           <li><b>A small board moves.</b> An ESP32 bridge drives the motors and servos and keeps them safe. If the phone goes quiet, AX-1 stops and holds.</li>
           <li><b>Open and CC0.</b> Models, firmware, app and docs are public domain. Build it, change it, sell kits: no permission needed.</li>
         </ul>
+        <h4 id="why-phone">Why a phone?</h4>
+        <p class="muted">A robot needs a brain with senses, power and a connection. You already carry one. AX-1 uses your phone for the hard parts; the body only adds motors and a small safety bridge.</p>
+        <ul class="features">
+          <li><b>It sees and hears.</b> Cameras, a microphone and a speaker are already there.</li>
+          <li><b>It feels movement.</b> Motion sensors and GPS tell the robot how it moves and where it is.</li>
+          <li><b>It thinks on the device.</b> A fast processor, with an AI chip on most recent phones, runs the control software locally.</li>
+          <li><b>It has a face and a link.</b> The screen is AX-1's face; Wi-Fi, Bluetooth and its own battery are built in.</li>
+          <li><b>It keeps getting better.</b> A software update upgrades the brain without touching the body.</li>
+        </ul>
+        <p class="note"><span class="tag">Today</span> Phone Brain drives AX-1's 3D twin, and its AI Pilot turns typed or spoken requests into safe moves. <span class="tag">Planned</span> The same app driving a real AX-1 by touch, text or voice, then on-phone vision for the Assisted and Autonomous modes. The bridge firmware is experimental until our first hardware build.</p>
         <div class="kicker">FIG. 03 · <b>The agents</b></div>
         <h3>1,024 agents: the lab's members and its record</h3>
         <ul class="perks">
@@ -103,7 +113,7 @@
         <div class="faq">
           <details><summary>Do I need an NFT to use the lab?</summary><p>No. No wallet, no sign-up, no payment. An agent (an optional NFT) adds three things: its own wallet, a public record of your verified lab missions under its number, and autonomy settings you control. Guests can play every mission; their runs just aren't saved to an agent's record.</p></details>
           <details><summary>Which phone works as AX-1's brain?</summary><p>Any phone drives AX-1's 3D twin. To pair with a real robot (once you've built one) you need Android Chrome: it has Bluetooth in the browser. iPhone Safari doesn't, so iPhones stay with the twin. An old phone is fine.</p></details>
-          <details><summary>What does a real AX-1 cost?</summary><p>Without the phone: about $100–115 for the Rover and $150–170 for the Desk body, from parts you can order online. The Walker is a longer community project. Prices change; the build guide lists each part and its source.</p></details>
+          <details><summary>What do I need to build a real AX-1?</summary><p>Your phone, a small ESP32 bridge board, motors or bus servos, a battery and printed parts. The Rover uses two geared motors and two head servos; the Desk uses seven bus servos. The Walker is a longer community project. The Workbench and the build guide list every part and its open source.</p></details>
           <details><summary>What works today, and what is still to come?</summary><p>Works today: the Workbench (11 robots), missions scored by a lab simulation, the Phone Brain driving AX-1's 3D twin, open build guides. Not yet: a filmed AX-1 on real hardware, real-robot run records, and agent software for Assisted and Autonomous modes. The AX-1 firmware is experimental.</p></details>
           <details><summary>What is a twin?</summary><p>A twin is the 3D copy of a robot that you drive in your browser. Twins are labelled TWIN, real build photos BUILD. Today, everything you drive is a twin.</p></details>
           <details><summary>Is the robot safe to build?</summary><p>The bridge firmware holds every joint still if the phone goes quiet, checks joint limits and speed itself, and needs a deliberate "arm" from you before moving again. Every build also has a physical power switch. The firmware is experimental until our first hardware build: start with the wheels off the ground.</p></details>
@@ -135,6 +145,24 @@
           <li><b>Dormant, then revealed.</b> At mint you get a dormant agent. After the sale ends, a public random draw assigns traits, so nobody can pick the rare ones early. The art is drawn from the lab's 3D models and is CC0: anyone may use it.</li>
         </ul>
         <p class="note">Not an investment: no returns promised, and the price can fall. The lab is free with or without an agent. Mint only on OpenSea; we never DM first.</p>
+        <h4 id="why-hold">Why hold an agent</h4>
+        <p class="muted">The lab is free for everyone. An agent adds a record of what you do in it, a wallet of its own, and a seat in how the lab grows. What exists today, and what is planned:</p>
+        <ul class="features">
+          <li><span class="tag">Today</span> <b>A verified record.</b> Passed and failed missions are replayed by the verifier and written on-chain under your agent's number.</li>
+          <li><span class="tag">Today</span> <b>Its own wallet, with limits you set.</b> Approve each action, set a daily limit, pause it, lock it before selling.</li>
+          <li><span class="tag">Today</span> <b>Sell what you build.</b> Everything is CC0: your kits, prints and guides are yours to sell, and your agent's record shows what you have done.</li>
+          <li><span class="tag">In development</span> <b>Credited datasets.</b> Every verified run is already hashed and tied to your agent; the next step is open robot-learning datasets that credit each contributor.</li>
+          <li><span class="tag">Planned</span> <b>Prize missions.</b> Seasonal Proving Grounds events with prizes paid to the winners' agent wallets. The missions, verifier and leaderboards already run.</li>
+          <li><span class="tag">Planned</span> <b>Builder bounties.</b> Paid tasks to build, test and document AX-1 and the other robots, paid by the lab's treasury to your agent.</li>
+          <li><span class="tag">Planned</span> <b>Early access and votes.</b> First access to new bodies and tools, and a holder vote on what the lab builds next.</li>
+          <li><span class="tag">In development</span> <b>Assisted and Autonomous modes.</b> The agent wallet already supports them; the agent software that uses them is not released yet.</li>
+        </ul>
+        <p class="note">Planned items are intentions, not commitments: they may change or never ship. Any earning would come from what you do (a prize, a bounty, a kit you sell), never from holding. No revenue share, no dividends, no promise of value. The 5% resale royalty funds the lab's treasury.</p>
+        <div class="faq">
+          <details><summary>Can I earn with my agent?</summary><p>Not by holding it. Planned prize missions and bounties would pay for work you do, and you can already sell your own CC0 builds. None of it is guaranteed.</p></details>
+          <details><summary>Do holders get a share of revenue or royalties?</summary><p>No. The 5% resale royalty goes to the lab's treasury, which pays for hardware, development, prizes and bounties. There is no revenue share or dividend.</p></details>
+          <details><summary>Will my agent go up in value?</summary><p>We make no claim about price. The <a href="market.html">Market</a> page shows sales and holders for information only. Buy an agent only if you want the record and the access, and only with money you can afford to lose.</p></details>
+        </div>
         <div class="kicker">FIG. 07 · <b>The collection</b></div>
         <h3>Factions: five story groups</h3>
         <p class="muted">Factions are story flavour: they don't change what an agent can do.</p>

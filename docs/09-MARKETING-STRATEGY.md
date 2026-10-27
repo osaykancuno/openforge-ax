@@ -1,5 +1,7 @@
 # Marketing & Communication Strategy
 
+> Superseded for the launch by [17-LAUNCH-PLAN.md](17-LAUNCH-PLAN.md) (positioning, calendar, assets) and [18-FEASIBILITY.md](18-FEASIBILITY.md). Rule: no component prices in public copy.
+
 > Goal: make people understand, in seconds, why an OpenForge agent is more than a picture, and sell 924 agents to people who will use them. Rule for every sentence: **show what the agent can do, never what it might earn.** No returns, yield, "passive income", floor or price talk ([01-ANALYSIS.md](01-ANALYSIS.md) §3.1).
 
 ## 1. Positioning
@@ -11,7 +13,7 @@
 **Three pillars** (every piece of content uses at least one):
 1. **Understand it.** The Workbench takes 11 robots apart in interactive 3D; every part links to its open-source origin.
 2. **Test it.** Every robot has missions with levels in the browser; SO-101 runs are replayed by a verifier, not self-reported.
-3. **Build it.** AX-1 is CC0 and cheap: Rover ~$100–115 without the phone, Desk ~$150–170, Walker ~$250–270 (community build). Each body carries a status: design / built / filmed.
+3. **Build it.** AX-1 is CC0: Rover, Desk and Walker (community build), with every part and its open source listed. Each body carries a status: design / built / filmed.
 
 **Why an NFT at all:** the lab is free; the 1,024 agents are its membership and record layer (wallet, on-chain record, Manual mode by default). Say it plainly, and say "skip the NFT if you only want the robot".
 
@@ -31,7 +33,7 @@ Primary for the mint: collectors and on-chain natives. Primary for long-term mea
 ## 3. Messages by audience
 
 - **Collectors:** "1,024 agents, the members of an open robotics lab. Each one owns a wallet and builds a record, failures included. Traits drawn on-chain after the sale: nobody, not even us, knows yours in advance."
-- **Makers:** "Meet AX-1: a phone for a brain, about $100 of parts for the body. Test it in 3D first, then build it. All CC0."
+- **Makers:** "Meet AX-1: a phone for a brain, open parts for the body. Test it in 3D first, then build it. All CC0."
 - **Builders:** "Pilot the twin, replay it on your SO-101. Guided, in the browser, no code. Everything CC0."
 - **On-chain natives:** "Every agent is an ERC-6551 account with a policy the holder controls: Manual, Assisted, Autonomous, a daily cap, an emergency pause and a sale lock. The operator can never move assets or sign."
 - **Everyone:** "Play before you mint: the Proving Grounds is open to guests."
@@ -46,7 +48,7 @@ AX-1 carries the story, in three acts:
 2. **Act 2, Prove it** (allowlist phase): everyone plays missions as a guest and enters the pilot ranking. Weekly "Pilot of the week", the first physical Rover build log, "Name AX-1's first trick".
 3. **Act 3, Embody it** (mint and after): reveal stream, holders' first verified runs on-chain, the first 10 community builds on the builders' wall.
 
-**Hero video (22 s, honest):** "A $10,000 robot." (illustration) → "A phone and about $100 of parts." (mock-up or TWIN) → the AX-1 twin fails a mission, logs it, tries again → "Tested in 3D. Experimental in hardware." → AX-1's face, tagline, "Play the mission". Every shot tagged ILLUSTRATION, TWIN or BUILD. When the first real AX-1 runs, swap in a twin-vs-real side by side; not earlier. Storyboard in [14-AX1-BRAND.md](14-AX1-BRAND.md).
+**Hero video (22 s, honest):** "A robot needs a brain." (illustration) → "You already own one." (mock-up or TWIN) → the AX-1 twin fails a mission, logs it, tries again → "Tested in 3D. Experimental in hardware." → AX-1's face, tagline, "Play the mission". Every shot tagged ILLUSTRATION, TWIN or BUILD. When the first real AX-1 runs, swap in a twin-vs-real side by side; not earlier. Storyboard in [14-AX1-BRAND.md](14-AX1-BRAND.md).
 - **Capture is built in:** "Record clip" in the Proving Grounds and Film mode in Robot Link produce ready-to-post videos.
 
 ## 5. Channels and role

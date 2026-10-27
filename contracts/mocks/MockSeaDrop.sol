@@ -28,6 +28,11 @@ contract MockSeaDrop {
         publicDrops[msg.sender] = d;
     }
 
+    /// @dev Same getter as SeaDrop: the site's Market page reads the mint price and window through it.
+    function getPublicDrop(address nft) external view returns (PublicDrop memory) {
+        return publicDrops[nft];
+    }
+
     function updateAllowList(AllowListData calldata a) external {
         allowListRoot[msg.sender] = a.merkleRoot;
     }

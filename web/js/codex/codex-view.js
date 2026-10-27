@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { PALETTE, makeStage } from "../models/look.js";
 
-export const PAGE_W = 4.2, PAGE_D = 5.2; // one page, in metres (x across, z down the page)
+export const PAGE_W = 4.2, PAGE_D = 5.9; // one page, in metres (x across, z down the page): A5 proportions, like a real notebook
 const SEG = 28;
 
 /** Cream notebook paper with a title block on the left page (decorative; the readable text is HTML). */
@@ -128,7 +128,7 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
 
   // the turning page: a strip of columns walked out from the spine, each bent a little more (a curl)
   const turnGeo = new THREE.PlaneGeometry(PAGE_W, PAGE_D, SEG, 1);
-  const turnMat = new THREE.MeshStandardMaterial({ roughness: 0.95, side: THREE.DoubleSide, map: rightMat.map }); // one texture, reused every turn
+  const turnMat = new THREE.MeshStandardMaterial({ roughness: 0.95, side: THREE.DoubleSide, map: rightMat.map }); // its map follows the leaf (show())
   const turn = new THREE.Mesh(turnGeo, turnMat);
   turn.visible = false;
   book.add(turn);
@@ -179,7 +179,7 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
     const span = focusRight ? PAGE_W * 1.12 : PAGE_W * 2.4; // wide: the book fills the screen, so the printed text stays large
     const vfov = (camera.fov * Math.PI) / 180;
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
-    const dist = Math.max(span / 2 / Math.tan(hfov / 2), (PAGE_D * (focusRight ? 1.2 : 1.22)) / 2 / Math.tan(vfov / 2));
+    const dist = Math.max(span / 2 / Math.tan(hfov / 2), (PAGE_D * (focusRight ? 1.2 : 1.1)) / 2 / Math.tan(vfov / 2));
     const dir = new THREE.Vector3(0, 0.95, 1.15).normalize(); // low enough that pop-ups stand up off the page
     camPos.copy(target).addScaledVector(dir, dist);
     camLook.copy(target);
@@ -285,16 +285,26 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
   }
 
   /** Show a chapter: number/title on the left page texture, a fresh diorama on the right. */
-  async function show(chapter, dio, { direction = 1, first = false } = {}) {
+  async function show(chapter, dio, { direction = 1, first = false, onLanded = () => {} } = {}) {
+    const next = pageTexture({ left: true, number: chapter.number, title: chapter.title });
     if (!first) {
       await sinkCurrent();
+      // a real leaf: it shows the page it leaves, then, past the vertical, the page it becomes
+      const from = direction > 0 ? rightMat.map : next, to = direction > 0 ? next : rightMat.map;
+      turnMat.map = from;
       turn.visible = true;
-      await animate(720, (k) => setTurn(direction > 0 ? k : 1 - k));
+      await animate(820, (k) => {
+        setTurn(direction > 0 ? k : 1 - k);
+        const m = k < 0.5 ? from : to;
+        if (turnMat.map !== m) (turnMat.map = m), (turnMat.needsUpdate = true);
+      });
       turn.visible = false;
     }
-    leftMat.map?.dispose();
-    leftMat.map = pageTexture({ left: true, number: chapter.number, title: chapter.title });
+    const old = leftMat.map;
+    leftMat.map = next;
     leftMat.needsUpdate = true;
+    if (old !== rightMat.map) old?.dispose();
+    onLanded(); // the leaf has landed: the printed text can appear on it
     await popIn(dio);
   }
 
@@ -310,7 +320,8 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
     if (!rect.width) return;
     if (!reduced) motionT += dt;
     if (current?.update) current.update(reduced ? 0 : dt, motionT);
-    camera.position.set(camPos.x + Math.sin(motionT / 4) * 0.15, camPos.y, camPos.z);
+    // the camera holds still: the HTML text is printed on the page's exact screen position (layout())
+    camera.position.copy(camPos);
     camera.lookAt(camLook);
     // idle and paused: nothing moves, so skip the render and save battery
     if (!reduced || anims.size || dirty) renderer.render(scene, camera);

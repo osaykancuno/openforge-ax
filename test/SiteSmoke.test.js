@@ -63,7 +63,7 @@ describe("Site smoke helpers", () => {
   it("covers every page of the site at five viewports and both themes", () => {
     const names = smoke.PAGES.map((p) => p.path);
     for (const p of ["index.html", "bench.html", "bench.html#so101/test", "bench.html#ax1-desk/test", "pilot.html", "arena.html", "robot.html",
-      "codex.html#1", "codex.html#8", "gallery.html", "agent.html?id=1", "agents.html", "license.html"]) expect(names, p).to.include(p);
+      "codex.html#1", "codex.html#8", "gallery.html", "market.html", "agent.html?id=1", "agents.html", "license.html"]) expect(names, p).to.include(p);
     expect(smoke.VIEWPORTS.map((v) => `${v.width}x${v.height}`)).to.deep.equal(["1800x823", "1366x768", "375x812", "345x600", "780x360"]);
     expect(smoke.THEMES).to.deep.equal(["light", "dark"]);
     expect(smoke.VIEWPORTS[2].mobile).to.equal(true);

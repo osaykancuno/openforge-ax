@@ -17,7 +17,7 @@ const BROWSERS = [
   "/usr/bin/google-chrome", "/usr/bin/chromium", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ].filter(Boolean);
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".woff2": "font/woff2" };
-const ALLOWED = ["art/brand/src/", "art/token/", "web/js/models/", "web/vendor/three/", "node_modules/@fontsource-variable/"];
+const ALLOWED = ["art/brand/src/", "art/marketing/src/", "art/token/", "web/js/models/", "web/vendor/three/", "node_modules/@fontsource-variable/"];
 
 /** Starts the server and the browser. Returns { base, browser, close() }; base is the server's http origin. */
 export async function startHeadless() {

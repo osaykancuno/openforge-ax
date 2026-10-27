@@ -47,7 +47,7 @@ const disposeFace = (rig) => rig?.face?.texture.dispose();
 export const CHAPTERS = [
   {
     number: "01", kicker: "Meet AX-1", title: "A phone for a brain",
-    body: `<p>This is <b>AX-1</b>, the lab's own open robot. Its head is a <b>phone</b>: the screen is its face, the camera and motion sensors are its senses, and the phone's chip does the thinking.</p><p>The rest is cheap, open parts: a printed body, a few bus servos and a small ESP32 board. Everything is <b>CC0</b>, so you can check every part.</p>`,
+    body: `<p>This is <b>AX-1</b>, the lab's own open robot. Its head is a <b>phone</b>: the screen is its face, the camera and motion sensors are its senses, and the phone's chip does the thinking.</p><p>The rest is simple, open parts: a printed body, a few bus servos and a small ESP32 board. Everything is <b>CC0</b>, so you can check every part.</p>`,
     actions: [{ id: "wake", label: "Wake AX-1" }, { id: "look", label: "Look around" }],
     build({ animate }) {
       const group = new THREE.Group();
@@ -300,7 +300,7 @@ export const CHAPTERS = [
   },
   {
     number: "06", kicker: "Building", title: "Build your AX-1",
-    body: `<p>One phone brain, three open bodies (prices without the phone):</p><ul><li><b>Rover</b>: two wheels and a pan/tilt head, about $100–115. The first build.</li><li><b>Desk</b>: a neck and two small arms, about $150–170.</li><li><b>Walker</b>: a 12–13 servo biped, about $250–270. Roadmap.</li></ul><p>The firmware is experimental and untested on hardware until our first build. Every part is listed with its open source.</p>`,
+    body: `<p>One phone brain, three open bodies:</p><ul><li><b>Rover</b>: two wheels and a pan/tilt head. The first build.</li><li><b>Desk</b>: a neck and two small arms.</li><li><b>Walker</b>: a 12–13 servo biped. Roadmap.</li></ul><p>The firmware is experimental and untested on hardware until our first build. Every part is listed with its open source.</p>`,
     actions: [{ id: "rover", label: "Rover" }, { id: "desk", label: "Desk" }, { id: "walker", label: "Walker" }, { id: "apart", label: "Take it apart" }],
     build({ animate }) {
       const group = new THREE.Group();
@@ -313,9 +313,9 @@ export const CHAPTERS = [
       }
       let shown = "rover", apart = false;
       const INFO = {
-        rover: "AX-1 Rover: two geared DC motors, two head servos, the ESP32 bridge and a 2S battery. About $100–115. Status: design; the twin drives it in Phone Brain.",
-        desk: "AX-1 Desk: seven STS3215 bus servos for the neck and arms. About $150–170. Status: design. It looks, points and waves in the twin.",
-        walker: "AX-1 Walker: 12–13 bus servos. About $250–270. Status: roadmap. Walking needs a learned policy, and it ships only when one runs in sim and on a real unit.",
+        rover: "AX-1 Rover: two geared DC motors, two head servos, the ESP32 bridge and a 2S battery. Status: design; the twin drives it in Phone Brain.",
+        desk: "AX-1 Desk: seven STS3215 bus servos for the neck and arms. Status: design. It looks, points and waves in the twin.",
+        walker: "AX-1 Walker: 12–13 bus servos. Status: roadmap. Walking needs a learned policy, and it ships only when one runs in sim and on a real unit.",
       };
       return {
         group, pickables: Object.values(bodies).map((r) => r.group),

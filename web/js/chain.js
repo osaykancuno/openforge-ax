@@ -22,6 +22,7 @@ export const ABI = {
     "function balanceOf(address) view returns (uint256)",
     "function tokenURI(uint256) view returns (string)",
     "function accountOf(uint256) view returns (address)",
+    "function royaltyBasisPoints() view returns (uint256)",
     "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
   ],
   account: [
@@ -60,7 +61,7 @@ export function loadConfig() {
 }
 
 // only known keys, of the right kind, are taken from deployment.json (no __proto__, no javascript: links)
-const DEPLOYMENT_KEYS = ["chainId", "chainName", "rpcUrl", "provingApi", "worldWs", "explorer", "openseaDropUrl", "ipfsGateway", "agents", "renderer", "reputation", "defaultOperator", "fromBlock"];
+const DEPLOYMENT_KEYS = ["chainId", "chainName", "rpcUrl", "provingApi", "worldWs", "explorer", "openseaDropUrl", "ipfsGateway", "agents", "renderer", "reputation", "defaultOperator", "seaDrop", "fromBlock"];
 const isLink = (v) => typeof v === "string" && (/^https:\/\//.test(v) || /^(#|\.\/|\/)/.test(v) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(v)) && !/["'<>\s]/.test(v);
 function pickDeployment(d) {
   const out = {};
@@ -69,7 +70,7 @@ function pickDeployment(d) {
     if (!Object.hasOwn(d, k)) continue;
     const v = d[k];
     if (k === "chainId" || k === "fromBlock") Number.isSafeInteger(v) && v >= 0 && (out[k] = v);
-    else if (["agents", "renderer", "reputation", "defaultOperator"].includes(k)) (v === "" || /^0x[0-9a-fA-F]{40}$/.test(v)) && (out[k] = v);
+    else if (["agents", "renderer", "reputation", "defaultOperator", "seaDrop"].includes(k)) (v === "" || /^0x[0-9a-fA-F]{40}$/.test(v)) && (out[k] = v);
     else if (k === "chainName") typeof v === "string" && v.length < 60 && (out[k] = v);
     else if (k === "provingApi" || k === "worldWs") (v === "" || (typeof v === "string" && /^(https|wss|http|ws):\/\/[^"'<>\s]+$/.test(v))) && (out[k] = v);
     else if (isLink(v)) out[k] = v;
@@ -309,7 +310,7 @@ export function renderChrome(active) {
       <a href="robot.html" data-k="robot">Robot Link</a>
       <a href="gallery.html" data-k="gallery">Gallery</a>
       <a href="agents.html" data-k="mine">My agents</a>
-      <a class="btn sm magenta" id="mintNav" href="${CONFIG.openseaDropUrl}" target="_blank" rel="noopener" title="Optional: the lab is free without an agent">Mint on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+      <a class="btn sm magenta" id="mintNav" href="market.html" data-k="market" title="Floor price, sales, holders and rarity. Optional: the lab is free without an agent">Market</a>
       <button class="btn sm" id="connectBtn" title="Optional: the lab works without a wallet">Connect wallet</button>
     </div></div>`;
   const skip = document.querySelector(".skip"); // the skip link stays first, so it can skip the nav

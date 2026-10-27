@@ -1,5 +1,4 @@
 // The Codex page: chapter text and controls (HTML), the book and dioramas (codex/codex-view.js).
-import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome } from "./chain.js";
 import { CHAPTERS } from "./codex/chapters.js";
 
@@ -20,7 +19,6 @@ function onto(w, h, [p0, p1, p3, p2]) {
 await loadConfig();
 renderChrome("codex");
 const $ = (id) => document.getElementById(id);
-$("mintEnd").href = CONFIG.openseaDropUrl;
 
 const page = $("page");
 const phoneQuery = matchMedia("(max-width: 760px)");
@@ -46,13 +44,70 @@ const speak = (id) => (text) => {
 const announce = speak("pageStatus");
 const setStatus = speak("chStatus");
 
-/** Printed on the book: the text shrinks a little (never below 72 %) until the chapter and its buttons fit the page. */
+/** Printed on the book: the text shrinks until the chapter and its buttons fit the page (no scrollbar on paper); when
+ *  that leaves it small on screen, the magnifier (below) reads it. */
 function fitPage() {
   const el = $("page");
   el.style.setProperty("--fit", "1");
-  if (!el.classList.contains("on-paper")) return;
-  for (let f = 1; f > 0.72 && el.scrollHeight > el.clientHeight + 1; ) el.style.setProperty("--fit", String((f -= 0.04).toFixed(2)));
+  if (!el.classList.contains("on-paper")) return lens.update();
+  for (let f = 1; f > 0.5 && el.scrollHeight > el.clientHeight + 1; ) el.style.setProperty("--fit", String((f -= 0.03).toFixed(2)));
+  lens.update();
 }
+
+// ---------------------------------------------------------------- magnifier: a reading lens for small printed text
+// With a mouse, over the page, the cursor becomes a round lens that shows the page twice as large. It is a live copy of
+// the page drawn above it (clicks go straight through to the real buttons under the cursor). Off for touch, keyboard
+// and phones (their text is a plain sheet), and whenever the text is large enough to read without it.
+const lens = (() => {
+  const R = 120, Z = 2; // lens radius (px) and zoom
+  const box = document.createElement("div");
+  box.className = "codex-lens";
+  box.setAttribute("aria-hidden", "true");
+  box.hidden = true;
+  const inner = document.createElement("div");
+  inner.className = "codex-lens-inner";
+  box.append(inner);
+  document.body.append(box);
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+  let on = false, copy = null, x = 0, y = 0;
+  const needed = () => {
+    const el = $("page");
+    if (!finePointer.matches || !el.classList.contains("on-paper")) return false;
+    // the body text's size on screen: its CSS size × the fit × how much the page is scaled down on screen
+    const r = el.getBoundingClientRect();
+    const fit = Number(getComputedStyle(el).getPropertyValue("--fit")) || 1;
+    return 14.5 * fit * (r.width / el.offsetWidth) < 14;
+  };
+  const refresh = () => {
+    if (!on) return;
+    copy = $("page").cloneNode(true);
+    copy.removeAttribute("id");
+    copy.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+    copy.classList.remove("turning");
+    inner.replaceChildren(copy);
+  };
+  const place = () => {
+    box.style.transform = `translate(${x - R}px, ${y - R}px)`;
+    inner.style.transform = `translate(${R - Z * x}px, ${R - Z * y}px) scale(${Z})`;
+  };
+  const page = $("page");
+  page.addEventListener("pointermove", (e) => {
+    if (!on || e.pointerType !== "mouse") return;
+    (x = e.clientX), (y = e.clientY);
+    box.hidden = page.classList.contains("turning");
+    place();
+  });
+  page.addEventListener("pointerleave", () => (box.hidden = true));
+  new MutationObserver(() => refresh()).observe(page, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-disabled", "hidden"] });
+  return {
+    update() {
+      on = needed();
+      document.body.classList.toggle("codex-lensing", on);
+      if (!on) return void (box.hidden = true);
+      refresh();
+    },
+  };
+})();
 
 function render(i) {
   const c = CHAPTERS[i];
@@ -89,17 +144,21 @@ async function go(i, { first = false } = {}) {
   let next = null;
   try {
     next = view ? CHAPTERS[i].build(view) : null; // build first: a failure leaves the current page intact
+    // the printed text leaves with the old page and comes back when the new leaf has landed (view.show's onLanded)
+    if (view && !first && page.classList.contains("on-paper")) {
+      page.classList.add("turning");
+      await new Promise((r) => setTimeout(r, view.reduced ? 0 : 180));
+    }
     index = i;
     render(i);
     if (!first) {
       $("chTitle").focus({ preventScroll: true });
       announce(`Page ${i + 1} of ${CHAPTERS.length}: ${CHAPTERS[i].title}`);
     }
-    page.classList.add("turning");
     setActionsBusy(true); // usable once the diorama has popped up
     if (view) {
       dio = next;
-      await view.show(CHAPTERS[i], dio, { direction, first });
+      await view.show(CHAPTERS[i], dio, { direction, first, onLanded: () => page.classList.remove("turning") });
     }
   } finally {
     page.classList.remove("turning");

@@ -83,9 +83,21 @@ async function main() {
   await wait((await acct(3)).connect(operator).propose(treasury.address, ethers.parseEther("0.01"), "0x"));
   console.log("✔ attestations, modes and proposals created");
 
+  // a few secondary sales through a Seaport stand-in (same OrderFulfilled event): the Market page reads them
+  const seaport = await (await ethers.getContractFactory("MockSeaport")).deploy();
+  const buyers = s.slice(14, 19);
+  for (const [k, [id, eth]] of [[41, "0.021"], [17, "0.019"], [33, "0.034"], [8, "0.026"], [52, "0.018"]].entries()) {
+    const seller = await holderOf(id);
+    const value = ethers.parseEther(eth);
+    const [royaltyTo, royalty] = await agents.royaltyInfo(id, value);
+    await wait(agents.connect(seller).approve(await seaport.getAddress(), id));
+    await wait(seaport.connect(buyers[k]).buy(agents, id, royaltyTo, royalty, FEE, value / 100n, { value })); // 1% marketplace fee, like OpenSea
+  }
+  console.log("✔ 5 secondary sales");
+
   fs.writeFileSync(
     path.join(root, "web/deployment.json"),
-    JSON.stringify({ chainId: 31337, chainName: "Hardhat Local", rpcUrl: "http://127.0.0.1:8545", provingApi: process.env.PROVING_API || "http://localhost:8787", worldWs: process.env.WORLD_WS || "ws://localhost:8788", explorer: "#", openseaDropUrl: "#demo-opensea", agents: await agents.getAddress(), renderer: await renderer.getAddress(), reputation: await rep.getAddress(), fromBlock }, null, 2)
+    JSON.stringify({ chainId: 31337, chainName: "Hardhat Local", rpcUrl: "http://127.0.0.1:8545", provingApi: process.env.PROVING_API || "http://localhost:8787", worldWs: process.env.WORLD_WS || "ws://localhost:8788", explorer: "#", openseaDropUrl: "#demo-opensea", seaDrop: sd, agents: await agents.getAddress(), renderer: await renderer.getAddress(), reputation: await rep.getAddress(), fromBlock }, null, 2)
   );
   await run([path.join(root, "scripts/build-web.mjs")]);
   console.log("\nDemo ready: npm run serve  ->  http://localhost:8080");

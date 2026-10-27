@@ -34,6 +34,7 @@
 <link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/pilot/ai/ai-panel.js">
+<link rel="modulepreload" href="js/pilot/ai/voice.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
 <link rel="modulepreload" href="js/pilot/bridge-sim.js">
@@ -177,8 +178,10 @@
             <div class="pl-row">
               <input id="aiInput" type="text" maxlength="500" placeholder="wave, then look left" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false">
               <button class="pl-btn pl-primary" id="aiSend" type="submit">Send</button>
+              <button class="pl-btn" id="aiVoice" type="button" aria-pressed="false" hidden>Speak</button>
             </div>
           </form>
+          <p class="pl-small" id="aiVoiceNote" hidden>Speak: say one request; it becomes the same text request, with the same safety rules. Your browser's speech service turns it into text (in Chrome it may be Google's).</p>
           <p class="pl-small">Try: forward 2 s, then turn left. The AI never arms the robot: you press ARM first. STOP or Esc stops it at once (Space types in the box).</p>
           <details class="pl-ai-more">
             <summary>Set up a model (optional)</summary>

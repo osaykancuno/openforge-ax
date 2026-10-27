@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market: floor, sales and rarity — OpenForge AX</title>
+<meta name="description" content="The OpenForge AX collection in numbers: floor price, latest sales, volume, holders and rarity, read from Ethereum and OpenSea.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<!--preload-->
+<link rel="modulepreload" href="js/market.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/traits-data.js">
+<link rel="modulepreload" href="js/market/market-data.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Market: floor, sales and rarity — OpenForge AX">
+<meta property="og:description" content="The OpenForge AX collection in numbers: floor price, latest sales, volume, holders and rarity, read from Ethereum and OpenSea.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<!--/seo-->
+</head>
+<body class="app">
+<main class="wrap pg mk">
+  <header class="pg-head mk-head">
+    <div class="kicker">FIG. 16 · <b>Market</b> · <span id="mkNet">Ethereum</span></div>
+    <h1 class="pg-title">Market</h1>
+    <p class="muted pg-lead">The collection in numbers: floor, latest sales, holders and rarity, read from the chain. Not an investment: prices can fall as well as rise.</p>
+    <div class="mk-cta">
+      <a class="btn sm primary magenta" id="mkBuy" target="_blank" rel="noopener">Buy on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+      <a class="btn sm" href="gallery.html">Browse the gallery</a>
+      <a class="btn sm ghost" href="index.html#lore">Why hold an agent?</a>
+    </div>
+  </header>
+
+  <div class="app-scroll app-fill mk-body" id="mkBody">
+    <section aria-labelledby="mkKpiTitle">
+      <h2 class="sr-only" id="mkKpiTitle">Key figures</h2>
+      <ul class="mk-kpis" id="kpis" aria-busy="true">
+        <li><small>Floor price</small><b id="kFloor">—</b><span id="kFloorNote">OpenSea</span></li>
+        <li><small>Last sale</small><b id="kLast">—</b><span id="kLastNote">on-chain</span></li>
+        <li><small>Volume · 7 days</small><b id="kWeek">—</b><span id="kWeekNote">—</span></li>
+        <li><small>Volume · all time</small><b id="kTotal">—</b><span id="kTotalNote">—</span></li>
+        <li><small>Average sale</small><b id="kAvg">—</b><span id="kAvgNote">—</span></li>
+        <li><small>Holders</small><b id="kHolders">—</b><span id="kHoldersNote">—</span></li>
+        <li><small>Minted</small><b id="kMinted">—</b><span id="kMintedNote">—</span></li>
+        <li><small>Mint</small><b id="kMint">—</b><span id="kMintNote">SeaDrop</span></li>
+      </ul>
+    </section>
+
+    <div class="mk-grid">
+      <section class="panel mk-activity" aria-labelledby="mkActTitle">
+        <div class="mk-panel-head">
+          <h2 id="mkActTitle">Latest activity</h2>
+          <div class="mk-filter" role="group" aria-label="Show">
+            <button class="btn sm sel" type="button" data-f="sale" aria-pressed="true">Sales</button>
+            <button class="btn sm" type="button" data-f="all" aria-pressed="false">All transfers</button>
+          </div>
+        </div>
+        <div id="activity" class="mk-list" aria-live="polite"><p class="muted small">Loading from Ethereum…</p></div>
+        <p class="muted small mk-foot" id="actNote"></p>
+      </section>
+
+      <div class="mk-side">
+        <section class="panel" aria-labelledby="mkRarTitle">
+          <h2 id="mkRarTitle">Rarity</h2>
+          <p class="muted small" id="rarNote">Share of each robot class in the collection.</p>
+          <ul class="mk-bars" id="classBars"></ul>
+          <h3>Rarest agents</h3>
+          <ol class="mk-rarest" id="rarest"></ol>
+        </section>
+        <section class="panel" aria-labelledby="mkHoldTitle">
+          <h2 id="mkHoldTitle">Holders</h2>
+          <ul class="mk-buckets" id="buckets"></ul>
+          <h3>Largest wallets</h3>
+          <ol class="mk-top" id="topHolders"><li class="muted small">—</li></ol>
+        </section>
+      </div>
+    </div>
+
+    <p class="note mk-disclaimer">Sales are read from Seaport orders on Ethereum: the price is what the buyer paid in ETH or WETH, royalty and fees included. The floor price is OpenSea's lowest listing, when this site's server provides it. None of this is advice or a promise of value: an agent is a collectible with tools, and the lab is free without one.</p>
+  </div>
+</main>
+<script type="module" src="js/market.js"></script>
+</body>
+</html>

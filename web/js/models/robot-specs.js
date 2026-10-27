@@ -10,8 +10,8 @@ export const TO_VERIFY = "to verify";
 export const SOURCE = "docs/research/open-robot-catalog.md";
 export const RESEARCH_DATE = "2026-10-26";
 
-const STS = "Feetech STS3215 7.4 V bus servo ($13.89 each, SO-ARM100 BOM)";
-const GDR = "Waveshare General Driver for Robots: ESP32, ST3215 bus, TB6612 motor driver, IMU ($27.99)";
+const STS = "Feetech STS3215 7.4 V bus servo";
+const GDR = "Waveshare General Driver for Robots: ESP32, ST3215 bus, TB6612 motor driver, IMU";
 
 export const ROBOT_SPECS = {
   so101: {
@@ -22,9 +22,7 @@ export const ROBOT_SPECS = {
     softwareLicense: "Apache-2.0",
     hardwareLicense: "Apache-2.0 (single repo licence, no separate CAD licence)",
     cc0Compatible: "derive ok",
-    bomUSD: [122, 230],
-    bomNote: "$121.94 for the follower arm, $229.88 for the leader + follower pair (README BOM, US).",
-    parts: [STS + " × 6 per arm", "Motor control board (Waveshare bus adapter, $10.60)", "Power supply ($10)", "3D-printed links and clamp"],
+    parts: [STS + " × 6 per arm", "Motor control board (Waveshare bus adapter)", "Power supply", "3D-printed links and clamp"],
     actuators: "6 × Feetech STS3215 (gear ratios 1/345, 1/191, 1/147)",
     sensors: "Servo feedback: position, load, speed, voltage",
     brain: "PC with LeRobot, or the browser lab over Web Serial",
@@ -41,8 +39,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "MIT",
     hardwareLicense: "MIT (single repo licence, covers body STL/STEP)",
     cc0Compatible: "derive ok",
-    bomUSD: [50, 50],
-    bomNote: "“About $50” for the body (README); the DIY BOM lists no prices. Phone not included.",
     parts: ["4 × TT gear motors", "L298N driver or the OpenBot PCB", "3 × 18650 cells", "Arduino Nano (DIY) or ESP32 (ready-to-run bodies)", "3D-printed body and phone mount"],
     actuators: "4 × TT gear motors (differential drive)",
     sensors: "The phone: camera, IMU, GPS; optional wheel odometry and sonar",
@@ -60,8 +56,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "MIT",
     hardwareLicense: TO_VERIFY,
     cc0Compatible: "link only",
-    bomUSD: [319, 399],
-    bomNote: "Bittle X V2 at RobotShop: $319 kit / $339 assembled (lite servos), $379 / $399 with alloy servos.",
     parts: ["Petoi servos (count on Bittle X: to verify)", "NyBoard (ATmega328P) or BiBoard (ESP32)", "Battery pack", "Frame"],
     actuators: "Petoi servos (up to 12 per the repo)",
     sensors: "IMU on the controller board",
@@ -69,7 +63,7 @@ export const ROBOT_SPECS = {
     difficulty: 3,
     buildHours: [3, 8],
     phoneBrain: "Partly: the BiBoard's ESP32 has BLE and Petoi offers mobile apps. No permissively licensed quadruped on STS3215 servos was found, so an original 12-servo AX hound is a gap we can fill.",
-    alternatives: [{ name: "Stanford Pupper v3 (~$2,000 DIY)", url: "https://github.com/Nate711/pupperv3-monorepo" }, { name: "Mini Pupper 2", url: "https://github.com/mangdangroboticsclub/mini_pupper" }],
+    alternatives: [{ name: "Stanford Pupper v3 (DIY)", url: "https://github.com/Nate711/pupperv3-monorepo" }, { name: "Mini Pupper 2", url: "https://github.com/mangdangroboticsclub/mini_pupper" }],
   },
   hand: {
     id: "hand",
@@ -79,8 +73,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "Apache-2.0",
     hardwareLicense: "CC BY 4.0 (mechanical design)",
     cc0Compatible: "derive ok",
-    bomUSD: TO_VERIFY,
-    bomNote: "“< 200 €” plus the control board (README); the full BOM is a Google Sheet. USD total to verify.",
     parts: ["8 × Feetech SCS0009 micro bus servos (2 per finger)", "Waveshare serial bus driver, or Arduino + Feetech TTL linker", "3D-printed fingers and palm"],
     actuators: "8 × Feetech SCS0009 (4 fingers × 2 DOF)",
     sensors: "Servo position and load feedback",
@@ -98,8 +90,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "MIT",
     hardwareLicense: "MIT (repo LICENSE.txt; STEP files in docs/3D)",
     cc0Compatible: "derive ok",
-    bomUSD: TO_VERIFY,
-    bomNote: "Not totalled upstream. Servos alone: 18 × $2.59 (MG90S) to 18 × $5.95 (SG92R) = $46.62–107.10.",
     parts: ["18 × SG90-class micro servos", "Raspberry Pi Pico", "Battery", "Printed body plates and legs"],
     actuators: "18 micro servos (3 per leg)",
     sensors: "Optional range sensor (lab model)",
@@ -117,8 +107,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "GPL-3.0 (core derived from Crazyflie)",
     hardwareLicense: TO_VERIFY,
     cc0Compatible: "link only",
-    bomUSD: TO_VERIFY,
-    bomNote: "BOM and price not published in a verifiable form.",
     parts: ["ESP32-S2 flight controller (Drone V1.2) or S3 configuration", "MPU6050 IMU", "4 coreless motors + props (2 CW, 2 CCW)", "1S LiPo"],
     actuators: "4 coreless motors",
     sensors: "MPU6050 gyro + accelerometer",
@@ -136,8 +124,6 @@ export const ROBOT_SPECS = {
     softwareLicense: "GPL-3.0",
     hardwareLicense: "GPL-3.0 (repo, covers CAD)",
     cc0Compatible: "link only",
-    bomUSD: TO_VERIFY,
-    bomNote: "Community BOM; the price varies by kit.",
     parts: ["Aluminium extrusion frame", "Stepper motors", "Mainboard + Klipper host", "Hotend and heated bed", "PSU"],
     actuators: "Stepper motors (the Voron 2.4 is CoreXY with four Z steppers; the bench model is a simpler bed-slinger)",
     sensors: "Endstops / probe, hotend and bed thermistors",
@@ -155,8 +141,6 @@ export const ROBOT_SPECS = {
     softwareLicense: TO_VERIFY,
     hardwareLicense: "CC BY-NC 4.0 (CAD, exports, BOM, assembly docs)",
     cc0Compatible: "link only",
-    bomUSD: [400, 400],
-    bomNote: "About $400 excluding the phone (project site). Non-commercial design: we link to it, never copy it.",
     parts: ["13 × Dynamixel XL430-W250-T (6 per leg + torso yaw)", "U2D2 TTL bus adapter", "Onboard SBC", "3S battery", "The phone in the torso"],
     actuators: "13 × Dynamixel XL430-W250-T",
     sensors: "The phone: IMU, camera",
@@ -175,9 +159,7 @@ export const ROBOT_SPECS = {
     softwareLicense: "CC0-1.0",
     hardwareLicense: "CC0-1.0",
     cc0Compatible: "derive ok",
-    bomUSD: [100, 115],
-    bomNote: "Estimate: $67.57 verified (driver board + 4 TT motors + 2 STS3215) plus ~$30–45 unverified (wheels, 2S pack, clamp, filament).",
-    parts: [GDR, "4 × TT gear motor 200 RPM ($2.95 each)", `2 × ${STS} for the head pan/tilt`, "2S Li-ion pack (price to verify)", "Printed chassis and phone clamp (CC0)", "Kill switch on servo power"],
+    parts: [GDR, "4 × TT gear motor 200 RPM", `2 × ${STS} for the head pan/tilt`, "2S Li-ion pack", "Printed chassis and phone clamp (CC0)", "Kill switch on servo power"],
     actuators: "Geared DC motors (TB6612) + 2 bus servos",
     sensors: "The phone: camera, IMU, mic; IMU on the driver board",
     brain: "The phone (Phone Brain app) + ESP32 bridge with the safety watchdog",
@@ -194,9 +176,7 @@ export const ROBOT_SPECS = {
     softwareLicense: "CC0-1.0",
     hardwareLicense: "CC0-1.0",
     cc0Compatible: "derive ok",
-    bomUSD: [150, 170],
-    bomNote: "Estimate: $125.22 verified (driver board + 7 STS3215) plus a 7.4 V PSU or 2S pack, clamp and filament.",
-    parts: [GDR, `7 × ${STS} (torso, neck pan/tilt, 2 × 2-DOF arms)`, "7.4 V PSU ($10) or 2S Li-ion pack", "Printed base, torso and phone clamp (CC0)", "Kill switch on servo power"],
+    parts: [GDR, `7 × ${STS} (torso, neck pan/tilt, 2 × 2-DOF arms)`, "7.4 V PSU or 2S Li-ion pack", "Printed base, torso and phone clamp (CC0)", "Kill switch on servo power"],
     actuators: "7 × STS3215 bus servos",
     sensors: "The phone: camera, IMU, mic; servo feedback",
     brain: "The phone (Phone Brain app) + ESP32 bridge",
@@ -213,9 +193,7 @@ export const ROBOT_SPECS = {
     softwareLicense: "CC0-1.0",
     hardwareLicense: "CC0-1.0",
     cc0Compatible: "derive ok",
-    bomUSD: [250, 270],
-    bomNote: "Estimate: $208.56 verified (driver board + 13 STS3215) plus a high-current 2S pack, screws and filament (~$40–60). Compare ~$400 for PhoneBot on Dynamixel.",
-    parts: [GDR, `13 × ${STS} (12 leg + 1 torso yaw)`, "High-current 2S/3S pack (price to verify)", "Printed frame and phone head (CC0)", "Kill switch on servo power"],
+    parts: [GDR, `13 × ${STS} (12 leg + 1 torso yaw)`, "High-current 2S/3S pack", "Printed frame and phone head (CC0)", "Kill switch on servo power"],
     actuators: "13 × STS3215 bus servos",
     sensors: "The phone: IMU, camera; servo feedback",
     brain: "The phone + ESP32 bridge; walking needs a learned policy (not shipped yet)",
@@ -224,9 +202,3 @@ export const ROBOT_SPECS = {
     phoneBrain: "Same brain and bridge as the Rover. Walking ships only when a policy runs in sim and on a real unit; until then the bench teaches balance.",
   },
 };
-
-/** Format a USD range, or TO_VERIFY. */
-export function formatBom(r) {
-  if (!Array.isArray(r)) return TO_VERIFY;
-  return r[0] === r[1] ? `≈ $${r[0]}` : `$${r[0]}–${r[1]}`;
-}

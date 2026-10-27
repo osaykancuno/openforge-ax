@@ -1,5 +1,7 @@
 # 14 · AX-1 brand book
 
+> Superseded for the launch by [17-LAUNCH-PLAN.md](17-LAUNCH-PLAN.md) (positioning, calendar, assets) and [18-FEASIBILITY.md](18-FEASIBILITY.md). Rule: no component prices in public copy.
+
 AX-1 is the mascot, the logo and the flagship build of OpenForge AX: a small, original, CC0 robot whose head and brain is a phone. The brand is **OpenForge AX**, the robot is **AX-1**. Never call it "PhoneBot": that is UCLA's research project, credited as the inspiration for the architecture.
 
 Assets: `npm run brand` renders everything in `art/brand/` (sources in `art/brand/src/`). Visual system: `docs/12-OPENFORGE-LAB.md` §4.
@@ -14,7 +16,7 @@ AX-1 is a lab apprentice: a student of its own body.
 | **Candid** | Reports failures plainly: "fell over, 3rd try, here is why". Never spins. |
 | **Patient, a little dry** | Small, understated humour. Not a hype man. |
 
-**Voice:** short sentences, first person, present tense. Name the real part (IMU, servo, BLE). Use notebook numbers ("attempt 7", "112 g", "$104"). End on an observation or a question, not a pitch.
+**Voice:** short sentences, first person, present tense. Name the real part (IMU, servo, BLE). Use notebook numbers ("attempt 7", "112 g"), never prices. End on an observation or a question, not a pitch.
 
 **Never:** price, floor, returns, "invest", "early", "don't miss"; crypto slang (gm, wagmi, LFG); cyberpunk or neon words; claims of feelings it can't back up (it "notices", "tries", "learns this session"); "it walks / drives / works" for a body not yet filmed on real hardware (say "the twin does", "the design aims to"); "better than" any named product.
 
@@ -38,7 +40,7 @@ Never: neon glow, red eyes, chrome, glitch, human skin, a real phone brand, logo
 |---|---|
 | **Understand it** | The Workbench and the Codex are live; every part links to its open-source origin. |
 | **Test it** | Missions in the browser for every robot; SO-101 runs are replayed by a verifier, not self-reported. |
-| **Build it** | AX-1 is CC0: Rover ~$100–115 without the phone, Desk ~$150–170, Walker ~$250–270 (community build). Each body carries a status label: design / built / filmed. |
+| **Build it** | AX-1 is CC0: Rover, Desk and Walker (community build), every part listed with its open source. Each body carries a status label: design / built / filmed. |
 
 **Standing honesty lines** (on every launch surface):
 - "The AX-1 firmware is experimental and untested on hardware until our first build."

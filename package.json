@@ -23,6 +23,7 @@
     "site:smoke": "node scripts/site-smoke.mjs",
     "assets": "node scripts/assets.mjs",
     "brand": "node scripts/brand.mjs",
+    "marketing": "node scripts/marketing.mjs",
     "post-reveal": "node scripts/post-reveal.mjs",
     "kpi": "node scripts/kpi.mjs",
     "trials:export": "node scripts/trials-export.mjs",

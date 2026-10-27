@@ -101,7 +101,7 @@ describe("Workbench missions (web/js/bench/missions)", function () {
       expect(r.id).to.equal(id);
       for (const k of ["name", "platform", "softwareLicense", "hardwareLicense", "cc0Compatible", "phoneBrain"]) expect(r[k], `${id}.${k}`).to.be.a("string").and.not.equal("");
       expect(["link only", "derive ok", TO_VERIFY]).to.include(r.cc0Compatible);
-      expect(r.bomUSD === TO_VERIFY || (Array.isArray(r.bomUSD) && r.bomUSD.length === 2 && r.bomUSD[0] <= r.bomUSD[1]), `${id}.bomUSD`).to.equal(true);
+      expect(JSON.stringify(r), `${id}: no prices on the site (they confuse visitors)`).not.to.match(/\$\s?\d|USD|€\s?\d/);
       expect(r.difficulty).to.be.within(1, 5);
       expect(r.parts).to.be.an("array").that.is.not.empty;
       if (r.upstream !== TO_VERIFY) expect(r.upstream).to.match(/^https:\/\//);

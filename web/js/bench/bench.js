@@ -2,7 +2,7 @@
 // Test stage missions (missions/*, deterministic) and the Build stage from robot-specs.js.
 import { loadConfig, renderChrome } from "../chain.js";
 import { ROBOTS, buildRobot } from "../models/robots.js";
-import { ROBOT_SPECS, TO_VERIFY, formatBom, RESEARCH_DATE } from "../models/robot-specs.js";
+import { ROBOT_SPECS, TO_VERIFY, RESEARCH_DATE } from "../models/robot-specs.js";
 import { ORDER, stagesFor, robotText } from "./content.js";
 import { MISSIONS } from "./missions/index.js";
 import { createMissionRunner, createProgressStore } from "./mission-runner.js";
@@ -272,7 +272,7 @@ function stageChips(s) {
   const chips = s.chips.slice();
   const spec = ROBOT_SPECS[robotId];
   if (s.id === "build") {
-    chips.push(["BOM", formatBom(spec.bomUSD)], ["DIFFICULTY", `${spec.difficulty} / 5`], ["LICENCE", spec.hardwareLicense.split(" (")[0]]);
+    chips.push(["PARTS", `${spec.parts.length} groups`], ["DIFFICULTY", `${spec.difficulty} / 5`], ["LICENCE", spec.hardwareLicense.split(" (")[0]]);
   }
   if (s.id === "test") {
     const done = MISSIONS[robotId].levels.filter((l) => levelRec(robotId, l.id)?.passed).length;
@@ -348,8 +348,6 @@ function renderBuild() {
   row("Software licence", s.softwareLicense);
   row("Hardware licence", s.hardwareLicense);
   row("Use in CC0 OpenForge assets", s.cc0Compatible === "derive ok" ? "derive ok (keep the upstream notice; never relabel it CC0)" : s.cc0Compatible === "link only" ? "link only (we describe and link, we never copy)" : s.cc0Compatible);
-  row("Bill of materials", Array.isArray(s.bomUSD) ? `${formatBom(s.bomUSD)} (without the phone)` : TO_VERIFY);
-  row("Price note", s.bomNote);
   const diff = el("span", "bn-dots");
   diff.setAttribute("role", "img");
   diff.setAttribute("aria-label", `Build difficulty ${s.difficulty} of 5`);

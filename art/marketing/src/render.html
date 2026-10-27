@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AX-1 marketing render</title>
+<!-- Rendered by scripts/marketing.mjs in a headless browser: ?asset=<name>. Stills set window.__ready; animations also
+     expose window.__frame(t) (seconds), which draws one deterministic frame. Same models, fonts and colours as the site. -->
+<script type="importmap">
+{ "imports": { "three": "/web/vendor/three/three.module.js", "three/addons/": "/web/vendor/three/addons/" } }
+</script>
+<style>
+  @font-face { font-family: "Inter"; src: url("/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "Inter Tight"; src: url("/node_modules/@fontsource-variable/inter-tight/files/inter-tight-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2") format("woff2"); font-weight: 100 800; }
+  :root { --paper: #f4efe6; --paper-2: #ebe4d6; --ink: #23211e; --ink-2: #3d3a35; --muted: #6b655c; --line: #d8cfbf; --terra: #b4472f; --sun: #e2b04a; --night: #141312; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  #art { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Inter", sans-serif; }
+  #art.grid { background-image: linear-gradient(rgba(35,33,30,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(35,33,30,.07) 1px, transparent 1px); background-size: 36px 36px; background-position: -1px -1px; }
+  #art.dark { background: var(--night); color: var(--paper); }
+  canvas { position: absolute; display: block; }
+  .t { position: absolute; }
+  .fig { font: 600 22px/1.3 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .fig b { color: var(--terra); font-weight: 700; }
+  .h { font: 800 96px/.98 "Inter Tight", sans-serif; letter-spacing: -.04em; margin: 0; }
+  .h em { font-style: normal; color: var(--terra); }
+  .p { font: 500 30px/1.4 "Inter", sans-serif; color: var(--ink-2); margin: 0; }
+  .word { display: flex; align-items: center; gap: .3em; font: 800 44px/1 "Inter Tight", sans-serif; letter-spacing: -.04em; }
+  .word b { color: var(--terra); font-weight: 800; }
+  .chips { display: flex; gap: 12px; flex-wrap: wrap; }
+  .chip { padding: 8px 18px; border: 2px solid #c6bba8; border-radius: 999px; font: 700 18px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); background: #fbf8f2; }
+  .lbl { position: absolute; transform: translateX(-50%); text-align: center; white-space: nowrap; font: 700 17px/1.3 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; }
+  .lbl span { display: block; color: var(--muted); font-weight: 600; font-size: 14px; }
+  .call { position: absolute; display: flex; align-items: center; gap: 14px; font: 700 30px/1.15 "Inter Tight", sans-serif; letter-spacing: -.01em; white-space: nowrap; }
+  .call small { display: block; font: 600 18px "JetBrains Mono", monospace; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .call i { flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--terra); box-shadow: 0 0 0 6px rgba(180,71,47,.15); }
+  .note { font: 600 18px/1.4 "JetBrains Mono", monospace; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="art"></div>
+<script type="module">
+import * as THREE from "three";
+import { makeRenderer, makeStage } from "/web/js/models/look.js";
+import { buildRobot, ROBOTS } from "/web/js/models/robots.js";
+import { markSVG } from "/art/brand/src/mark.mjs";
+
+const asset = new URLSearchParams(location.search).get("asset") || "hero";
+const art = document.getElementById("art");
+const el = (html, style = "") => { const d = document.createElement("div"); d.className = "t"; d.style.cssText = style; d.innerHTML = html; art.append(d); return d; };
+const size = (w, h, ...cls) => { art.style.cssText = `width:${w}px;height:${h}px`; art.classList.add(...cls); };
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const ease = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
+const seg = (t, a, b) => ease((t - a) / (b - a)); // 0 before a, 1 after b
+
+/** A persistent 3D stage at (x, y, w, h): robots framed once, then render(t) for each frame. */
+let shared = null; // one WebGL context for many small figures (the lineup): each is copied into its own 2D canvas
+function stage3d({ x, y, w, h, items, fov = 20, elev = 0.3, dist = 1, shadow = 0.22, lift = 0, copy = false }) {
+  const canvas = document.createElement("canvas");
+  Object.assign(canvas.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+  art.append(canvas);
+  const renderer = copy ? (shared ??= makeRenderer(document.createElement("canvas"), { alpha: true, preserveDrawingBuffer: true })) : makeRenderer(canvas, { alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setSize(w, h, false);
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const st = makeStage(scene, renderer, { size: 1.2, floor: false, background: null });
+  st.key.position.set(0.9, 2.2, 1.6);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: shadow }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  const group = new THREE.Group();
+  scene.add(group);
+  const rigs = items.map((it) => {
+    const rig = buildRobot(it.id);
+    if (it.pose) rig.pose(it.pose);
+    if (it.look) rig.face?.setLook(...it.look);
+    if (it.mood) rig.face?.setMood(it.mood);
+    rig.face?.tick(0.5);
+    Object.assign(rig.group.position, { x: it.x || 0, z: it.z || 0 });
+    rig.group.rotation.y = it.rotY || 0;
+    group.add(rig.group);
+    return rig;
+  });
+  const box = new THREE.Box3().setFromObject(group);
+  const c = box.getCenter(new THREE.Vector3());
+  c.y += lift;
+  const s = box.getSize(new THREE.Vector3());
+  const camera = new THREE.PerspectiveCamera(fov, w / h, 0.01, 50);
+  const r = (Math.max(s.y, Math.max(s.x, s.z) / (w / h)) / 2) / Math.tan((fov * Math.PI) / 360) * 1.18 * dist;
+  camera.position.set(c.x, c.y + r * elev, c.z + r);
+  camera.lookAt(c);
+  const render = copy
+    ? () => {
+        renderer.render(scene, camera);
+        canvas.width = w * devicePixelRatio; canvas.height = h * devicePixelRatio;
+        canvas.getContext("2d").drawImage(renderer.domElement, 0, 0);
+      }
+    : () => renderer.render(scene, camera);
+  render();
+  return { canvas, rigs, group, camera, render };
+}
+
+/** AX-1's face, drawn in 2D (the phone screen of the logo mark): look -1..1, open 0..1, glitch 0..1. */
+function drawFace(ctx, { cx, cy, w, look = [0, 0], open = 1, mood = "idle", glow = 0, color = "#f4efe6" }) {
+  const h = w * 0.62, rr = w * 0.15;
+  ctx.save();
+  if (glow) { ctx.shadowColor = "rgba(226,176,74,.55)"; ctx.shadowBlur = w * 0.12 * glow; }
+  ctx.fillStyle = "#23211e";
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, rr);
+  ctx.fill();
+  ctx.restore();
+  const ex = look[0] * w * 0.04, ey = look[1] * w * 0.035;
+  ctx.fillStyle = color;
+  for (const s of [-1, 1]) {
+    const x = cx + s * w * 0.16 + ex, y = cy - h * 0.07 + ey;
+    ctx.beginPath();
+    if (mood === "happy") {
+      ctx.lineWidth = w * 0.045; ctx.lineCap = "round"; ctx.strokeStyle = color;
+      ctx.arc(x, y + w * 0.05, w * 0.075, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    } else {
+      ctx.ellipse(x, y, w * 0.073, Math.max(w * 0.006, w * 0.1 * open), 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = "#c8553d";
+  ctx.beginPath();
+  ctx.roundRect(cx - w * 0.08, cy + h * 0.24, w * 0.16, w * 0.048, w * 0.024);
+  ctx.fill();
+}
+const rand = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }; // deterministic per frame
+
+const builders = {
+  // ------------------------------------------------------------------ stills
+  hero() { // 1600 × 900: X / site / press
+    size(1600, 900, "grid");
+    stage3d({ x: 760, y: 90, w: 820, h: 760, fov: 18, elev: 0.22, items: [
+      { id: "ax1-rover", x: -0.36, rotY: 0.55, look: [0.5, 0] },
+      { id: "ax1-desk", x: 0, pose: { r_shoulder: -140, r_elbow: -60, head_tilt: 6 }, look: [-0.2, 0.2], mood: "happy" },
+      { id: "ax1-walker", x: 0.36, rotY: -0.5, look: [-0.5, 0] },
+    ] });
+    el(`<div class="word">${markSVG({ size: 60, bg: null })}OpenForge <b>AX</b></div>`, "left:90px;top:80px");
+    el(`<div class="fig">FIG. 01 · <b>AX-1</b> · three bodies, one brain</div><h1 class="h" style="margin:26px 0 30px">Your phone<br><em>is the brain.</em></h1><p class="p" style="max-width:600px">The open robotics lab where robots, AI and the blockchain work together. Learn, test, build, pilot.</p>`, "left:90px;top:250px;width:700px");
+    el(`<div class="chips"><span class="chip">Learn</span><span class="chip">Test</span><span class="chip">Build</span><span class="chip">Pilot</span></div>`, "left:90px;top:770px");
+  },
+  portrait() { // 1080 × 1350: Instagram feed
+    size(1080, 1350, "grid");
+    el(`<div class="fig">FIG. 01 · <b>Meet AX-1</b></div><h1 class="h" style="font-size:104px;margin-top:22px">Meet <em>AX-1.</em></h1>`, "left:80px;top:80px");
+    stage3d({ x: 40, y: 330, w: 1000, h: 760, fov: 18, elev: 0.25, items: [{ id: "ax1-desk", rotY: -0.35, pose: { head_pan: -20, head_tilt: 8, l_shoulder: -120, l_elbow: -40 }, look: [-0.6, 0.15], mood: "happy" }] });
+    el(`<p class="p" style="font-size:34px;max-width:880px">A robot whose brain is the phone you already own. Open source, CC0.</p>`, "left:80px;top:1120px");
+    el(`<div class="word" style="font-size:30px">${markSVG({ size: 44, bg: null })}OpenForge <b>AX</b></div>`, "right:80px;top:96px");
+  },
+  story() { // 1080 × 1920: stories / reels cover
+    size(1080, 1920, "grid");
+    el(`<div class="fig" style="font-size:26px">FIG. 00 · <b>The lab is open</b></div>`, "left:80px;top:150px");
+    el(`<h1 class="h" style="font-size:118px">Tap in.<br><em>Drive AX-1.</em></h1>`, "left:80px;top:230px");
+    stage3d({ x: 0, y: 560, w: 1080, h: 960, fov: 18, elev: 0.32, items: [{ id: "ax1-rover", rotY: -0.6, pose: { head_pan: 20, head_tilt: -6 }, look: [0.6, -0.1] }] });
+    el(`<div class="chips"><span class="chip">Free</span><span class="chip">No wallet</span><span class="chip">CC0</span></div>`, "left:80px;top:1560px");
+    el(`<div class="word" style="font-size:40px">${markSVG({ size: 56, bg: null })}OpenForge <b>AX</b></div>`, "left:80px;top:1700px");
+  },
+  lineup() { // 1600 × 900: the 11 classes in cells, one shared WebGL scene re-framed for each robot
+    size(1600, 900, "grid");
+    el(`<div class="fig">FIG. 01–11 · <b>The collection</b></div><h1 class="h" style="font-size:64px;margin-top:14px">11 robots. <em>One lab.</em></h1>`, "left:70px;top:56px");
+    const ids = ["ax1-rover", "ax1-desk", "ax1-walker", "so101", "rover", "hound", "hand", "spider", "drone", "fab", "replicant"];
+    const W = 240, H = 230;
+    const renderer = makeRenderer(document.createElement("canvas"), { alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(W, H, false);
+    renderer.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene();
+    const stg = makeStage(scene, renderer, { size: 1.2, floor: false, background: null });
+    stg.key.position.set(0.9, 2.2, 1.6);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: 0.18 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    const camera = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
+    ids.forEach((id, i) => {
+      const row = i < 6 ? 0 : 1, col = row ? i - 6 : i, n = row ? 5 : 6;
+      const x = (1600 - n * W - (n - 1) * 18) / 2 + col * (W + 18), y = row ? 545 : 205;
+      const rig = buildRobot(id);
+      rig.group.rotation.y = -0.5;
+      rig.face?.setLook(0.4, 0);
+      if (id === "ax1-desk") rig.face?.setMood("happy");
+      rig.face?.tick(0.5);
+      scene.add(rig.group);
+      const box = new THREE.Box3().setFromObject(rig.group), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+      const r = (Math.max(sz.y, Math.max(sz.x, sz.z) / (W / H)) / 2) / Math.tan((22 * Math.PI) / 360) * 1.2;
+      camera.position.set(c.x, c.y + r * 0.35, c.z + r);
+      camera.lookAt(c);
+      renderer.render(scene, camera);
+      const cv = document.createElement("canvas");
+      cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+      Object.assign(cv.style, { left: `${x}px`, top: `${y}px`, width: `${W}px`, height: `${H}px` });
+      cv.getContext("2d").drawImage(renderer.domElement, 0, 0);
+      art.append(cv);
+      scene.remove(rig.group);
+      const d = el(`${String(ROBOTS[id].cls + 1).padStart(2, "0")} · ${ROBOTS[id].name}<span>${id.startsWith("ax1") ? "AX-1 body" : ROBOTS[id].platform.replace(/ \(.*\)$/, "").replace(" / Crazyflie class", "")}</span>`, `left:${x + W / 2}px;top:${y + H + 4}px`);
+      d.className = "lbl";
+      d.style.fontSize = "15px";
+    });
+  },
+  whyphone() { // 1080 × 1350: why a phone, as a diagram (the last frame of the video)
+    size(1080, 1350, "grid");
+    whyPhoneScene(12, true);
+  },
+
+  // ------------------------------------------------------------------ animations (window.__frame)
+  turntable() { // 720 × 720 loop, 4 s
+    size(720, 720, "grid");
+    const st = stage3d({ x: 0, y: 30, w: 720, h: 690, fov: 20, elev: 0.38, items: [{ id: "ax1-rover", pose: { head_tilt: -4 } }] });
+    el(`<div class="fig" style="font-size:18px">FIG. 01 · <b>AX-1 Rover</b></div>`, "left:34px;top:30px");
+    return (t) => {
+      const rig = st.rigs[0];
+      rig.group.rotation.y = (t / 4) * Math.PI * 2;
+      rig.set?.("head_pan", Math.sin(t * Math.PI) * 20);
+      rig.face?.setLook(Math.sin(t * Math.PI) * 0.7, 0);
+      rig.face?.tick(t + 3.6);
+      st.render();
+    };
+  },
+  wave() { // 720 × 720 loop, 3 s
+    size(720, 720, "grid");
+    const st = stage3d({ x: 0, y: 40, w: 720, h: 680, fov: 20, elev: 0.25, items: [{ id: "ax1-desk", rotY: -0.25, mood: "happy", look: [-0.3, 0.2] }] });
+    el(`<div class="fig" style="font-size:18px">FIG. 02 · <b>Hello, pilot</b></div>`, "left:34px;top:30px");
+    return (t) => {
+      const rig = st.rigs[0];
+      const w = Math.sin((t / 3) * Math.PI * 2 * 3); // three waves per loop
+      rig.pose({ r_shoulder: -150 + Math.sin((t / 3) * Math.PI * 2) * 6, r_elbow: -55 + w * 30, head_tilt: 6 + w * 3, head_pan: -10 });
+      rig.face?.tick(t);
+      st.render();
+    };
+  },
+  teaser() { // 1080 × 1350, 8 s, dark: AX-1's eyes wake up. No logo, no name.
+    size(1080, 1350, "dark");
+    const c = document.createElement("canvas");
+    c.width = 1080 * devicePixelRatio; c.height = 1350 * devicePixelRatio;
+    Object.assign(c.style, { left: 0, top: 0, width: "1080px", height: "1350px" });
+    art.append(c);
+    const off = new OffscreenCanvas(c.width, c.height);
+    const ctx = c.getContext("2d"), o = off.getContext("2d");
+    const top = el(`<div class="fig" style="color:#8f877b;font-size:24px"></div>`, "left:80px;top:90px");
+    const line = el(`<h1 class="h" style="font-size:76px;color:#f4efe6">Something is <em style="color:#e2b04a">waking up.</em></h1>`, "left:80px;top:1090px;opacity:0");
+    const code = el(`<div class="note" style="color:#8f877b">AX-1 / 00:07:31</div>`, "right:80px;top:96px;opacity:0");
+    const FIG = "FIG. 00 · SIGNAL";
+    return (t) => {
+      const f = Math.round(t * 30), d = devicePixelRatio;
+      o.setTransform(d, 0, 0, d, 0, 0);
+      o.fillStyle = "#141312"; o.fillRect(0, 0, 1080, 1350);
+      const on = seg(t, 1.0, 2.2); // the screen powers on
+      const flick = t < 2.4 ? (rand(f) > 0.35 ? 1 : 0.2) : 1;
+      if (t > 0.5 && t < 1.2 && rand(f + 7) > 0.5) { o.fillStyle = "rgba(244,239,230,.5)"; o.fillRect(140, 640, 800, 2); } // a scan line before power
+      if (on > 0) {
+        o.globalAlpha = on * flick;
+        const look = t < 3 ? [0, 0] : t < 4 ? [-0.9 * seg(t, 3, 3.3), 0] : t < 5 ? [0.9 * seg(t, 4, 4.3) - 0.9 * (1 - seg(t, 4, 4.3)), 0] : [0.9 * (1 - seg(t, 5, 5.4)), 0.2 * seg(t, 5, 5.4)];
+        const blink = (t > 5.9 && t < 6.05) ? 0.1 : 1;
+        drawFace(o, { cx: 540, cy: 660, w: 760, look, open: seg(t, 1.6, 2.6) * blink, glow: on });
+        o.globalAlpha = 1;
+      }
+      // glitch: horizontal slices shifted, in bursts
+      const burst = (t > 1.6 && t < 2.3) || (t > 4.4 && t < 4.6) || (t > 7.3 && t < 7.7);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(off, 0, 0);
+      if (burst) for (let k = 0; k < 9; k++) {
+        const y = Math.floor(rand(f * 13 + k) * c.height), hh = Math.floor((8 + rand(f + k * 3) * 50) * d), dx = (rand(f * 7 + k) - 0.5) * 120 * d;
+        ctx.drawImage(off, 0, y, c.width, hh, dx, y, c.width, hh);
+        if (rand(f + k) > 0.6) { ctx.fillStyle = "rgba(200,85,61,.22)"; ctx.fillRect(0, y, c.width, hh / 3); }
+      }
+      ctx.fillStyle = "rgba(0,0,0,.18)"; // scan lines
+      for (let y = 0; y < c.height; y += 4 * d) ctx.fillRect(0, y, c.width, d);
+      if (t > 7.75) { ctx.fillStyle = "#141312"; ctx.fillRect(0, 0, c.width, c.height); }
+      top.firstChild.textContent = FIG.slice(0, Math.floor(clamp01((t - 2.6) / 1.2) * FIG.length)) + (t > 2.6 && t < 7.75 && Math.floor(t * 2) % 2 ? "_" : "");
+      line.style.opacity = t > 7.75 ? 0 : seg(t, 5.2, 6);
+      code.style.opacity = t > 7.75 ? 0 : seg(t, 6.3, 6.6) * (rand(f) > 0.1 ? 1 : 0.3);
+    };
+  },
+  whyphonevideo() { // 1080 × 1350, 12.5 s
+    size(1080, 1350, "grid");
+    return whyPhoneScene(0, false);
+  },
+  reveal() { // 1920 × 1080, 9 s: the three bodies, then the end card
+    size(1920, 1080, "grid");
+    const st = stage3d({ x: 260, y: 60, w: 1400, h: 860, fov: 18, elev: 0.2, items: [
+      { id: "ax1-rover", x: -0.36, rotY: 0.55, look: [0.5, 0] },
+      { id: "ax1-desk", x: 0, look: [0, 0.2] },
+      { id: "ax1-walker", x: 0.36, rotY: -0.5, look: [-0.5, 0] },
+    ] });
+    const fig = el(`<div class="fig" style="font-size:26px">FIG. 01 · <b>AX-1</b> · three bodies, one phone brain</div>`, "left:110px;top:80px");
+    const end = el(`<div class="word" style="font-size:64px;justify-content:center">${markSVG({ size: 92, bg: null })}OpenForge <b>AX</b></div><h1 class="h" style="font-size:110px;text-align:center;margin-top:40px">Your phone <em>is the brain.</em></h1><p class="note" style="text-align:center;margin-top:36px;font-size:22px">An open robotics lab · CC0</p>`, "left:0;right:0;top:330px;opacity:0");
+    const names = ["Rover", "Desk", "Walker"].map((n, i) => el(`AX-1 ${n}`, `left:${[525, 960, 1410][i]}px;top:850px;opacity:0`));
+    names.forEach((n) => (n.className = "lbl", n.style.fontSize = "24px"));
+    return (t) => {
+      const [rv, dk, wk] = st.rigs;
+      st.group.rotation.y = Math.sin(t * 0.5) * 0.18;
+      dk.pose({ r_shoulder: -150 * seg(t, 2, 2.6), r_elbow: -55 + Math.sin(t * 6) * 28 * seg(t, 2.4, 2.8), head_tilt: 6 });
+      dk.face?.setMood(t > 2.3 ? "happy" : "idle");
+      rv.set?.("head_pan", Math.sin(t * 1.5) * 25);
+      for (const r of st.rigs) r.face?.tick(t);
+      st.render();
+      const out = seg(t, 6, 6.6);
+      st.canvas.style.opacity = 1 - out;
+      fig.style.opacity = seg(t, 0.3, 1) * (1 - out);
+      names.forEach((n, i) => (n.style.opacity = seg(t, 0.8 + i * 0.3, 1.3 + i * 0.3) * (1 - out)));
+      end.style.opacity = seg(t, 6.4, 7.1);
+    };
+  },
+};
+
+/** "Why a phone?": a phone, its built-in robot parts called out one by one, then the AX-1 body around it. */
+function whyPhoneScene(t0, still) {
+  const face = el("", "left:230px;top:450px;opacity:0"); // AX-1's face: the logo mark itself (DOM, so every frame is exact)
+  const head = el(`<div class="fig" style="font-size:24px">FIG. 03 · <b>Why a phone?</b></div><h1 class="h" style="font-size:80px;margin-top:20px">A robot needs a brain.<br><em>You already own one.</em></h1>`, "left:80px;top:80px");
+  const parts = [
+    ["Cameras", "sight"], ["Microphone + speaker", "hearing, voice"], ["Motion sensors + GPS", "balance, position"],
+    ["Processor + AI chip", "thinking, on the device"], ["Screen", "AX-1's face"], ["Wi-Fi · Bluetooth · 5G", "the link to the body"], ["Battery", "its own power"],
+  ];
+  const calls = parts.map(([a, b], i) => el(`<i></i><span>${a}<small>${b}</small></span>`, `left:${i % 2 ? 610 : 80}px;top:${470 + Math.floor(i / 2) * 150}px;opacity:0`));
+  calls.forEach((d) => (d.className = "call"));
+  const body = el(`<div class="p" style="font-size:30px"><b style="color:#23211e">The body adds motors and a small ESP32 bridge</b>, designed to stop and hold if the phone goes quiet.</div>`, "left:80px;top:1040px;width:560px;opacity:0");
+  const st = stage3d({ x: 650, y: 880, w: 380, h: 320, fov: 20, elev: 0.35, items: [{ id: "ax1-rover", look: [0.4, 0] }] });
+  const foot = el(`<div class="word" style="font-size:36px">${markSVG({ size: 50, bg: null })}OpenForge <b>AX</b></div>`, "left:80px;top:1230px;opacity:0");
+  const plan = el(`<div class="note">Planned: voice, vision, autonomy</div>`, "right:80px;top:1244px;opacity:0");
+  const draw = (t) => {
+    const ph = seg(t, 0.8, 1.6), out = seg(t, 2.2, 2.8); // the phone's face, alone, then the parts it already has
+    face.style.opacity = ph * (1 - out);
+    face.innerHTML = markSVG({ size: 620, bg: null, look: [Math.sin(t * 2) * 0.6, 0], mood: t > 2 ? "happy" : "idle" });
+    st.rigs[0].group.rotation.y = -0.7 + Math.sin(t * 0.8) * 0.25;
+    st.rigs[0].set?.("head_pan", Math.sin(t * 1.6) * 20);
+    st.rigs[0].face?.tick(t);
+    st.render();
+    st.canvas.style.opacity = seg(t, 7.2, 7.9);
+    head.style.opacity = seg(t, 0, 0.6);
+    calls.forEach((n, i) => (n.style.opacity = seg(t, 2.8 + i * 0.6, 3.2 + i * 0.6)));
+    body.style.opacity = seg(t, 7.4, 8);
+    foot.style.opacity = seg(t, 8.4, 9);
+    plan.style.opacity = seg(t, 8.8, 9.4);
+  };
+  if (still) { draw(t0); return null; }
+  return draw;
+}
+
+const anim = builders[asset]?.();
+await document.fonts.ready;
+// each frame waits for two paints: a 2D canvas is composited asynchronously, and a screenshot taken right after drawing
+// can catch the previous frame
+if (typeof anim === "function") { window.__frame = (t) => (anim(t), new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); anim(0); }
+window.__ready = { width: art.offsetWidth, height: art.offsetHeight, animated: typeof anim === "function" };
+</script>
+</body>
+</html>

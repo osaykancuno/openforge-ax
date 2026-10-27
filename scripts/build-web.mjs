@@ -98,7 +98,7 @@ try {
 } catch {} // no .env: no site address
 const SITE = (process.env.SITE_URL || process.env.EXTERNAL_URL || "").trim().replace(/\/+$/, "");
 if (SITE && !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?$/i.test(SITE)) throw new Error(`SITE_URL must be a bare https:// origin, got ${SITE}`);
-const INDEXABLE = ["index", "bench", "pilot", "arena", "robot", "codex", "gallery", "license"];
+const INDEXABLE = ["index", "bench", "pilot", "arena", "robot", "codex", "gallery", "market", "license"];
 const urlFor = (name) => (name === "index" ? `${SITE}/` : `${SITE}/${name}`); // Cloudflare Pages serves clean URLs
 const attr = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 function seoBlock(name, html) {

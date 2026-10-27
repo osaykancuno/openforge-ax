@@ -83,6 +83,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
     Robot Link      ${site}/robot.html   (Chrome or Edge, real SO-101 over USB, or the virtual arm)
     The Codex       ${site}/codex.html
     Gallery         ${site}/gallery.html (the agents, with their 3D token art)
+    Market          ${site}/market.html (floor, sales, holders and rarity)
   Ctrl+C stops everything.
   `);
 }

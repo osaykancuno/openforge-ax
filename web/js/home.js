@@ -1,4 +1,3 @@
-import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome, agents, isDeployed } from "./chain.js";
 import { TRAITS, FACTIONS } from "./traits-data.js";
 
@@ -42,7 +41,7 @@ const STATIONS = [
   { id: "codex", title: "The Codex", line: "Start here: a 3D book in 8 pages", color: 0x5f8a6e, model: "codex", href: "codex.html" },
   { id: "gallery", title: "Gallery", line: "All 1,024 agents, read from Ethereum", color: 0x8a6a9e, model: "gallery", href: "gallery.html" },
   { id: "agents", title: "My agents", line: "Your agents: wallet, settings, record", color: 0x4f7ea8, model: "agents", href: "agents.html" },
-  { id: "mint", title: "Mint", line: "On OpenSea · 1,024 agents", color: 0xe2b04a, model: "mint", href: CONFIG.openseaDropUrl, external: true },
+  { id: "market", title: "Market", line: "Floor, sales, holders and rarity", color: 0xe2b04a, model: "mint", href: "market.html" },
   { id: "lore", title: "Collection", line: "Classes, traits and rarity", color: 0x8a6a9e, model: "lore", panel: "lore" },
 ];
 const PANEL_TITLES = { guide: "Guide & FAQ", lore: "What an agent (NFT) is" };
