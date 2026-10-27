@@ -50,6 +50,15 @@ for (const [from, to] of [["placeholder.png", "placeholder.png"], ["og.png", "og
   if (existsSync(join(brand, from))) copyFileSync(join(brand, from), join(web, "assets", to));
 }
 writeFileSync(join(web, "assets/favicon.svg"), markSVG({ size: 64 }));
+// the Phone Brain's installable-app icons: the same mark (maskable: inside the 80 % safe zone, on paper)
+{
+  const inner = markSVG({ size: 100, bg: null }).replace(/^<svg[^>]*>|<\/svg>$/g, "");
+  const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 128 128" width="512" height="512"><rect x="-14" y="-14" width="128" height="128" fill="#f4efe6"/>${inner}</svg>`;
+  writeFileSync(join(web, "assets/pilot-icon.svg"), markSVG({ size: 64 }));
+  writeFileSync(join(web, "assets/pilot-maskable.svg"), maskable);
+  for (const [name, svg, px] of [["pilot-192.png", markSVG({ size: 512 }), 192], ["pilot-512.png", markSVG({ size: 512 }), 512], ["pilot-maskable-512.png", maskable, 512]])
+    await sharp(Buffer.from(svg)).resize(px, px).png({ compressionLevel: 9 }).toFile(join(web, "assets", name));
+}
 
 // Vendored libraries (pinned by package-lock): the site loads no third-party script at runtime.
 const nm = join(root, "node_modules");

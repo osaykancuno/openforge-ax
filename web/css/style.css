@@ -103,7 +103,7 @@ h3 { font-size: 18px; letter-spacing: -.01em; }
 .nav { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .nav .wrap { display: flex; align-items: center; gap: 20px; height: 60px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; font: 800 18px var(--display); letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
-.logo::before { content: ""; width: 14px; height: 22px; border-radius: 4px; background: var(--ink); box-shadow: inset 0 -4px 0 var(--accent); }
+.logo::before { content: ""; width: 30px; height: 30px; flex: none; background: url("../assets/favicon.svg") center / contain no-repeat; } /* the AX-1 mark (smiling): one source, art/brand/src/mark.mjs */
 .logo b { color: var(--accent-ink); font-weight: 800; }
 .nav .links { display: flex; gap: 4px; margin-left: auto; align-items: center; }
 .nav .links a { color: var(--ink-2); font-size: 14px; font-weight: 550; text-decoration: none; padding: 7px 10px; border-radius: 999px; }

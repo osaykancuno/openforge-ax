@@ -10,9 +10,9 @@ export const TERRA = "#c8553d";
  * @param {string|null} [o.bg] background fill, null = transparent
  * @param {"square"|"round"|"circle"} [o.shape] background shape
  * @param {[number, number]} [o.look] eye offset, -1..1 each
- * @param {"idle"|"happy"} [o.mood]
+ * @param {"idle"|"happy"} [o.mood] "happy" (arched, smiling eyes) is THE logo (user decision, 2026-10-27); "idle" = open eyes
  */
-export function markSVG({ size = 100, bg = PAPER, shape = "round", look = [0, 0], mood = "idle" } = {}) {
+export function markSVG({ size = 100, bg = PAPER, shape = "round", look = [0, 0], mood = "happy" } = {}) {
   const [lx, ly] = look;
   const ex = lx * 3, ey = ly * 2.5;
   const back =
