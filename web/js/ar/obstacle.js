@@ -7,6 +7,15 @@
 // up to the lens). The floor falls under MIN_H; something right in front of the camera falls outside the corridor and
 // makes those samples "not visible" instead. Without depth, hit-test rays feed the same tracker.
 //
+// Phones without a depth sensor (a Galaxy S24, for one) estimate depth from motion: on a plain floor it reads several per
+// cent short, which lifts the floor above MIN_H and blocked the Rover "0 cm ahead" on a clear floor. Two guards:
+//   1. Calibration, every evaluation: the floor AROUND the Rover (a ring beside and behind it, never the corridor ahead) is
+//      looked at too, and the median of measured / expected depth there is the phone's floor error right now (clamped to
+//      FLOOR_K_MIN..FLOOR_K_MAX). Every depth in the corridor is divided by it before it is judged.
+//   2. A surface has to stand clearly IN FRONT of the floor its line of sight would reach: nearer than that floor by
+//      FLOOR_ABS or FLOOR_REL of its distance, whichever is more. What is left of the floor error is ignored; anything
+//      rising from the floor still counts.
+//
 // Matrices are column-major Float32Array(16) as WebXR hands them out. View space: the camera looks down -Z, depth is the
 // distance along the view axis. Normalised view coordinates (u, v): origin top-left, v down. Pure: no DOM, no three.
 // Honesty: this is the PHONE's depth sensing, protecting the TWIN. It protects nothing else.
@@ -27,6 +36,11 @@ export const OBST = {
   BLIND_FRAC: 0.3, // below this fraction of the corridor in view, the tracker cannot judge ("blind")
 };
 const OCCLUDED_BY = 0.1; // m: a surface this much nearer than a sample hides it
+export const FLOOR_ABS = 0.05; // m: a surface must be at least this much nearer than the floor along its line of sight...
+export const FLOOR_REL = 0.06; // ...or this share of the floor's distance, whichever is more
+export const FLOOR_K_MIN = 0.7; // the floor calibration never believes the phone is more than 30% short...
+export const FLOOR_K_MAX = 1.2; // ...or 20% long
+const RING = { R: 0.35, STEP_DEG: 30, SKIP_DEG: 50, MIN: 4 }; // calibration ring: 35 cm around the Rover, not within 50 deg of ahead
 export const BLIND_MESSAGE = "Obstacle sensing: point the phone at the Rover";
 
 const xyz = (p) => (Array.isArray(p) || ArrayBuffer.isView(p) ? [p[0], p[1], p[2]] : [p.x, p.y, p.z]);
@@ -83,35 +97,66 @@ export function unproject(u, v, depthM, invProj, viewToWorld) {
 
 /**
  * Looks at every sample through the depth image.
- * -> { hits, nearestM, visibleFrac }: hits = samples whose real surface is inside the corridor volume; nearestM = the nearest
- * such surface, in metres from the front bumper (Infinity without hits); visibleFrac = share of the samples the camera
- * could actually judge (in view, valid depth, not hidden behind something near the lens).
+ * -> { hits, nearestM, visibleFrac, floorK, floorRatio }: hits = samples whose real surface is inside the corridor volume;
+ * nearestM = the nearest such surface, in metres from the front bumper (Infinity without hits); visibleFrac = share of the
+ * samples the camera could actually judge (in view, valid depth, not hidden behind something near the lens); floorK = the
+ * floor calibration used (1 when the ring could not be read); floorRatio = corrected depth / floor depth in the corridor
+ * (median, about 1 on a clear floor).
  */
 export function evaluateDepth({ samples, getDepth, worldToView, viewToWorld, proj, invProj, worldPose, floorY = worldPose.y }) {
   const fx = Math.sin(worldPose.yaw);
   const fz = Math.cos(worldPose.yaw);
+  const eyeY = viewToWorld[13]; // the camera's height in the world
+  // where the line of sight through (u, v) meets the floor (depth along the view axis); Infinity when it never does
+  const floorDepth = (u, v) => {
+    const y1 = unproject(u, v, 1, invProj, viewToWorld)[1];
+    return y1 < eyeY - 1e-6 && eyeY > floorY ? (eyeY - floorY) / (eyeY - y1) : Infinity;
+  };
+  const readDepth = (u, v) => {
+    const d = getDepth(u, v);
+    return typeof d === "number" && d > 0 && Number.isFinite(d) ? d : null;
+  };
+  const median = (a) => (a.sort((x, y) => x - y), a.length ? a[a.length >> 1] : null);
+  // 1. the phone's floor error right now, from the floor beside and behind the Rover
+  const ring = [];
+  for (let deg = 0; deg < 360; deg += RING.STEP_DEG) {
+    if (Math.min(deg, 360 - deg) < RING.SKIP_DEG) continue; // never the corridor ahead
+    const a = worldPose.yaw + (deg * Math.PI) / 180;
+    const pr = project({ x: worldPose.x + Math.sin(a) * RING.R, y: floorY, z: worldPose.z + Math.cos(a) * RING.R }, worldToView, proj);
+    if (!pr) continue;
+    const d = readDepth(pr.u, pr.v);
+    const fd = floorDepth(pr.u, pr.v);
+    if (d !== null && Number.isFinite(fd)) ring.push(d / fd);
+  }
+  const k = ring.length >= RING.MIN ? Math.min(FLOOR_K_MAX, Math.max(FLOOR_K_MIN, median(ring))) : 1;
   let hits = 0;
   let visible = 0;
   let nearest = Infinity;
+  const ratios = []; // corrected depth / floor depth, for the debug panel
   for (const s of samples) {
     const pr = project(s, worldToView, proj);
     if (!pr) continue; // out of view
-    const d = getDepth(pr.u, pr.v);
-    if (typeof d !== "number" || !(d > 0) || !Number.isFinite(d)) continue; // no depth there
+    const raw = readDepth(pr.u, pr.v);
+    if (raw === null) continue; // no depth there
+    const d = raw / k;
+    const floorD = floorDepth(pr.u, pr.v);
+    if (Number.isFinite(floorD)) ratios.push(d / floorD);
+    // 2. it must stand clearly in front of the floor its line of sight would reach
+    const standsOut = d < floorD - Math.max(FLOOR_ABS, FLOOR_REL * floorD);
     const [sx, sy, sz] = unproject(pr.u, pr.v, d, invProj, viewToWorld);
     const dx = sx - worldPose.x;
     const dz = sz - worldPose.z;
     const along = dx * fx + dz * fz - FRONT;
     const lateral = dx * fz - dz * fx;
     const h = sy - floorY;
-    if (along >= 0 && along <= OBST.LOOKAHEAD && Math.abs(lateral) < OBST.HALF_W && h > OBST.MIN_H && h < OBST.MAX_H) {
+    if (standsOut && along >= 0 && along <= OBST.LOOKAHEAD && Math.abs(lateral) < OBST.HALF_W && h > OBST.MIN_H && h < OBST.MAX_H) {
       hits++;
       visible++;
       if (along < nearest) nearest = along;
     } else if (d >= pr.zView - OCCLUDED_BY) visible++; // the sample's own line of sight is free (it ends on the floor or a far wall)
     // else: something near the lens hides this sample: not visible
   }
-  return { hits, nearestM: nearest, visibleFrac: samples.length ? visible / samples.length : 0 };
+  return { hits, nearestM: nearest, visibleFrac: samples.length ? visible / samples.length : 0, floorK: k, floorRatio: median(ratios) };
 }
 
 /**

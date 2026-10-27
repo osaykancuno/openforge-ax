@@ -1,5 +1,7 @@
 // The AR page's parser: what the AI Pilot's built-in parser understands, plus
 //   * extensions (objects: "what do you see", "go to the cup"...) that run first,
+//   * the chip names said out loud: "left", "right" and "spin" alone do what the Left, Right and Spin chips do (the page
+//     tells people to say "spin"; the shared parser only reads "turn left", "spin around"),
 //   * an obstacle filter: while something is in the Rover's way, forward drives are dropped (turns and backing up stay),
 //   * a final validatePlan, so no extension and no filter can produce a step the AI Pilot's own rules would not allow.
 // Text is untrusted (a voice transcript): invisible and bidi characters are stripped before any parser sees it.
@@ -9,9 +11,32 @@
 // order, the first non-null wins; one that throws or returns something that is not a result is skipped.
 import { parseCommand } from "../pilot/ai/grammar.js";
 import { cleanSay, validatePlan } from "../pilot/ai/tools.js";
+import { chipText } from "./chips.js";
 
 const MAX_TEXT = 2000;
 const FORWARD = /^forward/;
+
+// a clause that is only a chip's name (as speech recognition writes it) -> that chip's phrase
+const SPOKEN = [
+  [/^(?:go |move )?left$/, "left"],
+  [/^(?:go |move )?right$/, "right"],
+  [/^(?:do a )?spin$/, "spin"],
+];
+const CLAUSE_SPLIT = /\s*(?:[,;.!?]+|\band then\b|\bthen\b|\band\b)\s*/i;
+
+/** "forward then left" -> "forward then turn left 45"; text without a chip-name clause comes back unchanged. */
+export function spokenAliases(text) {
+  const clauses = String(text).split(CLAUSE_SPLIT).filter((c) => c.trim());
+  let changed = false;
+  const out = clauses.map((c) => {
+    const key = c.trim().toLowerCase();
+    const hit = SPOKEN.find(([re]) => re.test(key));
+    if (!hit) return c.trim();
+    changed = true;
+    return chipText(hit[1]);
+  });
+  return changed ? out.join(" then ") : text;
+}
 
 const isForward = (s) => !!s && s.tool === "drive" && typeof s.direction === "string" && FORWARD.test(s.direction);
 const isResult = (r) => r !== null && typeof r === "object" && Array.isArray(r.steps);
@@ -54,7 +79,7 @@ export function createArParser({ getBlocked = () => null, getMode = () => "xr", 
     }
     if (!result) {
       try {
-        result = base(clean, bodyKey, opts);
+        result = base(spokenAliases(clean), bodyKey, opts);
       } catch {
         result = { steps: [], say: "I could not read that. Try: forward 2 s, turn left, look up.", unknown: [], rejected: [] };
       }

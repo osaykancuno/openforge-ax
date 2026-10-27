@@ -523,6 +523,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       `hit results ${dbg.hitResults} · floor hits ${dbg.upHits} · up ${dbg.upY ?? "-"} · reticle ${reticle.visible}`,
       `placed ${view.placed} · root visible ${placeRoot.visible} scale ${r2(placeRoot.scale.x)} · rover ${w ? [w.x, w.y, w.z].map(r2).join(", ") : "-"}`,
       `camera ${[cam.x, cam.y, cam.z].map(r2).join(", ")} · distance ${w ? r2(Math.hypot(w.x - cam.x, w.y - cam.y, w.z - cam.z)) : "-"} m · rover on screen ${dbg.ndc ? dbg.ndc.join(", ") : "-"}`,
+      `depth: hits ${dbg.depth ? dbg.depth.hits : "-"} · in view ${dbg.depth ? r2(dbg.depth.visibleFrac) : "-"} · nearest ${dbg.depth && Number.isFinite(dbg.depth.nearestM) ? r2(dbg.depth.nearestM) : "-"} m · floor k ${dbg.depth ? r2(dbg.depth.floorK) : "-"} · depth/floor ${dbg.depth && dbg.depth.floorRatio !== null ? r2(dbg.depth.floorRatio) : "-"}`,
       `test cube ${dbg.cube ? "magenta, 60 cm ahead of the start" : "off"}`,
     ].join("\n");
   }
@@ -564,6 +565,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       worldPose: world,
       floorY,
     });
+    if (debug) dbg.depth = res;
     sendObstacle(tracker.update({ hits: res.hits, nearestM: res.nearestM, visibleFrac: res.visibleFrac, source: "depth" }));
   }
 

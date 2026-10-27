@@ -305,7 +305,11 @@ or chips through the same AI Pilot, built-in parser and drive loop as `pilot.htm
 - **Obstacles** (AR mode, phones with the ARCore Depth API): the phone's depth is read along the twin's forward
   corridor (60 cm ahead, Rover width, 5–26 cm above the floor). Three frames with hits block forward drives ("Something is
   in my way (about 30 cm ahead)."); turns and backing up still work; eight clear frames unblock. Without depth a forward
-  hit-test ray is used. When the corridor is out of view the chip says so and nothing is blocked.
+  hit-test ray is used. When the corridor is out of view the chip says so and nothing is blocked. Most phones (a Galaxy
+  S24 too) have no depth sensor and estimate depth from motion, which reads a plain floor several per cent short: every
+  evaluation calibrates that error on the floor beside and behind the Rover, and a surface counts only when it stands
+  clearly in front of the floor (5 cm or 6% of its distance). Things about 20 cm tall or more are found; lower ones only
+  with the phone about a metre away or closer.
 
 **Look around (optional, off by default).** Finds the 80 COCO object types (cup, chair, person, …) with MediaPipe
 Tasks Vision 1.1.1 and the EfficientDet-Lite0 int8 model, both self-hosted under `vendor/mediapipe/` (Apache 2.0, the

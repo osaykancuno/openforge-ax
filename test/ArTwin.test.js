@@ -339,10 +339,10 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
   describe("ar-parse: parser with obstacle filter and extensions", () => {
     const corpus = [
       "forward", "forward 2 s", "go forward slowly", "back 1 s then turn right", "turn left 45", "turn left 180 then turn left 180",
-      "look left then look right then look up then look center", "turn left 30 then turn right 60 then turn left 30", "spin", "wave", "hello",
-      "nod", "sing me a song", "stop", "", "   ", "forward 5 meters", "turn around", "drive forward 3 s then wait 2 then back 3 s", "go left",
+      "look left then look right then look up then look center", "turn left 30 then turn right 60 then turn left 30", "wave", "hello",
+      "nod", "sing me a song", "stop", "", "   ", "forward 5 meters", "turn around", "drive forward 3 s then wait 2 then back 3 s",
       "forward 99 s", "speed 30 then forward 2", "forward, back, forward, back, forward, back, forward, back, forward, back, forward, back, forward, back",
-      "look 90 degrees left", "reverse", "AX-1 please move forward", "forward and left", "turn left and wait", "freeze",
+      "look 90 degrees left", "reverse", "AX-1 please move forward", "turn left and wait", "freeze",
     ];
 
     it("with no obstacle and no extension the output deep-equals parseCommand over a corpus (any userSpeed)", () => {
@@ -354,6 +354,22 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       }
       expect(parse("forward", "rover")).to.deep.equal(GR.parseCommand("forward", "rover", {}));
       expect(parse("forward", "nonsense", {})).to.deep.equal(GR.parseCommand("forward", "nonsense", {}));
+    });
+
+    it("chip names said out loud do what the chip does: left, right, spin (also inside a longer sentence)", () => {
+      const parse = ARP.createArParser({ getBlocked: () => null, getMode: () => "xr" });
+      const same = (said, phrase) => expect(parse(said, "rover", { userSpeed: 60 }), said).to.deep.equal(GR.parseCommand(phrase, "rover", { userSpeed: 60 }));
+      for (const id of ["left", "right", "spin"]) {
+        const phrase = CH.chipText(id);
+        for (const said of [id, id[0].toUpperCase() + id.slice(1) + ".", `${id}!`]) same(said, phrase);
+      }
+      same("go left", CH.chipText("left"));
+      same("do a spin", CH.chipText("spin"));
+      same("forward then left", `forward then ${CH.chipText("left")}`);
+      same("Forward, right.", `Forward then ${CH.chipText("right")}`);
+      // what the shared parser already reads is left alone
+      for (const t of ["turn left", "spin around", "look left", "left wheel"]) expect(ARP.spokenAliases(t), t).to.equal(t);
+      expect(parse("spin", "rover").steps.length).to.be.greaterThan(0);
     });
 
     const blocked = { distanceM: 0.3, message: "Something is in my way (about 30 cm ahead)." };
@@ -588,6 +604,32 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(far.hits).to.equal(0);
     });
 
+    it("a phone's depth-from-motion floor error is not an obstacle: 8-25% short everywhere, +-6% noise, a 4 cm floor mismatch", () => {
+      const cam = camera();
+      const scaled = (k, noise = 0) => {
+        const base = sceneDepth(cam, {});
+        let seed = 7;
+        const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) * 2 - 1;
+        return (u, v) => base(u, v) * (k + rnd() * noise);
+      };
+      const run = (getDepth, floorY = 0) => OB.evaluateDepth({ samples: OB.corridorSamples({ ...pose0, y: floorY }), getDepth, worldToView: cam.worldToView, viewToWorld: cam.viewToWorld, proj: cam.proj, invProj: cam.invProj, worldPose: { ...pose0, y: floorY }, floorY });
+      // the old rule (only "higher than 5 cm") counted this floor as an obstacle: the Galaxy S24 bug, "0 cm ahead"
+      const short = run(scaled(0.92));
+      expect(short.hits).to.equal(0);
+      expect(short.visibleFrac).to.be.greaterThan(0.8);
+      expect(short.floorK).to.be.within(0.91, 0.93); // calibrated from the floor around the Rover
+      expect(short.floorRatio).to.be.within(0.98, 1.02);
+      for (const k of [0.85, 0.75]) expect(run(scaled(k)).hits, `floor x${k}`).to.equal(0);
+      expect(run(scaled(0.85, 0.05)).hits, "15% short with noise").to.equal(0);
+      expect(run(scaled(1, 0.06)).hits).to.equal(0);
+      expect(run(scaled(1), 0.04).hits).to.equal(0); // the hit-test floor 4 cm above the depth floor
+      expect(run(scaled(1), -0.04).hits).to.equal(0); // and 4 cm below it
+      // a real obstacle still counts with the same errors on top
+      const wall = sceneDepth(cam, { wall: { z: 0.4 } });
+      expect(run((u, v) => wall(u, v) * 0.95).hits).to.be.at.least(OB.OBST.MIN_HITS);
+      expect(run((u, v) => wall(u, v) * 0.85).hits, "a wall seen through a 15% short phone").to.be.at.least(OB.OBST.MIN_HITS);
+    });
+
     it("a floor with +-3 cm depth noise stays clear", () => {
       const cam = camera();
       const e = evalScene(cam, { noise: 0.03 });
@@ -597,10 +639,12 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       for (let i = 0; i < 20; i++) expect(t.update({ ...e, source: "depth" }).state).to.equal("clear");
     });
 
-    it("something low on the floor (below 5 cm) does not stop the rover; something 12 cm tall does", () => {
+    it("something low on the floor (below 5 cm) does not stop the rover; 20 cm does from 1.5 m, 12 cm from about 1 m", () => {
       const cam = camera();
       expect(evalScene(cam, { wall: { z: 0.4, h: 0.03 } }).hits).to.equal(0);
-      expect(evalScene(cam, { wall: { z: 0.4, h: 0.12 } }).hits).to.be.at.least(OB.OBST.MIN_HITS);
+      expect(evalScene(cam, { wall: { z: 0.4, h: 0.2 } }).hits).to.be.at.least(OB.OBST.MIN_HITS);
+      // a low thing must stand out from the floor by more than a phone's depth error: closer, it does
+      expect(evalScene(camera([0, 1.1, 0.9], [0, 0, 0.2]), { wall: { z: 0.4, h: 0.12 } }).hits).to.be.at.least(OB.OBST.MIN_HITS);
     });
 
     it("a hand in front of the lens (near-camera occluder) is no hit, and the corridor reads as not visible: blind", () => {
@@ -954,6 +998,15 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       say("halt now please");
       expect(r.ctl.state).to.equal("latched");
       await r.armButton();
+      // a stop word anywhere in the sentence stops at once, without a plan: "ok stop", "please stop now"
+      for (const said of ["OK stop", "please stop now"]) {
+        r.ctl.listen();
+        r.order.length = 0;
+        say(said);
+        expect(r.order[0], said).to.equal("ai.cancel:stop");
+        expect(r.ctl.state, said).to.equal("latched");
+        await r.armButton();
+      }
       r.ctl.listen();
       say("turn left 45");
       await r.frames(100);

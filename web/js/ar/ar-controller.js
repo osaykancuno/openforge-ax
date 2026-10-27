@@ -23,7 +23,7 @@ import { edgeAhead, isForwardStep, isForwardWheels } from "./obstacle.js";
 export const STATES = { READY: "ready", STARTING: "starting", PLACING: "placing", ARMED: "armed", LATCHED: "latched" };
 export const CAMERA_SENSING = "Obstacle sensing needs Android Chrome AR";
 const MAX_SAY = 500;
-const STOP_WORDS = /^\s*(stop|halt|freeze|brake|abort)\b/i;
+const STOP_WORDS = /\b(stop|halt|freeze|brake|abort)\b/i; // anywhere in the sentence: "ok stop" stops at once
 const BLUR_MESSAGE = "AR is paused (something is on top of the camera view), so I stopped moving.";
 const EMPTY_AI = Object.freeze({ state: "idle", running: false, busy: false, messages: [], plan: null, progress: null });
 const ROVER = P.bodyByKey("rover");
@@ -286,7 +286,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       return ok;
     },
 
-    /** A request in words (voice transcript, chip phrase): untrusted text. "stop" at the start is STOP. */
+    /** A request in words (voice transcript, chip phrase): untrusted text. A stop word anywhere in it is STOP. */
     async say(text, { source = "text" } = {}) {
       if (!loop || !ai || state === STATES.READY || state === STATES.STARTING) return null;
       const clean = cleanSay(typeof text === "string" ? text : "", MAX_SAY);
