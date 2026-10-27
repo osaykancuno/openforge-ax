@@ -352,7 +352,7 @@ export const CHAPTERS = [
   },
   {
     number: "07", kicker: "On-chain", title: "Agents on-chain",
-    body: `<p>The lab is free, no wallet needed. The collection is optional: <b>1,024 NFT agents</b> that act as lab membership and logbook. Each has a robot class, <b>its own wallet</b> (a standard called ERC-6551) and a <b>record</b> of verified lab missions, failures included. Records from real robots come later.</p><p>New agents start in <b>Manual</b>: the agent proposes, you approve. In no mode can it move your NFTs. It is a collectible with tools, not an investment: <b>no returns promised</b>, and the price can fall.</p>`,
+    body: `<p><b>1,024 NFT agents</b> are the heart of the lab: your membership and your logbook. Each has a robot class, <b>its own wallet</b> (a standard called ERC-6551) and a <b>record</b> of verified lab missions, failures included. Records from real robots come later.</p><p>New agents start in <b>Manual</b>: the agent proposes, you approve. In no mode can it move your NFTs. It is a collectible with tools, not an investment: <b>no returns promised</b>, and the price can fall.</p>`,
     actions: [{ id: "wallet", label: "Show its wallet" }, { id: "record", label: "Log a mission" }, { id: "manual", label: "Manual mode" }],
     build({ animate }) {
       const group = new THREE.Group();

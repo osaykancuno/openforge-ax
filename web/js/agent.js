@@ -37,7 +37,7 @@ const refresh = () => load().catch(failed);
 const readFailed = (e) => (isOffline(e) ? (console.warn("Ethereum RPC unreachable"), toast(OFFLINE, true)) : toast(e?.shortMessage || "Something went wrong.", true));
 
 if (!available) {
-  $("name").textContent = id ? "Agents will appear here once minting starts. The lab works without them." : "Agent not found. Check the number, or browse the Gallery.";
+  $("name").textContent = id ? "Agents appear here as they are minted, on OpenSea." : "Agent not found. Check the number, or browse the Gallery.";
 }
 
 async function load() {

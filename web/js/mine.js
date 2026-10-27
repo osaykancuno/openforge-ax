@@ -26,7 +26,7 @@ async function show(s) {
     return;
   }
   if (!ids.length) {
-    state.innerHTML = `<p>This wallet has no agents yet. The lab works without one.</p><a class="btn primary magenta" href="market.html">See the market</a>`;
+    state.innerHTML = `<p>This wallet has no agents yet. An agent keeps your verified runs on its record and has a wallet of its own.</p><a class="btn primary magenta" href="market.html">See the market</a>`;
     return;
   }
   state.style.display = "none";

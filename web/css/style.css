@@ -529,6 +529,7 @@ body.codex-lensing .codex-page.on-paper, body.codex-lensing .codex-page.on-paper
   color: var(--ink); background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 6px 8px; backface-visibility: hidden;
 }
 .codex-page.on-paper .btn { background: transparent; color: var(--ink); border-color: var(--ink); font-size: calc(13px * var(--fit, 1)); min-height: calc(36px * var(--fit, 1)); padding: calc(6px * var(--fit, 1)) calc(13px * var(--fit, 1)); }
+.codex-page.on-paper .codex-status { font-size: calc(13.5px * var(--fit, 1)); min-height: 0; }
 .codex-page.on-paper .codex-status:empty { min-height: 0; margin: 0; } /* no reserved line on paper: room for the text */
 .codex-page.on-paper .codex-try-label, .codex-page.on-paper .kicker { font-size: calc(11px * var(--fit, 1)); }
 .codex-page.on-paper .codex-try .row, .codex-page.on-paper .codex-end { gap: calc(8px * var(--fit, 1)); }

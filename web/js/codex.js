@@ -43,6 +43,8 @@ const speak = (id) => (text) => {
 };
 const announce = speak("pageStatus");
 const setStatus = speak("chStatus");
+// an action's result line is part of the printed page: fit the page again whenever it changes
+new MutationObserver(() => fitPage()).observe($("chStatus"), { childList: true, characterData: true, subtree: true });
 
 /** Printed on the book: the text shrinks until the chapter and its buttons fit the page (no scrollbar on paper); when
  *  that leaves it small on screen, the magnifier (below) reads it. */

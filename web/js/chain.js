@@ -310,8 +310,8 @@ export function renderChrome(active) {
       <a href="robot.html" data-k="robot">Robot Link</a>
       <a href="gallery.html" data-k="gallery">Gallery</a>
       <a href="agents.html" data-k="mine">My agents</a>
-      <a class="btn sm magenta" id="mintNav" href="market.html" data-k="market" title="Floor price, sales, holders and rarity. Optional: the lab is free without an agent">Market</a>
-      <button class="btn sm" id="connectBtn" title="Optional: the lab works without a wallet">Connect wallet</button>
+      <a class="btn sm magenta" id="mintNav" href="market.html" data-k="market" title="Floor price, sales, holders and rarity of the 1,024 agents">Market</a>
+      <button class="btn sm" id="connectBtn" title="Connect to fly your agents and save their verified runs">Connect wallet</button>
     </div></div>`;
   const skip = document.querySelector(".skip"); // the skip link stays first, so it can skip the nav
   if (skip) skip.after(nav);

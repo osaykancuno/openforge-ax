@@ -39,14 +39,14 @@ press.
 |---|---|---|---|---|
 | `ax1-signal-teaser-1080x1350.mp4` | Teaser, days 1–3. Dark, no logo | Something is waking up. | Something in the lab is waking up. Watch closely: every frame hides something. | Dark screen. Two robot eyes flicker on through glitches. |
 | `ax1-turntable.gif` / `.mp4` | Reveal of AX-1 | FIG. 01 · AX-1 Rover | AX-1: a robot whose brain is your phone. Open, CC0, free to explore in 3D. | A small robot with a phone for a head turns on a turntable. |
-| `ax1-wave.gif` / `.mp4` | Warmth, replies | FIG. 02 · Hello, pilot | AX-1 says hello. Next, you give it something to do. The lab is free and needs no wallet. | The AX-1 Desk robot waves one arm, smiling on its phone screen. |
+| `ax1-wave.gif` / `.mp4` | Warmth, replies | FIG. 02 · Hello, pilot | AX-1 says hello. Next, you give it something to do. Explore the lab; hold an agent and your runs go on its record. | The AX-1 Desk robot waves one arm, smiling on its phone screen. |
 | `ax1-reveal-1920x1080.mp4` | Reveal day, YouTube, Discord | Your phone is the brain. | Three bodies, one brain: the phone you already own. Meet AX-1. | Three AX-1 robots, then the OpenForge AX logo. |
 | `why-a-phone-1080x1350.mp4` / `.png` | "Why a phone?" day | A robot needs a brain. You already own one. | Cameras, mic, motion sensors, an AI chip, a screen, a battery. AX-1 borrows the phone you own; the body adds motors. | A phone face, then the phone's built-in parts, then the AX-1 Rover. |
 | `ax1-hero-1600x900.png` | X header posts, press, Discord | Your phone is the brain. | AX-1's brain is the phone you already own. Drive its 3D twin today. Real-robot control is in development. | Three AX-1 robots next to the title. |
 | `ax1-portrait-1080x1350.png` | Instagram feed | Meet AX-1. | A mascot and a robot. Models, firmware, app and docs are CC0. Fork it, build it, improve it. | The AX-1 Desk robot, smiling and waving. |
-| `ax1-story-1080x1920.png` | Stories, reels cover | Tap in. Drive AX-1. | Free. No wallet. Pick a robot, learn how it works in 3D, then test yourself. | The AX-1 Rover, large, under the title. |
+| `ax1-story-1080x1920.png` | Stories, reels cover | Tap in. Drive AX-1. | Pick a robot, learn how it works in 3D, then pilot it. Your agent keeps the record. | The AX-1 Rover, large, under the title. |
 | `class-lineup-1600x900.png` | Collection posts, FIG. drops | 11 robots. One lab. | Three AX-1 bodies and eight classes inspired by open platforms. Each one explained in 3D. | Eleven robots in a grid, each labelled with its FIG. number. |
-| `lab-tour-1280x720.mp4` | Lab opening | (none) | The lab in 20 seconds: Workbench, Proving Grounds, Phone Brain, Market. Free to use, no wallet needed. | Screens of the OpenForge lab, one after another. |
+| `lab-tour-1280x720.mp4` | Lab opening | (none) | The lab in 20 seconds: Workbench, Proving Grounds, Phone Brain, Market. Open to explore; agents keep the verified record. | Screens of the OpenForge lab, one after another. |
 | `art/brand/x-header.png`, `banner.png`, `logo.png`, `og.png` | Profiles, OpenSea | Brand | `npm run brand` rebuilds them from the same models. | |
 
 Cut the 8 s teaser to 6 s for TikTok if needed. Never add music with lyrics; the lab's own ambient tracks are CC0.
@@ -79,7 +79,7 @@ Cut the 8 s teaser to 6 s for TikTok if needed. Never add music with lyrics; the
 ### Week 2: the lab opens
 | Day | Channel | Format | Goal | Hook | Asset |
 |---|---|---|---|---|---|
-| 8 | All | Video | **Lab opens** | "The lab is open. Free. No wallet." | lab tour |
+| 8 | All | Video | **Lab opens** | "The lab is open. Explore it; your agent makes it count." | lab tour |
 | 9 | X, IG | Image | Scale | "11 robots. Explained in 3D." | lineup |
 | 10 | X, IG/TikTok | Video + thread (8) | **Why a phone?** | "Why is AX-1's brain a phone?" | why-a-phone |
 | 11 | X | Thread (5) | The verified record | "Your run, replayed and written on-chain." | lab tour clip, hero |
@@ -141,7 +141,7 @@ Set baselines in week 1; no invented targets.
 | Real runs and real bugs | Fake countdowns, fake scarcity, fake testimonials |
 | "Designed to stop and hold" | "Safe" without the qualifier; a real AX-1 driving today |
 | Mint links only to OpenSea | Links in DMs; any other mint site |
-| "The lab is free" | Component prices, cost comparisons, "cheap robot" |
+| Agents are the heart of the lab (never "optional") | Component prices, cost comparisons, "cheap robot" |
 
 ---
 
