@@ -239,7 +239,7 @@ export function createMissionRunner({ robotId, view = null, scenes = null, getRi
         parts.push(b);
       } else if (c.type === "pad") {
         const fs = el("fieldset", "bn-pad");
-        fs.append(el("legend", null, `${c.label} (hold the button or the key)`));
+        fs.append(el("legend", null, `${c.label} (${c.hint || "hold the button or the key"})`));
         for (const p of c.buttons) {
           const b = el("button", "btn sm", p.label);
           b.type = "button";

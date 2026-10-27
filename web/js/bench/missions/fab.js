@@ -148,17 +148,45 @@ export const mission = {
     { type: "pulse", id: "homeX", label: "Home X", levels: ["home"] },
     { type: "pulse", id: "homeY", label: "Home Y", levels: ["home"] },
     { type: "pulse", id: "homeZ", label: "Home Z", levels: ["home"] },
-    { type: "pad", id: "jog", label: "Jog", buttons: [{ id: "yp", label: "Y+", key: "ArrowUp" }, { id: "xm", label: "X−", key: "ArrowLeft" }, { id: "ym", label: "Y−", key: "ArrowDown" }, { id: "xp", label: "X+", key: "ArrowRight" }, { id: "zp", label: "Z up", key: "PageUp" }, { id: "zm", label: "Z down", key: "PageDown" }] },
+    { type: "mode", id: "jogStep", label: "Jog step (X, Y)", levels: ["square", "layer"], options: [{ id: "10", label: "10 mm" }, { id: "1", label: "1 mm" }], value: "10" },
+    { type: "pad", id: "jog", label: "Jog", hint: "X and Y: one step per press, hold to repeat · Z: hold", buttons: [{ id: "yp", label: "Y+", key: "ArrowUp" }, { id: "xm", label: "X−", key: "ArrowLeft" }, { id: "ym", label: "Y−", key: "ArrowDown" }, { id: "xp", label: "X+", key: "ArrowRight" }, { id: "zp", label: "Z up", key: "PageUp" }, { id: "zm", label: "Z down", key: "PageDown" }] },
     { type: "pulse", id: "gotoZ", label: "Go to Z 0.2", levels: ["square", "layer"], key: "z" },
     { type: "pulse", id: "babyDown", label: "Baby-step −0.05", levels: ["layer"], key: "-" },
     { type: "pulse", id: "babyUp", label: "Baby-step +0.05", levels: ["layer"], key: "=" },
     { type: "toggle", id: "ext", label: "Extrude", levels: ["square", "layer"], key: "e" },
   ],
-  uiDefaults: () => ({ ext: false }),
-  toAction(ui) {
+  uiDefaults: (s) => ({ ext: !!s.ext }),
+  /**
+   * X and Y jog a fixed step per press, like a printer's jog panel (10 or 1 mm; holding repeats every 0.15 s after
+   * 0.4 s): a hold-to-move jog at 20 mm/s could not stop within the 1 mm the perimeter needs. Z keeps the continuous
+   * jog. The step targets live on `ui` (one run's controls); the recorded action is still a plain jog speed.
+   */
+  toAction(ui, s) {
     const h = ui.held || {}, p = ui.pulse || {};
+    let jx = 0, jy = 0;
+    if (s) {
+      const goal = (ui.jogGoal ||= {}), since = (ui.jogSince ||= {});
+      const step = Number(ui.mode) || 10;
+      for (const [id, ax, dir] of [["xp", "x", 1], ["xm", "x", -1], ["yp", "y", 1], ["ym", "y", -1]]) {
+        if (!h[id]) {
+          delete since[id];
+          continue;
+        }
+        const first = since[id] == null;
+        if (first) since[id] = s.t;
+        const after = s.t - since[id] - 0.4;
+        if (first || (after >= 0 && Math.floor(after / 0.15) !== Math.floor((after - DT) / 0.15))) goal[ax] = clamp(Math.round(goal[ax] ?? s[ax]) + dir * step, 0, BED);
+      }
+      for (const ax of ["x", "y"]) {
+        if (goal[ax] == null) continue;
+        const v = q(clamp((goal[ax] - s[ax]) / (XY_SPEED * DT), -1, 1), 4);
+        if (ax === "x") jx = v;
+        else jy = v;
+        if (Math.abs(goal[ax] - s[ax]) < 1e-6 || !s.homed[ax]) delete goal[ax]; // an unhomed axis refuses once, then forgets
+      }
+    }
     return {
-      jx: (h.xp ? 1 : 0) - (h.xm ? 1 : 0), jy: (h.yp ? 1 : 0) - (h.ym ? 1 : 0), jz: (h.zp ? 1 : 0) - (h.zm ? 1 : 0),
+      jx, jy, jz: (h.zp ? 1 : 0) - (h.zm ? 1 : 0),
       ext: !!ui.ext, home: p.homeX ? "x" : p.homeY ? "y" : p.homeZ ? "z" : null, gotoZ: !!p.gotoZ, baby: p.babyUp ? 1 : p.babyDown ? -1 : 0,
     };
   },

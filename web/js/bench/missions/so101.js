@@ -177,6 +177,9 @@ export const mission = {
     const { tip } = fk(s.joints);
     const parts = [`Tip ${(tip.x * 100).toFixed(1)} fwd, ${(-tip.y * 100).toFixed(1)} side, ${(tip.z * 100).toFixed(1)} cm up`, `gripper ${s.joints[5] > 50 ? "open" : "closed"}`];
     if (s.target) parts.push(`marker ${s.metrics.distanceCm ?? "–"} cm away`);
+    // how far the gripper is from grabbing: closing grasps a cube within 3 cm of the tip
+    const free = s.cubes.filter((c) => c.mode === "table");
+    if (s.held < 0 && free.length) parts.push(`nearest cube ${(Math.min(...free.map((c) => Math.hypot(tip.x - c.x, tip.y - c.y, tip.z - c.z))) * 100).toFixed(1)} cm from the tip (close the gripper within 3 cm)`);
     if (s.dock) parts.push(`cube ${s.held === 0 ? "held" : "on table"}, ${s.metrics.dockCm ?? "–"} cm from dock`);
     if (s.level === "stack") parts.push(`cubes ${s.metrics.offsetMm ?? "–"} mm apart`);
     return parts.join(" · ");

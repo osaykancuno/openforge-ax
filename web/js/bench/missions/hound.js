@@ -75,6 +75,21 @@ function step(s, a, dt = DT) {
   return s;
 }
 
+/**
+ * The next move toward a stand. The good poses are a narrow diagonal (knee bend ≈ twice the thigh angle), so the
+ * readout names the slider: more bend brings the feet back under the hips, and thigh and bend move together (1 : 2)
+ * to raise or lower the body without moving the feet.
+ */
+function standHint(s) {
+  const x = s.footX ?? leg(s.thigh, s.bend).x, h = s.height;
+  if (x >= 0.025) return "next: knee bend +";
+  if (x <= -0.025) return "next: knee bend −";
+  if (s.bend < 20) return "next: knee bend +";
+  if (h < 0.13) return "next: thigh − and knee bend − together (about 1 : 2)";
+  if (h > 0.16) return "next: thigh + and knee bend + together (about 1 : 2)";
+  return "hold it";
+}
+
 function finish(s, ok, reason) {
   s.done = true;
   s.success = ok;
@@ -109,7 +124,7 @@ export const mission = {
     return standardScore(mission, trace, replay(mission, trace));
   },
   readout(s) {
-    if (s.level === "stand") return `Body height ${(s.height * 100).toFixed(1)} cm · feet ${s.metrics.footCm ?? 0} cm from under the hips · knee bend ${Math.round(s.bend)}°`;
+    if (s.level === "stand") return `Body height ${(s.height * 100).toFixed(1)} cm · feet ${s.metrics.footCm ?? 0} cm from under the hips · knee bend ${Math.round(s.bend)}° · ${standHint(s)}`;
     const out = [`${s.mode === "trot" ? "Trotting" : "Standing"}`, `speed ${(s.v * 100).toFixed(0)} cm/s`, `stumble ${Math.round(s.stumble * 100)} %`];
     if (s.level === "trot") out.push(`${Math.max(0, Math.round(s.z * 100))} / 100 cm`);
     else out.push(`heading ${Math.round(s.heading / RAD)}° (goal ${Math.round(s.goal / RAD)}°)`, `drift ${s.metrics.distanceCm ?? 0} cm`);

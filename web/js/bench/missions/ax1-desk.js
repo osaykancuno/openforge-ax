@@ -107,7 +107,7 @@ export const mission = {
     const out = [`Gaze ${Math.round(g.az)}° / ${Math.round(g.el)}°`, `arm points ${Math.round(p.az)}° / ${Math.round(p.el)}°`];
     if (s.level === "look") out.push(`target ${s.target.az}° / ${s.target.el}°, off by ${s.metrics.gazeErr ?? "–"}°`);
     if (s.level === "wave") out.push(`swings ${s.swings}/4`);
-    if (s.level === "point") out.push(`next: object ${Math.min(s.k, 2) + 1} of 3 (${s.objects[s.order[Math.min(s.k, 2)]].az}°), off by ${s.metrics.pointErr ?? "–"}°`);
+    if (s.level === "point") out.push(`next: object ${Math.min(s.k, 2) + 1} of 3 (${s.objects[s.order[Math.min(s.k, 2)]].az}° / ${s.objects[s.order[Math.min(s.k, 2)]].el}°), off by ${s.metrics.pointErr ?? "–"}°`);
     return out.join(" · ");
   },
   solve(level, seed) {
