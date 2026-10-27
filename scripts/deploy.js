@@ -91,7 +91,7 @@ async function main() {
   await tx("presentation", renderer.setPresentation(imageUri(env.PLACEHOLDER_IMAGE, env.EXTERNAL_URL) ? env.PLACEHOLDER_IMAGE : "ipfs://__PLACEHOLDER_CID__", site, license));
   const contractMeta = {
     name: "OpenForge Agents",
-    description: "OpenForge AX: the 1,024 members of an open robotics lab. Each NFT is an agent with its own wallet (ERC-6551) and an on-chain record; each class maps to a real open-source robot. Meet AX-1, the CC0 robot with a phone for a brain. Art, metadata and code are CC0 (public domain). No promise of returns.",
+    description: "OpenForge AX: the 1,024 members of an open robotics lab. Each NFT is an agent with its own wallet (ERC-6551) and an on-chain record; most classes are inspired by a real open-source robot (the AX-1 bodies are our own). Meet AX-1, the CC0 robot with a phone for a brain. Art, metadata and code are CC0 (public domain). No promise of returns.",
     image: imageUri(env.COLLECTION_IMAGE, env.EXTERNAL_URL) ? env.COLLECTION_IMAGE : "ipfs://__COLLECTION_IMAGE_CID__",
     banner_image: imageUri(env.COLLECTION_BANNER, env.EXTERNAL_URL) ? env.COLLECTION_BANNER : "ipfs://__COLLECTION_BANNER_CID__",
     external_link: site,

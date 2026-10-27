@@ -233,7 +233,7 @@ contract AgentRenderer is Ownable2Step {
         string memory json;
         if (agents.seed() == bytes32(0)) {
             json = string.concat(
-                '{"name":"AX-', num, ' // DORMANT","description":"An OpenForge Agent awaiting activation. Traits are derived from a public on-chain seed after the sale.",',
+                '{"name":"AX-', num, ' // DORMANT","description":"A dormant OpenForge agent. Its robot class and traits are assigned by a public random draw after the sale.",',
                 '"image":"', placeholderImage, '","external_url":"', externalUrl, '","background_color":"0a0612",',
                 '"attributes":[{"trait_type":"State","value":"Dormant"}', _dynamic(id), "]}"
             );
@@ -258,7 +258,7 @@ contract AgentRenderer is Ownable2Step {
             : _factionLore(t.faction);
         return string.concat(
             lore,
-            " This token IS the agent: it owns an on-chain wallet (ERC-6551), a reputation and a growing record of physical AI data."
+            " This NFT is the agent's membership card and logbook: it owns an on-chain wallet (ERC-6551) and a record of verified lab missions."
         );
     }
 

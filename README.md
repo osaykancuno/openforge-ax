@@ -77,4 +77,4 @@ Then open http://localhost:8080 (Workbench: /bench.html, Phone Brain: /pilot.htm
 
 [CC0 1.0](LICENSE): the art, the metadata, the code and the docs are public domain. Third-party parts keep their own licenses (`contracts/seadrop/` interfaces: MIT, OpenSea; npm dependencies: see each package). CC0 does not waive trademarks: don't present your work as official OpenForge.
 
-No yield or return is promised. NFTs are digital objects with operational utility.
+No yield or return is promised. An agent is a collectible with tools, and its price can fall.

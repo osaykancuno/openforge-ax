@@ -2,14 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Phone Brain · OpenForge AX-1</title>
 <meta name="description" content="Turn your phone into the brain of OpenForge AX-1: drive the 3D twin in the browser, or a real AX-1 over Bluetooth through an ESP32 bridge.">
 <meta name="theme-color" content="#f4efe6">
-<meta property="og:title" content="Phone Brain · OpenForge AX-1">
-<meta property="og:description" content="Your phone is the robot's brain. Try the 3D twin, then build the real one.">
-<meta property="og:image" content="assets/og.png">
 <link rel="manifest" href="pilot.webmanifest">
 <link rel="icon" href="assets/pilot-icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/pilot-192.png">
@@ -18,10 +15,48 @@
 <link rel="stylesheet" href="css/pilot.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/pilot/pilot.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="js/pilot/ax-proto.js">
+<link rel="modulepreload" href="js/pilot/drive-loop.js">
+<link rel="modulepreload" href="js/pilot/twin-transport.js">
+<link rel="modulepreload" href="js/pilot/ble-transport.js">
+<link rel="modulepreload" href="js/pilot/sensors.js">
+<link rel="modulepreload" href="js/pilot/ui.js">
+<link rel="modulepreload" href="js/pilot/motions.js">
+<link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/pilot/ai/ai-panel.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="modulepreload" href="js/pilot/bridge-sim.js">
+<link rel="modulepreload" href="js/pilot/ai/tools.js">
+<link rel="modulepreload" href="js/pilot/ai/grammar.js">
+<link rel="modulepreload" href="js/pilot/ai/prompt.js">
+<link rel="modulepreload" href="js/pilot/ai/executor.js">
+<link rel="modulepreload" href="js/pilot/ai/settings.js">
+<link rel="modulepreload" href="js/pilot/ai/model-client.js">
+<link rel="modulepreload" href="js/robot/sts-bus.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Phone Brain · OpenForge AX-1">
+<meta property="og:description" content="Turn your phone into the brain of OpenForge AX-1: drive the 3D twin in the browser, or a real AX-1 over Bluetooth through an ESP32 bridge.">
+<meta name="twitter:card" content="summary_large_image">
+<!--/seo-->
 </head>
 <body class="pilot">
 <div class="pl-app">

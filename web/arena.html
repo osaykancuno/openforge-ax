@@ -2,25 +2,73 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Proving Grounds — OpenForge AX</title>
-<meta name="description" content="Test every OpenForge robot in the browser: the SO-101 Energy Cell and three lab trials per robot, replayed and verified, with passes saved to your agent's on-chain record.">
+<meta name="description" content="Test every OpenForge robot in your browser: the SO-101 Energy Cell plus three lab trials per robot, replayed, verified and saved to your agent's record.">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/bench.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/arena.js">
+<link rel="modulepreload" href="vendor/ethers.min.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/sim/arm-sim.js">
+<link rel="modulepreload" href="js/sim/episode.js">
+<link rel="modulepreload" href="js/sim/autopilot.js">
+<link rel="modulepreload" href="js/sim/arena-view.js">
+<link rel="modulepreload" href="js/recorder.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="js/bench/content.js">
+<link rel="modulepreload" href="js/bench/missions/index.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="vendor/three/addons/controls/OrbitControls.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/bench/missions/so101.js">
+<link rel="modulepreload" href="js/bench/missions/rover.js">
+<link rel="modulepreload" href="js/bench/missions/hound.js">
+<link rel="modulepreload" href="js/bench/missions/hand.js">
+<link rel="modulepreload" href="js/bench/missions/spider.js">
+<link rel="modulepreload" href="js/bench/missions/drone.js">
+<link rel="modulepreload" href="js/bench/missions/fab.js">
+<link rel="modulepreload" href="js/bench/missions/replicant.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-rover.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-desk.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-walker.js">
+<link rel="modulepreload" href="js/bench/missions/common.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="modulepreload" href="js/bench/missions/drive.js">
+<link rel="modulepreload" href="js/bench/missions/biped.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Proving Grounds — OpenForge AX">
+<meta property="og:description" content="Test every OpenForge robot in your browser: the SO-101 Energy Cell plus three lab trials per robot, replayed, verified and saved to your agent's record.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<!--/seo-->
 </head>
 <body class="app">
 <main class="wrap pg">
   <header class="pg-head">
-  <div class="kicker">FIG. 05 · <b>Proving Grounds</b> · <span id="pgKicker">SO-101 twin</span></div>
+  <div class="kicker">FIG. 14 · <b>Proving Grounds</b> · <span id="pgKicker">SO-101 twin</span></div>
   <h1 class="pg-title" id="pgTitle">Mission: Energy Cell</h1>
   <p class="muted pg-lead" id="pgLead">Pick up the cell and place it in the charging dock within 60 seconds. The arm is a digital twin of an SO-101: every run can be replayed on the real robot.</p>
   </header>
@@ -58,7 +106,7 @@
       <div class="panel" style="margin-top:0">
         <h2>Pilot</h2>
         <select id="pilot" aria-label="Agent" style="width:100%"><option value="0">Guest (runs are not recorded)</option></select>
-        <p class="muted small" id="pilotInfo" style="margin-top:8px">Connect your wallet to pilot your Synth Arm and earn on-chain reputation.</p>
+        <p class="muted small" id="pilotInfo" style="margin-top:8px">Hold an agent? Connect your wallet to fly with it; its verified runs go on its record. No agent: play as a guest.</p>
       </div>
       <div class="panel">
         <h2>Controls</h2>
@@ -91,7 +139,7 @@
       </div>
       <div class="panel" id="trialPanel" hidden>
         <h2>Pilot ranking</h2>
-        <p class="muted small" style="margin-top:0">No agent needed. Connect any wallet, dock the cell, and submit (a free signature). Allowlist spots go to steady pilots: <span id="trialRule"></span>. Your wallet address, times and best run are shown publicly here.</p>
+        <p class="muted small" style="margin-top:0">No agent needed. Connect any wallet, dock the cell, and submit (a free signature). Steady pilots can earn a spot on the allowlist (the early, cheaper mint list): <span id="trialRule"></span>. Your wallet address, times and best run are shown publicly here.</p>
         <div id="trialBoard" class="small muted">Loading…</div>
       </div>
       <div class="panel">

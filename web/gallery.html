@@ -4,18 +4,40 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gallery — OpenForge AX</title>
+<title>Gallery: all 1,024 agents — OpenForge AX</title>
+<meta name="description" content="Browse every OpenForge AX agent: robot class, faction, rarity and lab-mission record, read straight from Ethereum.">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
+<!--preload-->
+<link rel="modulepreload" href="js/gallery.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/traits-data.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Gallery: all 1,024 agents — OpenForge AX">
+<meta property="og:description" content="Browse every OpenForge AX agent: robot class, faction, rarity and lab-mission record, read straight from Ethereum.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<!--/seo-->
 </head>
 <body class="app">
 <main class="wrap pg">
   <header class="pg-head">
-  <div class="kicker">FIG. 07 · <b>Gallery</b> · every agent</div>
+  <div class="kicker">FIG. 11 · <b>Gallery</b> · every agent</div>
   <h1 class="pg-title">Gallery</h1>
-  <p class="muted pg-lead" id="intro">Every minted agent, read straight from the blockchain.</p>
-  <p class="agent-what">Each agent: a robot class, its own wallet, a verified mission record, autonomy you control. <a href="index.html#lore">What an agent does →</a></p>
+  <p class="muted pg-lead" id="intro">Every minted agent, read straight from Ethereum.</p>
+  <p class="agent-what">Each agent is an NFT with a robot class, its own wallet and a verified lab-mission record. <a href="index.html#lore">What is an agent? →</a></p>
   </header>
   <div class="toolbar">
     <input type="text" id="q" placeholder="Search by number (e.g. 42 or AX-0042)" aria-label="Search by number">

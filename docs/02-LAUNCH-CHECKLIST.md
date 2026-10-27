@@ -22,6 +22,8 @@ Four ECC audits ran (contracts and launch scripts, verifier and servers, website
 - [ ] 🧑 **Supply values are explicit**: on mainnet `deploy.js` requires `MAX_SUPPLY=1024`, `TEAM_RESERVE=100`, `ROYALTY_BPS` (0-1000), `REVEAL_DEADLINE_DAYS` (7-45), `PUBLIC_PRICE_ETH` and `MAX_PER_WALLET` in `.env`. No silent defaults.
 - [ ] 🧑 **Ownership**: the Safe must call `acceptOwnership` on all three contracts (Ownable2Step) before the drop opens. Keep the deploy key on a minimal balance until then.
 - [ ] 🧑 **Reserve before the end of the public phase** (see §3 step 4): an unminted reserve is lost if anyone commits the reveal at the deadline.
+- [ ] 🤖 **Smoke test**: `npm run site:smoke` must report 78/78 (every page, 3 viewports, both themes: no page errors, no 4xx, no page scroll, no horizontal overflow, no sound before a gesture).
+- [ ] 🧑 **Comprehension test** with 5 people ([16-COMPREHENSION-TEST.md](16-COMPREHENSION-TEST.md)): at least 4 of 5 right on every question.
 - [ ] 🧑 **Site config**: `web/deployment.json` must come from the real deploy (`npm run site:check -- 1` refuses chain 31337, localhost and `#` links). Then `npm run web:build`: the CSP lists loopback hosts only for the local demo.
 - [ ] 🧑 **Headers on the live host**: `curl -I https://<site>/arena.html` must show `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, HSTS and nosniff from `web/_headers`. On a host that ignores `_headers`, the pages hide themselves when framed (fallback in `theme-boot.js`), but set the headers anyway.
 - [ ] 🧑 **Publish from a clean tree**: `git init`, then check `git status --ignored` before the first commit. `.gitignore` keeps out `.env`, `.claude/`, `coverage.json`, `data/`, `art/out*`, `web/demo-images/` and rehearsal logs.

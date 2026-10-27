@@ -22,15 +22,28 @@ function tile(id, meta) {
   const rank = rarity?.tokens?.[id - 1]?.rank;
   const [num, call = ""] = String(meta.name).split(" // ");
   return `<a class="tile${legend ? " legend" : ""}" href="agent.html?id=${Number(id)}">
-    <img loading="lazy" src="${esc(ipfs(meta.image))}" alt="${esc(meta.name)}">
+    <img loading="lazy" decoding="async" src="${esc(ipfs(meta.image))}" alt="${esc(meta.name)}">
     <div class="meta"><b>${esc(num)}</b>${esc(call)}
     <div class="muted small">${esc(attr(meta, "Class") ?? "Dormant")}${rank ? ` · #${Number(rank)} rarity` : ""}</div></div></a>`;
 }
 
+// an unreachable RPC is expected now and then: a calm message and a Retry button, never an uncaught error
+function offline(retry) {
+  console.warn("Ethereum RPC unreachable");
+  more.style.display = "none";
+  grid.innerHTML = `<div class="empty">Can't reach Ethereum right now. Try again in a moment.<div style="margin-top:14px"><button class="btn sm" type="button">Retry</button></div></div>`;
+  grid.querySelector("button").onclick = retry;
+}
+
 async function renderNext() {
+  const start = shown;
   const batch = ids.slice(shown, shown + PAGE);
   shown += batch.length;
   const metas = await Promise.all(batch.map((id) => tokenMeta(id).catch(() => null)));
+  if (batch.length && metas.every((m) => !m)) {
+    shown = start; // nothing could be read: the chain is out of reach, not 24 broken agents
+    throw new Error("rpc");
+  }
   const fc = $("fClass").value;
   const ff = $("fFaction").value;
   grid.insertAdjacentHTML(
@@ -46,11 +59,19 @@ async function renderNext() {
 }
 
 async function reset() {
+  try {
+    await load();
+  } catch {
+    offline(reset);
+  }
+}
+
+async function load() {
   grid.innerHTML = "";
   shown = 0;
   const raw = $("q").value.trim();
   const q = Number(raw.match(/\d+/)?.[0]); // accepts 42, #42, AX-0042
-  const supply = Number(await agents().totalSupply());
+  const supply = Number(await (await agents()).totalSupply());
   ids = Array.from({ length: supply }, (_, i) => i + 1);
   if (raw && !q) {
     grid.innerHTML = `<div class="empty">Search by agent number, for example 42 or AX-0042.</div>`;
@@ -63,15 +84,15 @@ async function reset() {
   if ($("fClass").value || $("fFaction").value) {
     while (shown < ids.length) await renderNext();
   } else await renderNext();
-  if (!supply) grid.innerHTML = `<div class="empty">No agents minted yet. Minting happens on OpenSea.</div>`;
+  if (!supply) grid.innerHTML = `<div class="empty">No agents minted yet. Minting happens on OpenSea only.</div>`;
 }
 
 if (!isDeployed()) {
-  grid.innerHTML = `<div class="empty">The collection has not been published yet.</div>`;
+  grid.innerHTML = `<div class="empty">Agents will appear here once minting starts. The lab works without them.</div>`;
   more.style.display = "none";
 } else {
   rarity = await fetch("data/rarity.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  more.onclick = renderNext;
+  more.onclick = () => renderNext().catch(() => offline(reset));
   for (const id of ["q", "fClass", "fFaction", "sort"]) $(id).addEventListener("change", reset);
   reset();
 }

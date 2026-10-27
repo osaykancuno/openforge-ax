@@ -7,19 +7,19 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 
 **Name:** OpenForge Agents · **Symbol:** AX · **Category:** PFPs (secondary: Gaming)
 
-**Description** (≈ 880 characters):
+**Description** (≈ 1,000 characters with markdown):
 
-> **The membership and record layer of OpenForge Lab**, an open digital robotics lab.
+> **The membership and logbook of OpenForge Lab**, an open robotics lab.
 >
-> Learn how robots work in interactive 3D. Test them with missions in the browser. Build a real one with **AX-1**, our CC0 robot that uses a phone as its brain.
+> Learn robots in 3D, test them in browser missions, and build **AX-1**, our CC0 robot with a phone for a brain.
 >
-> **1,024 agents on Ethereum.** Each NFT has its own wallet (ERC-6551) and an on-chain record of verified work, failures included. There are 11 classes: our own **AX-1** in three bodies (Rover, Desk, Walker; 31% of the collection), and 8 classes inspired by real open-source platforms: SO-101 arm, OpenBot rover, quadruped, AmazingHand, hexapod, ESP-Drone, 3D printer, small humanoid.
+> **1,024 NFT agents on Ethereum.** Each has its own wallet (ERC-6551) and an on-chain record of verified lab missions, failures included. Real-robot records come later. 11 classes: our own **AX-1** in three bodies (Rover, Desk, Walker; 31%), and 8 inspired by open-source platforms: SO-101 arm, OpenBot rover, quadruped, AmazingHand, hexapod, ESP-Drone, 3D printer, humanoid.
 >
-> Agents start in Manual mode and do nothing without their holder's approval. Traits are computed on-chain from a seed drawn after the sale. Art, metadata and code are **CC0**.
+> Agents start in Manual: nothing happens without the holder's approval. Agent software for Assisted and Autonomous modes is not released yet. You mint a dormant agent; traits come from a public random draw after the sale. Art, metadata and code are **CC0**.
 >
-> The lab is free without an NFT. The AX-1 firmware is experimental until our first hardware build.
+> The lab is free without an NFT. AX-1's firmware is experimental until our first hardware build.
 >
-> No promise of returns: this is a collectible with tools, not an investment.
+> Not an investment: a collectible with tools, no returns promised. The price can fall.
 
 | Slot | File |
 |---|---|
@@ -33,7 +33,7 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 ## X profile
 
 - **Name:** OpenForge AX
-- **Bio** (158 chars): Open robotics lab. Learn in 3D, test in missions, build AX-1: a CC0 robot with a phone for a brain. 1,024 agents on Ethereum. Experimental.
+- **Bio** (143 chars): Open robotics lab. Learn in 3D, test in missions, build AX-1: a CC0 robot with a phone for a brain. 1,024 NFT agents on Ethereum. Experimental.
 - **Avatar:** `logo-1000.png` · **Header:** `x-header.png`
 
 ## Pinned thread (8 posts)
@@ -45,7 +45,7 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 5. Honest status: the firmware is experimental and untested on hardware until our first build. Until then, drive AX-1's 3D twin in your browser. [clip, labelled TWIN]
 6. iPhone note: Safari has no Web Bluetooth, so iPhones drive the twin. Android Chrome and desktop Chrome can pair with a real robot.
 7. The lab is free, no wallet needed: Workbench (take 11 robots apart in 3D), missions with levels, the Codex, the Phone Brain app. [link]
-8. The collection: 1,024 agents on Ethereum are the lab's membership and record layer, CC0. Not an investment, no returns promised. The only mint link is on our site, never in DMs. [link]
+8. The collection: 1,024 NFT agents on Ethereum are the lab's membership and record layer, CC0. Not an investment, no returns promised. The only mint link is on our site, never in DMs. [link]
 
 ## Discord server
 

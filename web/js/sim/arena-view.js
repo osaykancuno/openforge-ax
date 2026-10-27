@@ -49,7 +49,7 @@ function simArm() {
 export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) {
   // same settings as makeRenderer() in models/look.js, plus preserveDrawingBuffer for the recorder
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.setPixelRatio(Math.min(matchMedia("(max-width: 760px)").matches ? 1.5 : 2, window.devicePixelRatio)); // phones: fewer pixels, same look
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -154,7 +154,7 @@ export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) 
   let raf;
   let paused = false; // hidden (the Proving Grounds lab trials are shown): no GPU work
   (function loop() {
-    if (!paused) {
+    if (!paused && !document.hidden) { // a hidden tab draws nothing
       resize();
       controls.update();
       renderer.render(scene, camera);

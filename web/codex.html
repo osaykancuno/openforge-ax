@@ -2,19 +2,45 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Codex — OpenForge AX</title>
-<meta name="description" content="Learn the OpenForge Lab by playing: a 3D pop-up book in 8 pages. Meet AX-1, then see how a robot senses, decides and moves, how to test it, build it, and what an on-chain agent is.">
+<meta name="description" content="Learn how robots sense, decide and move in an 8-page 3D pop-up book. Meet AX-1, then test it, build it and see what an agent (NFT) is.">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/codex.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/codex/chapters.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="The Codex — OpenForge AX">
+<meta property="og:description" content="Learn how robots sense, decide and move in an 8-page 3D pop-up book. Meet AX-1, then test it, build it and see what an agent (NFT) is.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<!--/seo-->
 </head>
 <body class="lab codex">
 <main class="lab-app">

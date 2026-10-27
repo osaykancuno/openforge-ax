@@ -2,41 +2,64 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenForge AX — Build a robot. Your phone is the brain.</title>
 <meta name="description" content="An open robotics lab: learn how robots work in 3D, test them in your browser, and build AX-1, a robot that uses your phone as its brain. CC0, open source.">
-<meta property="og:title" content="OpenForge AX — meet AX-1">
-<meta property="og:description" content="Learn, test and build a real robot with the phone you already have. An open, CC0 robotics lab.">
-<meta property="og:image" content="assets/og.png">
-<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#f4efe6">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/home.js">
+<link rel="modulepreload" href="js/lab/lab-view.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/traits-data.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="OpenForge AX — Build a robot. Your phone is the brain.">
+<meta property="og:description" content="An open robotics lab: learn how robots work in 3D, test them in your browser, and build AX-1, a robot that uses your phone as its brain. CC0, open source.">
+<meta name="twitter:card" content="summary_large_image">
+<!--/seo-->
 </head>
 <body class="lab">
 <main class="lab-app">
   <canvas id="lab" aria-hidden="true" role="presentation"></canvas>
-  <noscript><p class="lab-noscript">The 3D lab needs JavaScript. Go straight to the <a href="bench.html">Workbench</a>, the <a href="pilot.html">Phone Brain</a>, the <a href="gallery.html">Gallery</a> or the <a href="license.html">CC0 license</a>.</p></noscript>
+  <noscript><p class="lab-noscript">The 3D lab needs JavaScript. Go straight to the <a href="codex.html">Codex</a>, the <a href="bench.html">Workbench</a>, the <a href="pilot.html">Phone Brain</a>, the <a href="arena.html">Proving Grounds</a>, the <a href="gallery.html">Gallery</a> or the <a href="license.html">CC0 license</a>.</p></noscript>
 
   <div class="lab-hud">
     <div class="kicker">FIG. 00 · <b>OpenForge Lab</b> · CC0</div>
     <h1>Build a robot.<br><em>Your phone is the brain.</em></h1>
-    <p class="lead">Meet <b>AX-1</b>. Learn how robots work in 3D, test them in your browser, then build your own for about $100 with the phone you already have. Open source, end to end.</p>
+    <p class="lead">Meet <b>AX-1</b>. Learn how robots work in 3D, test them in your browser, then build one for about $100 in parts, plus the phone you already own. Free, open source, no wallet or sign-up.</p>
     <ol class="lab-steps" aria-label="How the lab works"><li>Learn</li><li>Test</li><li>Build</li><li>Pilot</li></ol>
-    <div class="cta"><a class="btn primary" href="pilot.html">Try the Phone Brain</a><a class="btn" href="bench.html">Open the Workbench</a><button class="btn ghost" data-open="lore" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">What an agent does</button><button class="btn ghost" data-open="guide" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">FAQ</button></div>
+    <div class="cta"><a class="btn primary" href="pilot.html">Try the Phone Brain</a><a class="btn" href="bench.html">Open the Workbench</a><button class="btn ghost" data-open="lore" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">What is an agent (NFT)?</button><button class="btn ghost" data-open="guide" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false">FAQ</button></div>
+    <p class="lead small" style="font-size:13px;margin:12px 0 0">Optional: 1,024 NFT agents are the lab's membership and logbook. The lab works without one.</p>
     <div class="lab-stats" role="group" aria-label="Collection status">
-      <div><b id="sMinted">—</b><span>Agents minted</span></div>
+      <div><b id="sMinted">—</b><span>NFT agents minted</span></div>
       <div><b id="sSupply">1,024</b><span>Supply</span></div>
-      <div><b id="sState">—</b><span>Status</span></div>
-      <div hidden><b id="sLegend">10</b><span id="sLegendLabel">1/1 max</span></div>
+      <div><b id="sState">—</b><span>Mint</span></div>
+      <div hidden><b id="sLegend">10</b><span id="sLegendLabel">Prime Constructs max</span></div>
     </div>
     <div class="bar" aria-hidden="true"><i id="sBar"></i></div>
   </div>
@@ -70,20 +93,23 @@
         <div class="kicker">FIG. 03 · <b>The agents</b></div>
         <h3>1,024 agents: the lab's members and its record</h3>
         <ul class="perks">
-          <li><b>Each agent is a robot class</b>: one of our own AX-1 bodies (Rover, Desk, Walker), or a class inspired by a real open platform: arm, rover, quadruped, hand, hexapod, drone, 3D printer or humanoid. <a href="#lore">What an agent does →</a></li>
-          <li><b>Its own wallet and record</b> (ERC-6551): lab missions and real-robot runs are attested on-chain, failures included.</li>
-          <li><b>You stay in control</b>: Manual, Assisted or Autonomous, a daily spend limit and an emergency pause.</li>
+          <li><b>Each agent has a robot class</b>: AX-1 Rover, Desk or Walker (31% of the collection), or one of 8 inspired by open platforms: Synth Arm (SO-101 arm), Street Rover (OpenBot rover), Cyber Hound (quadruped), Ghost Hand (hand), Spider Mech (hexapod), Sky Drone (drone), Fab Rig (3D printer) and Replicant (humanoid). <a href="#lore">What is an agent (NFT)? →</a></li>
+          <li><b>Its own wallet and a mission record.</b> Passed lab missions are checked by a verifier and written to the blockchain, failures too. Records from real robots come later.</li>
+          <li><b>You stay in control</b>: Manual (it proposes, you approve), a daily spend limit and an emergency pause. Assisted and Autonomous need agent software that isn't released yet.</li>
           <li><b>Minted only on OpenSea.</b> The lab itself is free for everyone, with or without an agent.</li>
         </ul>
         <div class="kicker" id="faq">FIG. 04 · <b>Questions</b></div>
         <h3>FAQ</h3>
         <div class="faq">
-          <details><summary>Do I need an NFT to use the lab?</summary><p>No. The Workbench, the missions, the Phone Brain and every build guide are free and open to everyone. An agent adds an on-chain identity, a wallet and a public record of your runs.</p></details>
-          <details><summary>Which phone works as AX-1's brain?</summary><p>An Android phone with Chrome connects to the robot over Bluetooth. iPhones can't use Web Bluetooth in Safari, so they drive the 3D twin (or use a Bluetooth-capable browser). An old phone is fine.</p></details>
+          <details><summary>Do I need an NFT to use the lab?</summary><p>No. No wallet, no sign-up, no payment. An agent (an optional NFT) adds three things: its own wallet, a public record of your verified lab missions under its number, and autonomy settings you control. Guests can play every mission; their runs just aren't saved to an agent's record.</p></details>
+          <details><summary>Which phone works as AX-1's brain?</summary><p>Any phone drives AX-1's 3D twin. To pair with a real robot (once you've built one) you need Android Chrome: it has Bluetooth in the browser. iPhone Safari doesn't, so iPhones stay with the twin. An old phone is fine.</p></details>
           <details><summary>What does a real AX-1 cost?</summary><p>Without the phone: about $100–115 for the Rover and $150–170 for the Desk body, from parts you can order online. The Walker is a longer community project. Prices change; the build guide lists each part and its source.</p></details>
+          <details><summary>What works today, and what is still to come?</summary><p>Works today: the Workbench (11 robots), missions scored by a lab simulation, the Phone Brain driving AX-1's 3D twin, open build guides. Not yet: a filmed AX-1 on real hardware, real-robot run records, and agent software for Assisted and Autonomous modes. The AX-1 firmware is experimental.</p></details>
+          <details><summary>What is a twin?</summary><p>A twin is the 3D copy of a robot that you drive in your browser. Twins are labelled TWIN, real build photos BUILD. Today, everything you drive is a twin.</p></details>
           <details><summary>Is the robot safe to build?</summary><p>The bridge firmware holds every joint still if the phone goes quiet, checks joint limits and speed itself, and needs a deliberate "arm" from you before moving again. Every build also has a physical power switch. The firmware is experimental until our first hardware build: start with the wheels off the ground.</p></details>
-          <details><summary>How do I mint an agent?</summary><p>Only on OpenSea, through its drop page: connect a wallet such as MetaMask or Rabby and press Mint. Never type your 12-word recovery phrase anywhere: the team will never ask for it.</p></details>
-          <details><summary>Is this an investment?</summary><p>No. OpenForge AX promises no returns or profits. Agents are digital objects with lab utility, and their market value can go up or down.</p></details>
+          <details><summary>Is it OK for kids or a classroom?</summary><p>The lab needs no account, wallet or payment. The Phone Brain uses the camera only inside your browser; nothing is recorded or sent. Buying an agent involves crypto and is for adults. Build the robot with an adult: the firmware is experimental, so start with the wheels off the ground.</p></details>
+          <details><summary>How do I mint an agent?</summary><p>Only on OpenSea, through our drop page. Price: 0.015 ETH (0.01 ETH on the allowlist), max 3 per wallet, plus network fees. You need a wallet app such as MetaMask or Rabby. At mint you receive a dormant agent; its class and traits are revealed after the sale. Never type your recovery phrase anywhere: the team will never ask for it.</p></details>
+          <details><summary>Is this an investment?</summary><p>No. We promise no returns or profit. An agent is a collectible with tools, and its price can fall as well as rise. Only spend what you'd be fine not getting back.</p></details>
           <details><summary>Can I use the art and the designs commercially?</summary><p>Yes, and so can anyone: everything we make is CC0. Third-party designs we link to keep their own licenses, and some are non-commercial. <a href="license.html">About CC0 →</a></p></details>
         </div>
         <div class="kicker">FIG. 05 · <b>Roadmap</b></div>
@@ -91,29 +117,32 @@
         <ul class="roadmap-list">
           <li class="now"><b>Now · The lab</b>: Workbench for 11 robots, missions, Phone Brain with the AX-1 twin, open firmware and build guides.</li>
           <li><b>Next · First AX-1</b>: the team's first physical Rover build, measured parts list, then the Desk body.</li>
-          <li><b>Then · Agents</b>: mint on OpenSea, signed mission results for more robot classes, real-run records.</li>
-          <li><b>Later · Walker</b>: a learned walking policy trained in simulation by the community, on-phone vision and voice.</li>
+          <li><b>Soon · Agents</b>: the mint opens on OpenSea; mission records for lab simulations.</li>
+          <li><b>Later · Walker and real runs</b>: records of real-robot runs, a learned walking policy trained in simulation by the community, on-phone vision and voice.</li>
         </ul>
       </section>
 
       <section data-panel="lore">
-        <div class="kicker">FIG. 06 · <b>What an agent does</b></div>
-        <h3>An agent is a robot's identity in the lab, with its own wallet and record</h3>
+        <div class="kicker">FIG. 06 · <b>What an agent (NFT) is</b></div>
+        <h3>An agent is an NFT: your membership and logbook in the lab</h3>
         <ul class="features">
-          <li><b>A robot class.</b> 11 classes: AX-1 Rover, Desk and Walker (31% of the collection), plus 8 classes inspired by open platforms (SO-101 arm, OpenBot rover, quadruped, hand, hexapod, drone, 3D printer, humanoid).</li>
-          <li><b>Missions with a record.</b> In the <a href="arena.html">Proving Grounds</a> your agent flies its own robot and the three AX-1 bodies. A passed run is replayed by the verifier and attested on-chain, so the record can't be faked. It is lab data, not proof of a real robot.</li>
-          <li><b>Its own wallet.</b> Every agent owns an ERC-6551 account, created at mint. Only the current holder controls it: top it up or withdraw, from the agent's page.</li>
-          <li><b>Autonomy you set.</b> It starts in Manual: it proposes, you approve. Assisted and Autonomous work only within a daily limit you choose. An emergency pause and a 7-day sale lock are one click away. It can never move your other tokens.</li>
-          <li><b>Real robots next.</b> <a href="robot.html">Robot Link</a> replays a run on a real SO-101 arm; the <a href="pilot.html">Phone Brain</a> drives a real AX-1 (experimental firmware). Records of real-robot runs are on the roadmap.</li>
-          <li><b>Open art and traits.</b> Traits are computed on-chain from a seed drawn after the sale. The art is drawn from the lab's 3D models, and everything is CC0.</li>
+          <li><b>What it is.</b> A profile you own: a robot class, a wallet and a mission record. It is not a robot you can drive, and no agent software ships yet.</li>
+          <li><b>11 classes.</b> AX-1 Rover, Desk and Walker (31% of the collection), plus 8 inspired by open platforms. In the gallery they appear as Synth Arm (SO-101 arm), Street Rover (OpenBot rover), Cyber Hound (quadruped), Ghost Hand (hand), Spider Mech (hexapod), Sky Drone (drone), Fab Rig (3D printer) and Replicant (humanoid).</li>
+          <li><b>Missions with a record.</b> In the <a href="arena.html">Proving Grounds</a> your agent flies its own robot and the three AX-1 bodies. Each passed run is replayed by a verifier and written to the blockchain, so nobody can self-report a score. It is lab-simulation data, not proof of a real robot.</li>
+          <li><b>Its own wallet.</b> Every agent has an Ethereum wallet of its own (a standard called ERC-6551), created at mint. Whoever holds the agent controls it. Sell the agent and the wallet goes with it.</li>
+          <li><b>Autonomy you set.</b> It starts in Manual: it proposes, you approve. Assisted and Autonomous will act only within a daily limit you choose; the agent software for them isn't out yet. An emergency pause is one click away, and you can lock the wallet for up to 30 days before selling so a buyer knows it can't be emptied. It can never move your other tokens.</li>
+          <li><b>Real robots next.</b> <a href="robot.html">Robot Link</a> replays a run on a real SO-101 arm; the <a href="pilot.html">Phone Brain</a> is built to drive a real AX-1, but the firmware is untested on hardware until our first build. No real-robot records or wallet history exist yet.</li>
+          <li><b>Dormant, then revealed.</b> At mint you get a dormant agent. After the sale ends, a public random draw assigns traits, so nobody can pick the rare ones early. The art is drawn from the lab's 3D models and is CC0: anyone may use it.</li>
         </ul>
-        <p class="note">Not an investment: no returns are promised, and the lab is free for everyone, with or without an agent. Mint only on OpenSea.</p>
+        <p class="note">Not an investment: no returns promised, and the price can fall. The lab is free with or without an agent. Mint only on OpenSea; we never DM first.</p>
         <div class="kicker">FIG. 07 · <b>The collection</b></div>
-        <h3>Factions</h3>
+        <h3>Factions: five story groups</h3>
+        <p class="muted">Factions are story flavour: they don't change what an agent can do.</p>
         <div id="factions" class="factions"></div>
         <div class="kicker">FIG. 08 · <b>Rarity</b></div>
-        <h3>8 trait categories, up to 10 legendaries</h3>
-        <p class="muted">One Prime Construct per 50 agents minted, so 10 at sell-out. Traits are computed on-chain from a public seed drawn <b>after</b> minting ends; the art generator's hash is stored in the contract before the first mint.</p>
+        <h3>8 trait categories, up to 10 Prime Constructs (1/1)</h3>
+        <p class="muted">One Prime Construct for every 50 agents minted, up to 10. Traits come from a public random draw after minting ends; the art generator's fingerprint is fixed in the contract before the first mint.</p>
+        <p class="muted small">Core Model names (VLA = vision-language-action) are a collectible trait, not software running inside your agent.</p>
         <div class="traits" id="traitTables"></div>
       </section>
 

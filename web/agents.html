@@ -8,15 +8,35 @@
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
+<!--preload-->
+<link rel="modulepreload" href="js/mine.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="My agents — OpenForge AX">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<meta name="robots" content="noindex, follow">
+<!--/seo-->
 </head>
 <body class="app">
 <main class="wrap pg">
   <header class="pg-head">
-  <div class="kicker">FIG. 08 · <b>My agents</b></div>
+  <div class="kicker">FIG. 13 · <b>My agents</b></div>
   <h1 class="pg-title">My agents</h1>
   </header>
   <div id="state" class="empty">
-    <p>Connect your wallet to see your agents. Nothing to sign: it is read-only.</p>
+    <p>Connect your wallet to see your agents. Nothing to sign: it is read-only. No agent and no wallet? You don't need one: open the <a href="bench.html">Workbench</a>.</p>
     <button class="btn primary" id="connectHere">Connect wallet</button>
   </div>
   <div class="app-scroll app-fill pg-list"><div class="gallery" id="grid"></div></div>

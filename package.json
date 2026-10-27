@@ -20,6 +20,7 @@
     "finalize:sepolia": "hardhat run scripts/finalize.js --network sepolia",
     "finalize:mainnet": "hardhat run scripts/finalize.js --network mainnet",
     "site:check": "node scripts/check-site.mjs",
+    "site:smoke": "node scripts/site-smoke.mjs",
     "assets": "node scripts/assets.mjs",
     "brand": "node scripts/brand.mjs",
     "post-reveal": "node scripts/post-reveal.mjs",

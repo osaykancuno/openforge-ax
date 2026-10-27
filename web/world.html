@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Neo-Forge — OpenForge AX</title>
 <meta name="description" content="Neo-Forge is retired: the OpenForge Lab lives at index.html. This archived city still works for visitors.">
@@ -11,10 +11,44 @@
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/world.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/world/world-view.js">
+<link rel="modulepreload" href="js/world/district.js">
+<link rel="modulepreload" href="js/world/protocol.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/EffectComposer.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/RenderPass.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/UnrealBloomPass.js">
+<link rel="modulepreload" href="js/world/voxel-avatar.js">
+<link rel="modulepreload" href="vendor/three/addons/shaders/CopyShader.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/ShaderPass.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/MaskPass.js">
+<link rel="modulepreload" href="vendor/three/addons/postprocessing/Pass.js">
+<link rel="modulepreload" href="vendor/three/addons/shaders/LuminosityHighPassShader.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Neo-Forge — OpenForge AX">
+<meta property="og:description" content="Neo-Forge is retired: the OpenForge Lab lives at index.html. This archived city still works for visitors.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<meta name="robots" content="noindex, follow">
+<!--/seo-->
 </head>
 <body class="world-page app">
 <p role="note" style="margin:8px 16px;padding:8px 14px;background:var(--card,#fbf8f2);color:var(--ink,#23211e);border:1px solid var(--line,#d8cfbf);border-left:3px solid var(--accent,#b4472f);border-radius:8px;font-size:13.5px;line-height:1.4">Neo-Forge is retired; the lab lives at <a href="index.html">index.html</a>.</p>

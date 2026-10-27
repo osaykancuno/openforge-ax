@@ -351,6 +351,13 @@ body.lab footer a { pointer-events: auto; }
 .lab-hud .lead { font-size: 16px; margin: 0 0 16px; }
 .lab-hud .lead b { color: var(--ink); }
 .lab-hud .cta { margin: 18px 0 0; }
+/* laptop heights (about 700-860 px): a tighter HUD, so the stats never reach the footer */
+@media (min-width: 761px) and (max-height: 860px) {
+  .lab-hud { top: 80px; }
+  .lab-hud h1 { font-size: clamp(34px, 6.4vh, 52px); margin: 6px 0 10px; }
+  .lab-hud .lead { font-size: 15px; margin-bottom: 10px; }
+  .lab-hud .cta { margin-top: 12px; }
+}
 .lab-steps { display: grid; grid-template-columns: repeat(4, auto); gap: 6px 18px; justify-content: start; margin: 0; padding: 0; list-style: none; counter-reset: v; }
 .lab-steps li { counter-increment: v; font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .lab-steps li::before { content: "0" counter(v) " "; color: var(--accent-ink); }

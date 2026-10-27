@@ -1,6 +1,6 @@
 // Builds the site's static assets from art/ (single source of truth for traits).
 //   node scripts/build-web.mjs  -> web/js/traits-data.js, web/assets/*, web/data/rarity.json (if art/out exists)
-import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, cpSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, cpSync, readdirSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,7 +55,8 @@ writeFileSync(join(web, "assets/favicon.svg"), markSVG({ size: 64 }));
 const nm = join(root, "node_modules");
 mkdirSync(join(web, "vendor/three/addons"), { recursive: true });
 copyFileSync(join(nm, "ethers/dist/ethers.min.js"), join(web, "vendor/ethers.min.js"));
-copyFileSync(join(nm, "three/build/three.module.js"), join(web, "vendor/three/three.module.js"));
+copyFileSync(join(nm, "three/build/three.module.js"), join(web, "vendor/three/three.module.js")); // the art renders load this one
+copyFileSync(join(nm, "three/build/three.module.min.js"), join(web, "vendor/three/three.module.min.js")); // the pages: same exports, half the size
 for (const dir of ["controls", "postprocessing", "shaders", "geometries", "environments"]) {
   cpSync(join(nm, "three/examples/jsm", dir), join(web, "vendor/three/addons", dir), { recursive: true });
 }
@@ -89,11 +90,95 @@ try {
   LOCAL_DEMO = JSON.parse(readFileSync(join(web, "deployment.json"), "utf8")).chainId === 31337;
 } catch {} // no deployment yet: the demo setup
 const NARROW = { "pilot.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self' http://localhost:* http://127.0.0.1:*" /* Chrome rejects http://[::1]:* as a CSP source */ } };
+// Search and link previews: every page gets Open Graph / Twitter tags from its own <title> and description; the
+// absolute ones (canonical, og:url, og:image, sitemap) only when the site's address is known (SITE_URL, else
+// EXTERNAL_URL in .env), so a local or preview build never carries a wrong domain. Private or retired pages: noindex.
+try {
+  process.loadEnvFile(join(root, ".env"));
+} catch {} // no .env: no site address
+const SITE = (process.env.SITE_URL || process.env.EXTERNAL_URL || "").trim().replace(/\/+$/, "");
+if (SITE && !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?$/i.test(SITE)) throw new Error(`SITE_URL must be a bare https:// origin, got ${SITE}`);
+const INDEXABLE = ["index", "bench", "pilot", "arena", "robot", "codex", "gallery", "license"];
+const urlFor = (name) => (name === "index" ? `${SITE}/` : `${SITE}/${name}`); // Cloudflare Pages serves clean URLs
+const attr = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+function seoBlock(name, html) {
+  const title = (html.match(/<title>([^<]*)<\/title>/) || [])[1] || "OpenForge AX";
+  const desc = (html.match(/<meta name="description" content="([^"]*)">/) || [])[1] || "";
+  const tags = [
+    `<meta property="og:type" content="website">`, `<meta property="og:site_name" content="OpenForge AX">`,
+    `<meta property="og:title" content="${attr(title)}">`, desc && `<meta property="og:description" content="${desc}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    !/<meta name="theme-color"/.test(html) && `<meta name="theme-color" content="#f4efe6">`,
+    !INDEXABLE.includes(name) && `<meta name="robots" content="noindex, follow">`,
+  ];
+  if (SITE && INDEXABLE.includes(name)) {
+    const img = `${SITE}/assets/og.png`;
+    tags.push(`<link rel="canonical" href="${urlFor(name)}">`, `<meta property="og:url" content="${urlFor(name)}">`,
+      `<meta property="og:image" content="${img}">`, `<meta property="og:image:width" content="1200">`, `<meta property="og:image:height" content="630">`,
+      `<meta property="og:image:alt" content="OpenForge AX: Build a robot. Your phone is the brain.">`, `<meta name="twitter:image" content="${img}">`);
+    if (name === "index") tags.push(`<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": [
+      { "@type": "WebSite", "@id": `${SITE}/#site`, name: "OpenForge AX", url: `${SITE}/`, description: "A phone for a brain. Open for everything else." },
+      { "@type": "Organization", "@id": `${SITE}/#org`, name: "OpenForge AX", url: `${SITE}/`, logo: `${SITE}/assets/brand/logo-1000.png` },
+    ] })}</script>`);
+  }
+  return `<!--seo-->\n${tags.filter(Boolean).join("\n")}\n<!--/seo-->`;
+}
+
+// Preloads: each page announces its module graph (so the browser fetches all of it in parallel instead of
+// discovering it one import at a time) and the normal-style fonts that css/style.css declares. Rewritten between
+// <!--preload--> markers on every build, so running the build again never duplicates a tag.
+const STATIC_IMPORT = /(?:^|[\s;}])(?:import|export)\s*(?:[^'"()]*?\bfrom\s*)?["']([^"']+)["']/g; // import/export ... from "x" and import "x"; never import("x")
+// comments out, string and template literals kept as they are (a "/*" inside a // comment or a "//" inside a URL string are not comment starts)
+const stripComments = (src) => src.replace(/("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m, str) => str ?? "");
+function moduleGraph(entries, importmap) {
+  const seen = new Set();
+  const queue = [...entries];
+  const resolveBare = (spec) => {
+    if (importmap[spec]) return importmap[spec];
+    const prefix = Object.keys(importmap).filter((k) => k.endsWith("/") && spec.startsWith(k)).sort((a, b) => b.length - a.length)[0];
+    return prefix ? importmap[prefix] + spec.slice(prefix.length) : null;
+  };
+  while (queue.length) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    if (!existsSync(file)) throw new Error(`module graph: ${file} does not exist`);
+    seen.add(file);
+    for (const m of stripComments(readFileSync(file, "utf8")).matchAll(STATIC_IMPORT)) {
+      const spec = m[1];
+      const target = /^\.{0,2}\//.test(spec) ? join(dirname(file), spec) : /^[a-z@][^:]*$/i.test(spec) ? (resolveBare(spec) ? join(web, resolveBare(spec)) : null) : null;
+      if (!target) throw new Error(`module graph: cannot resolve "${spec}" imported by ${file}`);
+      queue.push(target);
+    }
+  }
+  return [...seen];
+}
+// the @font-face rules of css/style.css with font-style: normal (the italic one is rare and is not preloaded)
+const css = readFileSync(join(web, "css/style.css"), "utf8");
+const FONTS = [...css.matchAll(/@font-face\s*{[^}]*}/g)]
+  .map((m) => m[0])
+  .filter((r) => /font-style:\s*normal/.test(r))
+  .map((r) => r.match(/url\("\.\.\/([^"]+\.woff2)"\)/)?.[1])
+  .filter(Boolean);
+if (FONTS.length !== 3) throw new Error(`expected 3 normal fonts in css/style.css, found ${FONTS.length}`);
+// modules a page imports dynamically but always, right at start (the preload scan only follows static imports)
+const EAGER = { "index.html": ["js/lab/lab-view.js"], "bench.html": ["js/bench/bench-view.js"] };
+function preloadBlock(html, page) {
+  const importmap = JSON.parse((html.match(/<script type="importmap">([\s\S]*?)<\/script>/) || [, '{"imports":{}}'])[1]).imports;
+  const entries = [...html.matchAll(/<script[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/g)].map((m) => join(web, m[1]));
+  entries.push(...(EAGER[page] || []).map((f) => join(web, f)));
+  const links = moduleGraph(entries, importmap).map((f) => `<link rel="modulepreload" href="${f.slice(web.length + 1).replace(/\\/g, "/")}">`);
+  if (/<link rel="stylesheet" href="css\/style\.css">/.test(html)) links.push(...FONTS.map((f) => `<link rel="preload" as="font" type="font/woff2" crossorigin href="${f}">`));
+  return links.length ? `<!--preload-->\n${links.join("\n")}\n<!--/preload-->` : "";
+}
+
 for (const page of readdirSync(web).filter((f) => f.endsWith(".html"))) {
   const file = join(web, page);
-  let html = readFileSync(file, "utf8").replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/, "");
-  // browsers hash inline scripts after the HTML parser turns CRLF into LF: hash the same text
-  const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash("sha256").update(m[1].replace(/\r\n?/g, "\n")).digest("base64")}'`);
+  let html = readFileSync(file, "utf8").replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/, "").replace(/\s*<!--seo-->[\s\S]*?<!--\/seo-->/, "").replace(/\s*<!--preload-->[\s\S]*?<!--\/preload-->/, "");
+  const preload = preloadBlock(html, page);
+  if (preload) html = /<script type="importmap">[\s\S]*?<\/script>/.test(html) ? html.replace(/(<script type="importmap">[\s\S]*?<\/script>)/, `$1\n${preload}`) : html.replace("</head>", `${preload}\n</head>`);
+  html = html.replace("</head>", `${seoBlock(page.replace(/\.html$/, ""), html)}\n</head>`);
+  // browsers hash inline scripts after the HTML parser turns CRLF into LF: hash the same text (JSON-LD is data: no hash)
+  const hashes = [...html.matchAll(/<script(?![^>]*\b(?:src=|type="application\/ld\+json"))[^>]*>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash("sha256").update(m[1].replace(/\r\n?/g, "\n")).digest("base64")}'`);
   const local = LOCAL_DEMO ? "http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*" : ""; // loopback only for the local demo
   const narrow = NARROW[page] || {};
   const csp = [
@@ -104,6 +189,16 @@ for (const page of readdirSync(web).filter((f) => f.endsWith(".html"))) {
   if (!/<meta charset="[^"]*">/i.test(html)) throw new Error(`${page}: no <meta charset> to anchor the CSP`);
   html = html.replace(/(<meta charset="[^"]*">)/i, `$1\n<meta http-equiv="Content-Security-Policy" content="${csp}">`);
   writeFileSync(file, html);
+}
+
+// robots.txt always; the sitemap only with an absolute address (private and retired pages are never listed)
+if (SITE) {
+  const urls = INDEXABLE.map((n) => `  <url><loc>${urlFor(n)}</loc></url>`).join("\n");
+  writeFileSync(join(web, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+  writeFileSync(join(web, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
+} else {
+  writeFileSync(join(web, "robots.txt"), "User-agent: *\nAllow: /\n");
+  rmSync(join(web, "sitemap.xml"), { force: true });
 }
 
 const rarity = join(root, "art/out/rarity.json");

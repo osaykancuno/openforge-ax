@@ -20,6 +20,22 @@
 /robot
   ! Permissions-Policy
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
+# the free *.pages.dev address is a preview: never indexed by search engines (the custom domain is not affected)
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+# private or retired pages: never in search results (the pages also carry a robots meta tag)
+/agents.html
+  X-Robots-Tag: noindex
+/agents
+  X-Robots-Tag: noindex
+/agent.html
+  X-Robots-Tag: noindex, follow
+/agent
+  X-Robots-Tag: noindex, follow
+/world.html
+  X-Robots-Tag: noindex
+/world
+  X-Robots-Tag: noindex
 /pilot.webmanifest
   Content-Type: application/manifest+json
 /deployment.json

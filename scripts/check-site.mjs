@@ -24,7 +24,7 @@ for (const [k, scheme] of [["provingApi", "https://"], ["worldWs", "wss://"]]) {
 if (!/^https:\/\/opensea\.io\/collection\/[\w-]+/.test(value("openseaDropUrl") || "")) problems.push("openseaDropUrl must be the real OpenSea collection page");
 if (!/^https:\/\//.test(value("explorer") || "")) problems.push("explorer must be https://etherscan.io (or the testnet explorer)");
 if (/x\.com\/"|discord\.gg\/"/.test(config)) problems.push("config.js social links are still empty (x.com/, discord.gg/)");
-for (const f of ["vendor/ethers.min.js", "vendor/three/three.module.js", "_headers"]) if (!existsSync(join(web, f))) problems.push(`missing web/${f}: run npm run web:build`);
+for (const f of ["vendor/ethers.min.js", "vendor/three/three.module.js", "vendor/three/three.module.min.js", "_headers"]) if (!existsSync(join(web, f))) problems.push(`missing web/${f}: run npm run web:build`);
 for (const page of readdirSync(web).filter((f) => f.endsWith(".html"))) {
   const html = readFileSync(join(web, page), "utf8");
   if (!html.includes('http-equiv="Content-Security-Policy"')) problems.push(`${page} has no CSP: run npm run web:build`);

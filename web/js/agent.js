@@ -1,8 +1,8 @@
-import { parseEther, isAddress } from "../vendor/ethers.min.js";
+import { parseEther, isAddress, formatEther } from "../vendor/ethers.min.js";
 import { CONFIG } from "./config.js";
 import {
   loadConfig, renderChrome, agents, account, reputation, reader, onWallet, send, toast,
-  tokenMeta, ipfs, attr, short, formatEther, isDeployed, esc,
+  tokenMeta, ipfs, attr, short, isDeployed, esc,
 } from "./chain.js";
 
 await loadConfig();
@@ -14,13 +14,34 @@ const MODES = ["", "Manual", "Assisted", "Autonomous"];
 const DAY = 86400;
 let acctAddr, owner, signer;
 
-if (!isDeployed() || !id) {
-  $("name").textContent = "Agent not found";
-  throw new Error("no agent");
+const OFFLINE = "Can't reach Ethereum right now. Try again in a moment.";
+// RPC / network failures are expected now and then; a reverted call (no such token) is not one
+const isOffline = (e) => e instanceof TypeError || ["NETWORK_ERROR", "SERVER_ERROR", "TIMEOUT"].includes(e?.code) || /fetch|network|timeout|timed out|failed to/i.test(`${e?.shortMessage || ""} ${e?.message || ""}`);
+const available = isDeployed() && Boolean(id); // without a deployment (or a number) the RPC is never asked
+const failed = (e) => {
+  if (!isOffline(e)) {
+    $("name").textContent = "Agent not found. Check the number, or browse the Gallery.";
+    console.warn(e);
+    return;
+  }
+  console.warn("Ethereum RPC unreachable");
+  $("name").textContent = OFFLINE;
+  $("desc").innerHTML = `<button class="btn sm" type="button">Retry</button>`;
+  $("desc").querySelector("button").onclick = () => {
+    $("name").textContent = "Loading…";
+    $("desc").textContent = "";
+    refresh();
+  };
+};
+const refresh = () => load().catch(failed);
+const readFailed = (e) => (isOffline(e) ? (console.warn("Ethereum RPC unreachable"), toast(OFFLINE, true)) : toast(e?.shortMessage || "Something went wrong.", true));
+
+if (!available) {
+  $("name").textContent = id ? "Agents will appear here once minting starts. The lab works without them." : "Agent not found. Check the number, or browse the Gallery.";
 }
 
 async function load() {
-  const c = agents();
+  const c = await agents();
   const [meta, own, acct] = await Promise.all([tokenMeta(id), c.ownerOf(id), c.accountOf(id)]);
   owner = own;
   acctAddr = acct;
@@ -29,7 +50,7 @@ async function load() {
   $("desc").textContent = meta.description;
   $("img").src = ipfs(meta.image);
   $("img").alt = meta.name;
-  $("kicker").textContent = attr(meta, "1/1") ? "FIG. 08 · Legendary 1/1" : `FIG. 08 · ${attr(meta, "Faction") ?? "Dormant agent"}`;
+  $("kicker").textContent = attr(meta, "1/1") ? "FIG. 12 · Prime Construct (1/1)" : `FIG. 12 · ${attr(meta, "Faction") ?? "Dormant agent · revealed after the sale"}`;
   $("osLink").href = CONFIG.openseaItemUrl(CONFIG.agents, id);
   $("scanLink").href = `${CONFIG.explorer}/address/${acct}`;
   $("acct").textContent = acct;
@@ -41,21 +62,22 @@ async function load() {
     .map((a) => `<div><small>${esc(a.trait_type)}</small>${esc(a.value)}</div>`)
     .join("");
 
-  const a = account(acct);
+  const a = await account(acct);
   const [bal, lvl, paused, lockedUntil, lockOwner, stats] = await Promise.all([
-    reader().getBalance(acct),
+    reader().then((r) => r.getBalance(acct)),
     a.autonomyLevel(),
     a.paused(),
     a.lockedUntil(),
     a.lockOwner(),
-    CONFIG.reputation && !/^0x0{40}$/i.test(CONFIG.reputation) ? reputation().statsOf(id) : null,
+    CONFIG.reputation && !/^0x0{40}$/i.test(CONFIG.reputation) ? reputation().then((r) => r.statsOf(id)) : null,
   ]);
   $("bal").textContent = `${Number(formatEther(bal)).toFixed(4)} ETH`;
   $("lvl").textContent = MODES[Number(lvl)];
   $("rep").textContent = attr(meta, "Reputation") ?? "Rookie";
   $("tasks").textContent = stats ? `${stats.tasks} / ${stats.dataPoints}` : "0 / 0";
   $("sim").textContent = `${attr(meta, "Sim Successes") ?? 0} / ${attr(meta, "Sim Runs") ?? 0}`;
-  $("arenaLink").hidden = $("robotLink").hidden = attr(meta, "Class") !== "Synth Arm";
+  $("arenaLink").hidden = false; // every class has lab trials in the Proving Grounds
+  $("robotLink").hidden = attr(meta, "Class") !== "Synth Arm"; // Robot Link drives a real SO-101 only
 
   const now = Math.floor(Date.now() / 1000);
   const locked = Number(lockedUntil) > now && lockOwner.toLowerCase() === own.toLowerCase();
@@ -101,14 +123,19 @@ function showOwnerArea() {
 }
 
 // ---------------------------------------------------------------- owner actions
-const acctW = () => account(acctAddr, signer);
+const acctW = () => account(acctAddr, signer); // a promise of the contract, signing
 let pendingLevel = 1;
 
 document.querySelectorAll(".mode").forEach((b) =>
   b.addEventListener("click", async () => {
     pendingLevel = Number(b.dataset.l);
     document.querySelectorAll(".mode").forEach((x) => (x.classList.toggle("on", x === b), x.setAttribute("aria-pressed", String(x === b))));
-    const op = await account(acctAddr).operator();
+    let op;
+    try {
+      op = await (await account(acctAddr)).operator();
+    } catch (e) {
+      return readFailed(e);
+    }
     $("operator").value = CONFIG.defaultOperator || (/^0x0{40}$/i.test(op) ? "" : op);
     $("operator").hidden = Boolean(CONFIG.defaultOperator);
     $("modeOpts").hidden = false;
@@ -117,32 +144,37 @@ document.querySelectorAll(".mode").forEach((b) =>
 
 $("applyMode").onclick = async () => {
   const op = CONFIG.defaultOperator || $("operator").value.trim();
-  if (!isAddress(op)) return toast("The agent runtime address (0x…) is required.", true);
+  if (!isAddress(op)) return toast("The agent software address (0x…) is required.", true);
   const limit = parseEther($("limit").value);
-  if (await send(`${MODES[pendingLevel]} mode`, () => acctW().configure(op, pendingLevel, limit, DAY))) load();
+  if (await send(`${MODES[pendingLevel]} mode`, () => acctW().then((a) => a.configure(op, pendingLevel, limit, DAY)))) refresh();
 };
 
 $("pauseBtn").onclick = async () => {
   const resume = Boolean($("pauseBtn").dataset.paused);
-  if (await send(resume ? "Resume agent" : "Emergency pause", () => acctW().setPaused(!resume))) load();
+  if (await send(resume ? "Resume agent" : "Emergency pause", () => acctW().then((a) => a.setPaused(!resume)))) refresh();
 };
 
 $("lockBtn").onclick = async () => {
   if (!confirm("The agent wallet will stay locked for 7 days (not even you can move funds). If you sell, the lock ends for the new owner. Confirm?")) return;
   const until = Math.floor(Date.now() / 1000) + 7 * DAY;
-  if (await send("Prepare for sale", () => acctW().lock(until))) load();
+  if (await send("Prepare for sale", () => acctW().then((a) => a.lock(until)))) refresh();
 };
 
 $("depBtn").onclick = async () => {
   const v = $("dep").value;
   if (!(Number(v) > 0)) return toast("Enter how much ETH to send to the agent.", true);
-  if (await send("Top up", () => signer.sendTransaction({ to: acctAddr, value: parseEther(v) }))) load();
+  if (await send("Top up", () => signer.sendTransaction({ to: acctAddr, value: parseEther(v) }))) refresh();
 };
 
 $("wdBtn").onclick = async () => {
-  const bal = await reader().getBalance(acctAddr);
+  let bal;
+  try {
+    bal = await (await reader()).getBalance(acctAddr);
+  } catch (e) {
+    return readFailed(e);
+  }
   if (bal === 0n) return toast("The agent wallet is empty.");
-  if (await send("Withdraw all", () => acctW().execute(signer.addressChecksum, bal, "0x", 0))) load();
+  if (await send("Withdraw all", () => acctW().then((a) => a.execute(signer.addressChecksum, bal, "0x", 0)))) refresh();
 };
 
 $("proposals").addEventListener("click", async (e) => {
@@ -150,15 +182,20 @@ $("proposals").addEventListener("click", async (e) => {
   const no = e.target.dataset.no;
   if (ok !== undefined) {
     // the full target, checked by the human: a look-alike address must never be approved by habit
-    const p = await acctW().proposalAt(ok);
+    let p;
+    try {
+      p = await (await acctW()).proposalAt(ok);
+    } catch (e) {
+      return readFailed(e);
+    }
     if (!confirm(`Approve proposal #${ok}?
 
 To: ${p.to}
 Value: ${formatEther(p.value)} ETH
 ${p.data.length > 2 ? `Contract call ${p.data.slice(0, 10)} (${(p.data.length - 2) / 2} bytes)` : "ETH transfer"}`)) return;
-    if (await send(`Approve #${ok}`, () => acctW().approve(ok))) load();
+    if (await send(`Approve #${ok}`, () => acctW().then((a) => a.approve(ok)))) refresh();
   }
-  if (no !== undefined && (await send(`Reject #${no}`, () => acctW().reject(no)))) load();
+  if (no !== undefined && (await send(`Reject #${no}`, () => acctW().then((a) => a.reject(no))))) refresh();
 });
 
 onWallet((s) => {
@@ -166,7 +203,4 @@ onWallet((s) => {
   showOwnerArea();
 });
 
-load().catch((e) => {
-  $("name").textContent = "Agent not found";
-  console.error(e);
-});
+if (available) refresh();

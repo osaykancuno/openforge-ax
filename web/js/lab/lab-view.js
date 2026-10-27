@@ -116,11 +116,19 @@ const PIECES = {
   } },
 };
 
-export function createLabView(canvas, stations, { onHover = () => {}, onSelect = () => {}, onFrame = () => {}, safeArea = () => ({ left: 0, top: 0 }) } = {}) {
+/**
+ * Options: onHover / onSelect / onFrame / safeArea (see home.js), plus two frame-budget knobs the page passes:
+ *  maxFps       cap the loop (0 = every display frame); home.js uses 30 on small screens
+ *  adaptiveDpr  drop to pixel ratio 1 when the first 30 frames average more than 24 ms
+ */
+export function createLabView(canvas, stations, { onHover = () => {}, onSelect = () => {}, onFrame = () => {}, safeArea = () => ({ left: 0, top: 0 }), maxFps = 0, adaptiveDpr = false } = {}) {
   let reduced = matchMedia("(prefers-reduced-motion: reduce)").matches; // also set by the page's "Pause animation"
   const small = matchMedia("(max-width: 760px)").matches;
   const renderer = makeRenderer(canvas);
   renderer.setPixelRatio(Math.min(small ? 1.5 : 2, devicePixelRatio));
+  // frames still to draw while everything else is at rest (easing needs ~60 frames to settle); only matters when motion is paused
+  let settle = 90;
+  const wake = () => (settle = 90);
   const scene = new THREE.Scene();
   const stage = makeStage(scene, renderer, { size: 10, floor: false });
   stage.key.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
@@ -137,6 +145,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     floor.material.map.dispose();
     floor.material.map = matTexture();
     floor.material.needsUpdate = true;
+    wake();
   });
   const ringLine = at(torus(RING, 0.012, "ink"), 0, 0.005, 0, scene);
   ringLine.rotation.x = Math.PI / 2;
@@ -153,17 +162,26 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   centre.add(hero.group);
 
   // ---------------------------------------------------------------- stations
+  // Positions and heights are known at once (so the framing is final from the first frame); the benches and robots
+  // themselves are built afterwards in idle chunks, so the hero shows up first.
   const items = stations.map((st, i) => {
     const ang = (i / stations.length) * Math.PI * 2 - Math.PI / 2;
     const group = at(new THREE.Group(), Math.cos(ang) * RING, 0, Math.sin(ang) * RING, scene);
     group.lookAt(0, 0, 0);
     group.rotateY(Math.PI); // face outwards, toward the viewer side of the ring
+    const def = PIECES[st.model] || PIECES.gallery;
+    const top = 0.22 + (def.lift || 0) + def.height * 1.3;
+    return { ...st, group, def, top, lift: 0, ready: false };
+  });
+  const hits = []; // pickable volumes, added as each station is built
+
+  function buildItem(it) {
+    const { group, def } = it;
     const plinth = at(cyl(PLINTH_R, PLINTH_R * 1.06, 0.22, "shell", 64), 0, 0.11, 0, group);
     void plinth;
-    const band = at(torus(PLINTH_R * 1.005, 0.018, new THREE.MeshStandardMaterial({ color: st.color, roughness: 0.5 })), 0, 0.2, 0, group);
+    const band = at(torus(PLINTH_R * 1.005, 0.018, new THREE.MeshStandardMaterial({ color: it.color, roughness: 0.5 })), 0, 0.2, 0, group);
     band.rotation.x = Math.PI / 2;
     const body = at(new THREE.Group(), 0, 0.22, 0, group);
-    const def = PIECES[st.model] || PIECES.gallery;
     let rig = null, node;
     if (def.robot) {
       rig = buildRobot(def.robot);
@@ -175,13 +193,28 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     holder.scale.setScalar(s);
     holder.add(node);
     node.userData.y = node.position.y;
-    const top = 0.22 + (def.lift || 0) + def.height * 1.3;
-    const hit = at(new THREE.Mesh(new THREE.CylinderGeometry(PLINTH_R * 1.1, PLINTH_R * 1.1, top + 0.4, 16), new THREE.MeshBasicMaterial({ visible: false })), 0, (top + 0.4) / 2, 0, group);
-    hit.userData.id = st.id;
+    const hit = at(new THREE.Mesh(new THREE.CylinderGeometry(PLINTH_R * 1.1, PLINTH_R * 1.1, it.top + 0.4, 16), new THREE.MeshBasicMaterial({ visible: false })), 0, (it.top + 0.4) / 2, 0, group);
+    hit.userData.id = it.id;
     const halo = at(new THREE.Mesh(new THREE.RingGeometry(PLINTH_R * 1.15, PLINTH_R * 1.24, 64), new THREE.MeshBasicMaterial({ color: PALETTE.ink, transparent: true, opacity: 0 })), 0, 0.01, 0, group);
     halo.rotation.x = -Math.PI / 2;
-    return { ...st, group, body, rig, node, def, hit, halo, top, lift: 0 };
-  });
+    Object.assign(it, { body, rig, node, hit, halo, ready: true });
+    hits.push(hit);
+  }
+
+  let built = 0, disposed = false;
+  const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(() => fn({ timeRemaining: () => 8 }), 30));
+  function buildChunk(deadline) {
+    if (disposed) return;
+    do buildItem(items[built++]);
+    while (built < items.length && deadline.timeRemaining() > 8); // at least one station per chunk, more while the browser is idle
+    wake();
+    if (built < items.length) idle(buildChunk);
+    else {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (w && h) fit(w, h); // everything is in: frame it once more
+    }
+  }
+  idle(buildChunk);
 
   // ---------------------------------------------------------------- camera
   const home = { pos: new THREE.Vector3(0, small ? 21 : 13.5, small ? 17 : 19), look: new THREE.Vector3(0, 0.9, 0) };
@@ -191,6 +224,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   function moveTo(pos, look, ms = 750) {
     if (reduced) ms = 0;
     tween = { from: { pos: cam.pos.clone(), look: cam.look.clone() }, to: { pos, look }, t0: performance.now(), ms };
+    wake();
   }
   function focus(id) {
     const it = items.find((s) => s.id === id);
@@ -203,7 +237,6 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
 
   // ---------------------------------------------------------------- input
   const ray = new THREE.Raycaster();
-  const hits = items.map((s) => s.hit);
   let rect = canvas.getBoundingClientRect();
   let hovered = null;
   function pick(e) {
@@ -213,14 +246,16 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   const setHover = (id) => {
     if (id === hovered) return;
     hovered = id;
+    wake();
     canvas.style.cursor = id ? "pointer" : "";
     onHover(id);
   };
   canvas.addEventListener("pointermove", (e) => {
     pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    wake();
     if (e.pointerType === "mouse") setHover(pick(e));
   });
-  canvas.addEventListener("pointerleave", () => (setHover(null), pointer.set(0, 0)));
+  canvas.addEventListener("pointerleave", () => (setHover(null), pointer.set(0, 0), wake()));
   canvas.addEventListener("click", (e) => {
     const id = pick(e);
     if (id) onSelect(id);
@@ -233,6 +268,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     renderer.setSize(w, h, false);
     rect = canvas.getBoundingClientRect();
     fit(w, h);
+    wake();
   }
   /** Frames the ring inside the area the HUD leaves free (right of it on wide screens, below it on narrow ones). */
   function fit(w, h) {
@@ -270,10 +306,23 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   const anchors = items.map((it) => ({ id: it.id, x: 0, y: 0, visible: true }));
   const look = new THREE.Vector2();
   let raf = 0, last = performance.now(), clock = 0;
+  const minDt = maxFps ? 1000 / maxFps - 2 : 0; // 2 ms of slack: display frames come in whole multiples of 16.7 ms
+  let seen = 0, prevRaf = 0, sum = 0, n = 0; // frame-time probe for adaptiveDpr: rAF to rAF, first 30 frames after a short warm-up
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    if (adaptiveDpr && n < 30) {
+      if (prevRaf && ++seen > 2) {
+        sum += now - prevRaf;
+        if (++n === 30 && sum / n > 24 && renderer.getPixelRatio() > 1) (renderer.setPixelRatio(1), resize());
+      }
+      prevRaf = now;
+    }
     if (!rect.width) return;
+    if (minDt && now - last < minDt) return;
+    // nothing moves while paused: no tween, pointer at rest and the easing settled, so there is nothing new to draw
+    if (reduced && !tween && settle <= 0) return void (last = now);
+    settle--;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (!reduced) clock += dt; // the lab's own time: frozen when paused, so poses hold still
@@ -307,6 +356,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     hero.update(dt, now / 1000);
 
     for (const it of items) {
+      if (!it.ready) continue;
       const goal = it.id === hovered ? 1 : 0;
       it.lift += (goal - it.lift) * 0.15;
       it.body.position.y = 0.22 + it.lift * 0.18;
@@ -318,12 +368,12 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
 
     items.forEach((it, i) => {
       tmp.copy(it.group.position).setY(it.top + 0.45 + it.lift * 0.18).project(camera);
-      Object.assign(anchors[i], { x: ((tmp.x + 1) / 2) * rect.width, y: ((1 - tmp.y) / 2) * rect.height, visible: tmp.z < 1 });
+      Object.assign(anchors[i], { x: ((tmp.x + 1) / 2) * rect.width, y: ((1 - tmp.y) / 2) * rect.height, visible: it.ready && tmp.z < 1 });
     });
     onFrame(anchors);
   }
   const stop = () => (cancelAnimationFrame(raf), (raf = 0));
-  const start = () => !raf && !document.hidden && ((last = performance.now()), (raf = requestAnimationFrame(frame)));
+  const start = () => !raf && !document.hidden && ((last = performance.now()), (prevRaf = 0), wake(), (raf = requestAnimationFrame(frame)));
   const onVisibility = () => (document.hidden ? stop() : start());
   document.addEventListener("visibilitychange", onVisibility);
   start();
@@ -331,8 +381,9 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   return {
     focus, reset, hover: setHover, resume: start,
     /** false freezes every automatic motion (drift, robots, waves); hover, clicks and AX-1's gaze still work */
-    setMotion: (on) => (reduced = !on),
+    setMotion: (on) => ((reduced = !on), wake()),
     dispose: () => {
+      disposed = true;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
       ro.disconnect();

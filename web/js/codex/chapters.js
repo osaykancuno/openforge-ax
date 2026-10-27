@@ -352,7 +352,7 @@ export const CHAPTERS = [
   },
   {
     number: "07", kicker: "On-chain", title: "Agents on-chain",
-    body: `<p>The lab is free. The OpenForge AX collection is its membership and record layer: <b>1,024 agents</b>, each one robot class with <b>its own wallet</b> (ERC-6551) and an on-chain <b>record</b> of what it verifiably did, failures included.</p><p>Start in <b>Manual</b> mode: the agent proposes, you approve. In no mode can it move your NFTs. It is a collectible with tools: <b>no promise of returns</b> or value.</p>`,
+    body: `<p>The lab is free, no wallet needed. The collection is optional: <b>1,024 NFT agents</b> that act as lab membership and logbook. Each has a robot class, <b>its own wallet</b> (a standard called ERC-6551) and a <b>record</b> of verified lab missions, failures included. Records from real robots come later.</p><p>New agents start in <b>Manual</b>: the agent proposes, you approve. In no mode can it move your NFTs. It is a collectible with tools, not an investment: <b>no returns promised</b>, and the price can fall.</p>`,
     actions: [{ id: "wallet", label: "Show its wallet" }, { id: "record", label: "Log a mission" }, { id: "manual", label: "Manual mode" }],
     build({ animate }) {
       const group = new THREE.Group();
@@ -378,7 +378,7 @@ export const CHAPTERS = [
               wallet.scale.setScalar(0.001);
               await animate(380, (k) => wallet.scale.setScalar(Math.max(0.001, k)));
             }
-            return "Its wallet: an Ethereum address that belongs to the agent itself (ERC-6551). Sell the agent and the wallet goes with it; the old owner's settings reset.";
+            return "Its wallet: an Ethereum address that belongs to the agent, not to a person. Whoever holds the agent controls it. Sell the agent and the wallet goes with it, funds included; the old owner's settings reset.";
           }
           if (id === "manual") {
             bubble.visible = true;
@@ -425,8 +425,8 @@ export const CHAPTERS = [
       let up = null;
       const INFO = {
         bench: "Workbench (bench.html): Unfold, Take it apart, Sensors, Brain, Move, Test, Build it. Start with AX-1 or the SO-101.",
-        pilot: "Phone Brain (pilot.html): camera, IMU and touch drive the twin. With an AX-1 bridge it drives the real robot over Bluetooth.",
-        arena: "Proving Grounds (arena.html): move the cell into the dock in 60 seconds. Guests can play; runs are not recorded without an agent.",
+        pilot: "Phone Brain (pilot.html): camera, IMU and touch drive the twin. With an AX-1 bridge it drives the real robot over Bluetooth from Android Chrome; iPhone Safari can't, so iPhones use the twin.",
+        arena: "Proving Grounds (arena.html): move the cell into the dock in 60 seconds. Guests can play. Any wallet can enter the pilot ranking; only agent holders get a record under an agent.",
       };
       return {
         group, pickables: Object.values(stations),

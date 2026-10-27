@@ -2,24 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Workbench · OpenForge Lab</title>
 <meta name="description" content="Learn how eleven open robots work, test them in lab missions in your browser, then build a real one: bill of materials, licences and upstream links.">
 <meta name="theme-color" content="#f4efe6">
-<meta property="og:title" content="Workbench · OpenForge Lab">
-<meta property="og:description" content="One robot at a time: take it apart, watch it move, pass three lab missions, then build the real thing.">
-<meta property="og:image" content="assets/og.png">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/bench.css">
 <script type="importmap">
 { "imports": {
-  "three": "./vendor/three/three.module.js",
+  "three": "./vendor/three/three.module.min.js",
   "three/addons/": "./vendor/three/addons/"
 } }
 </script>
+<!--preload-->
+<link rel="modulepreload" href="js/bench/bench.js">
+<link rel="modulepreload" href="js/bench/bench-view.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="js/models/robot-specs.js">
+<link rel="modulepreload" href="js/bench/content.js">
+<link rel="modulepreload" href="js/bench/missions/index.js">
+<link rel="modulepreload" href="js/bench/mission-runner.js">
+<link rel="modulepreload" href="js/bench/shared.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="js/bench/missions/so101.js">
+<link rel="modulepreload" href="js/bench/missions/rover.js">
+<link rel="modulepreload" href="js/bench/missions/hound.js">
+<link rel="modulepreload" href="js/bench/missions/hand.js">
+<link rel="modulepreload" href="js/bench/missions/spider.js">
+<link rel="modulepreload" href="js/bench/missions/drone.js">
+<link rel="modulepreload" href="js/bench/missions/fab.js">
+<link rel="modulepreload" href="js/bench/missions/replicant.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-rover.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-desk.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-walker.js">
+<link rel="modulepreload" href="js/bench/missions/common.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="modulepreload" href="js/sim/arm-sim.js">
+<link rel="modulepreload" href="js/bench/missions/drive.js">
+<link rel="modulepreload" href="js/bench/missions/biped.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Workbench · OpenForge Lab">
+<meta property="og:description" content="Learn how eleven open robots work, test them in lab missions in your browser, then build a real one: bill of materials, licences and upstream links.">
+<meta name="twitter:card" content="summary_large_image">
+<!--/seo-->
 </head>
 <body class="bench app">
 <a class="skip" href="#stageList">Skip to the stages</a>

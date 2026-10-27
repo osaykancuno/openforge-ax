@@ -2,6 +2,21 @@ import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome, agents, isDeployed } from "./chain.js";
 import { TRAITS, FACTIONS } from "./traits-data.js";
 
+// The 3D lab's code (and three.js with it) starts downloading right now, in parallel with the config fetch and the
+// page set-up below; nothing waits for it: the panels, FAQ, pause button and hash links work before the scene exists.
+const reducedPref = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// 400% zoom, tiny or very short screens: a plain scrolling list instead of the 3D lab (WCAG reflow)
+const listMode = matchMedia("(max-width: 340px), (max-height: 480px)").matches;
+const glOk = (() => {
+  try {
+    return Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+})();
+const labModule = glOk && !listMode ? import("./lab/lab-view.js") : null;
+labModule?.catch(() => {}); // the real handler is in startLab(); this only keeps a slow config fetch from reporting it as unhandled
+
 await loadConfig();
 renderChrome("home");
 const $ = (id) => document.getElementById(id);
@@ -10,18 +25,15 @@ const $ = (id) => document.getElementById(id);
 const STATIONS = [
   { id: "bench", title: "Workbench", line: "Take 11 robots apart, then test them", color: 0x4f7ea8, model: "bench", href: "bench.html" },
   { id: "pilot", title: "Phone Brain", line: "Your phone becomes AX-1's brain", color: 0xc8553d, model: "pilot", href: "pilot.html" },
-  { id: "arena", title: "Proving Grounds", line: "Pilot the arm twin, earn a record", color: 0x5f8a6e, model: "arena", href: "arena.html" },
+  { id: "arena", title: "Proving Grounds", line: "Fly scored missions. Agent holders keep a record", color: 0x5f8a6e, model: "arena", href: "arena.html" },
   { id: "robot", title: "Robot Link", line: "Replay a run on a real SO-101", color: 0xe2b04a, model: "robot", href: "robot.html" },
   { id: "codex", title: "The Codex", line: "Start here: a 3D book in 8 pages", color: 0x5f8a6e, model: "codex", href: "codex.html" },
-  { id: "gallery", title: "Gallery", line: "All 1,024 agents, live from the chain", color: 0x8a6a9e, model: "gallery", href: "gallery.html" },
-  { id: "agents", title: "My agents", line: "Wallet, modes and record", color: 0x4f7ea8, model: "agents", href: "agents.html" },
+  { id: "gallery", title: "Gallery", line: "All 1,024 agents, read from Ethereum", color: 0x8a6a9e, model: "gallery", href: "gallery.html" },
+  { id: "agents", title: "My agents", line: "Your agents: wallet, settings, record", color: 0x4f7ea8, model: "agents", href: "agents.html" },
   { id: "mint", title: "Mint", line: "On OpenSea · 1,024 agents", color: 0xe2b04a, model: "mint", href: CONFIG.openseaDropUrl, external: true },
   { id: "lore", title: "Collection", line: "Classes, traits and rarity", color: 0x8a6a9e, model: "lore", panel: "lore" },
 ];
-const PANEL_TITLES = { guide: "Guide & FAQ", lore: "What an agent does" };
-const reducedPref = matchMedia("(prefers-reduced-motion: reduce)").matches;
-// 400% zoom, tiny or very short screens: a plain scrolling list instead of the 3D lab (WCAG reflow)
-const listMode = matchMedia("(max-width: 340px), (max-height: 480px)").matches;
+const PANEL_TITLES = { guide: "Guide & FAQ", lore: "What an agent (NFT) is" };
 
 let view = null; // the 3D lab, once started
 let navigating = false;
@@ -69,44 +81,48 @@ new ResizeObserver(measure).observe(nav);
 measure();
 
 // ---------------------------------------------------------------- 3D lab (falls back to the list of stations)
-const glOk = (() => {
-  try {
-    return Boolean(document.createElement("canvas").getContext("webgl2"));
-  } catch {
-    return false;
+// startLab() runs at the end of this file, once every handler below is attached.
+async function startLab() {
+  if (labModule) {
+    try {
+      const { createLabView } = await labModule;
+      const small = matchMedia("(max-width: 760px)").matches;
+      view = createLabView($("lab"), STATIONS, {
+        maxFps: small ? 30 : 0, // phones: half the frames is plenty for a slow turntable, and cooler
+        adaptiveDpr: true, // a slow first second drops to pixel ratio 1
+        onHover: (id) => labels.forEach((b) => b.classList.toggle("hot", b.dataset.id === id)),
+        onSelect: (id) => select(id),
+        // the HUD's footprint: the lab is framed in the space it leaves free
+        safeArea: () => {
+          const r = document.querySelector(".lab-hud").getBoundingClientRect();
+          return { left: r.right, top: r.bottom };
+        },
+        onFrame: (pts) => {
+          const W = innerWidth;
+          for (const p of pts) {
+            const b = label(p.id);
+            const half = halfWidths.get(p.id) || 60;
+            const x = Math.round(Math.max(half + 6, Math.min(W - half - 6, p.x))); // labels never leave the screen
+            const y = Math.round(p.y);
+            if (b._x !== x || b._y !== y) (b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`), (b._x = x), (b._y = y);
+            const v = p.visible ? "" : "hidden";
+            if (b.style.visibility !== v) b.style.visibility = v;
+          }
+        },
+      });
+    } catch (e) {
+      console.error(e);
+      view = null;
+    }
   }
-})();
-if (glOk && !listMode) {
-  try {
-    const { createLabView } = await import("./lab/lab-view.js");
-    view = createLabView($("lab"), STATIONS, {
-      onHover: (id) => labels.forEach((b) => b.classList.toggle("hot", b.dataset.id === id)),
-      onSelect: (id) => select(id),
-      // the HUD's footprint: the lab is framed in the space it leaves free
-      safeArea: () => {
-        const r = document.querySelector(".lab-hud").getBoundingClientRect();
-        return { left: r.right, top: r.bottom };
-      },
-      onFrame: (pts) => {
-        const W = innerWidth;
-        for (const p of pts) {
-          const b = label(p.id);
-          const half = halfWidths.get(p.id) || 60;
-          const x = Math.round(Math.max(half + 6, Math.min(W - half - 6, p.x))); // labels never leave the screen
-          const y = Math.round(p.y);
-          if (b._x !== x || b._y !== y) (b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`), (b._x = x), (b._y = y);
-          const v = p.visible ? "" : "hidden";
-          if (b.style.visibility !== v) b.style.visibility = v;
-        }
-      },
-    });
-  } catch (e) {
-    console.error(e);
-    view = null;
-  }
+  document.body.classList.toggle("no-gl", !view);
+  document.body.classList.toggle("lab-list", listMode || !view); // no 3D lab: the scrolling list never overlaps the HUD
+  pauseBtn.hidden = !view;
+  applyMotion();
+  // a panel opened from the URL before the scene existed: fly to its station now
+  const station = open && STATIONS.find((s) => s.panel === open);
+  if (view && station) view.focus(station.id);
 }
-document.body.classList.toggle("no-gl", !view);
-document.body.classList.toggle("lab-list", listMode || !view); // no 3D lab: the scrolling list never overlaps the HUD
 
 // ---------------------------------------------------------------- motion: a visible pause (WCAG 2.2.2), default from the OS setting
 const pauseBtn = $("pauseBtn");
@@ -202,23 +218,25 @@ $("factions").innerHTML = FACTIONS.map(([n, lore, pct]) => `<div class="card"><s
 async function refresh() {
   if (!isDeployed()) {
     $("sState").textContent = "Soon";
+    $("sState").title = "The mint opens on OpenSea";
     return;
   }
   try {
-    const c = agents();
+    const c = await agents(); // the first call loads ethers (only when a deployment exists)
     const [minted, cap, seed, rb] = await Promise.all([c.totalSupply(), c.MAX_SUPPLY_CAP(), c.seed(), c.revealBlock()]);
     $("sMinted").textContent = Number(minted).toLocaleString("en-US");
     $("sSupply").textContent = Number(cap).toLocaleString("en-US");
     $("sBar").style.width = `${(Number(minted) / Number(cap)) * 100}%`;
     const revealed = seed !== "0x" + "0".repeat(64);
-    $("sState").textContent = revealed ? "Revealed" : rb > 0n ? "Reveal…" : "Mint open";
+    $("sState").textContent = revealed ? "Revealed" : rb > 0n ? "Revealing" : "Mint open";
     if (revealed) {
       $("sLegend").textContent = Math.min(10, Math.floor(Number(minted) / 50)); // one per 50 minted, capped at 10
-      $("sLegendLabel").textContent = "Legendary 1/1";
+      $("sLegendLabel").textContent = "Prime Constructs (1/1)";
     }
   } catch {
-    $("sState").textContent = "Offline";
+    $("sState").textContent = "Can't reach Ethereum"; // expected now and then: calm text, the next poll tries again
   }
 }
+startLab(); // every handler is attached: now build the scene
 refresh();
-setInterval(refresh, 30000);
+setInterval(() => !document.hidden && refresh(), 30000);

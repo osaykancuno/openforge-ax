@@ -1,11 +1,12 @@
 import { themeButton } from "./theme.js";
 import { musicButton } from "./ambient.js";
 import { soundsButton } from "./ui-sounds.js";
-import { BrowserProvider, Contract, JsonRpcProvider, formatEther, getAddress } from "../vendor/ethers.min.js";
 import { CONFIG } from "./config.js";
 import { SERVERS_KEY, applyServers, validServerUrl } from "./servers.js";
 
-export { formatEther };
+// ethers is ~270 KB: loaded on first use, so pages that only show the chrome (home, bench, codex...) never fetch it
+let E;
+export const eth = () => (E ??= import("../vendor/ethers.min.js"));
 
 export const ABI = {
   agents: [
@@ -127,14 +128,16 @@ function serversDialog() {
 
 // ---------------------------------------------------------------- provider
 let readProvider;
-export function reader() {
+export async function reader() {
+  const { JsonRpcProvider } = await eth();
   readProvider ??= new JsonRpcProvider(CONFIG.rpcUrl, CONFIG.chainId, { staticNetwork: true });
   return readProvider;
 }
 
-export const agents = (runner = reader()) => new Contract(CONFIG.agents, ABI.agents, runner);
-export const account = (addr, runner = reader()) => new Contract(addr, ABI.account, runner);
-export const reputation = (runner = reader()) => new Contract(CONFIG.reputation, ABI.reputation, runner);
+// async: the first call loads ethers; every helper resolves to a Contract
+export const agents = async (runner) => new (await eth()).Contract(CONFIG.agents, ABI.agents, runner ?? (await reader()));
+export const account = async (addr, runner) => new (await eth()).Contract(addr, ABI.account, runner ?? (await reader()));
+export const reputation = async (runner) => new (await eth()).Contract(CONFIG.reputation, ABI.reputation, runner ?? (await reader()));
 export const isDeployed = () => CONFIG.agents && !/^0x0{40}$/i.test(CONFIG.agents);
 
 // ---------------------------------------------------------------- wallet
@@ -148,6 +151,7 @@ export async function connect() {
     toast("No wallet found. Install MetaMask or Rabby (see the home page FAQ): it takes 2 minutes.", true);
     return null;
   }
+  const { BrowserProvider, getAddress } = await eth();
   const bp = new BrowserProvider(window.ethereum);
   try {
     await bp.send("eth_requestAccounts", []);
@@ -242,7 +246,7 @@ export const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
 const metaCache = new Map();
 /** Find the wallet's tokens from Transfer events; if the RPC limits logs, scan ownerOf instead. */
 export async function ownedBy(addr) {
-  const c = agents();
+  const c = await agents();
   try {
     const logs = await c.queryFilter(c.filters.Transfer(null, addr), CONFIG.fromBlock || 0);
     const candidates = [...new Set(logs.map((l) => Number(l.args.tokenId)))];
@@ -261,7 +265,11 @@ export async function ownedBy(addr) {
 }
 
 export async function tokenMeta(id) {
-  if (!metaCache.has(id)) metaCache.set(id, agents().tokenURI(id).then(decodeTokenURI));
+  if (!metaCache.has(id)) {
+    const p = agents().then((c) => c.tokenURI(id)).then(decodeTokenURI);
+    metaCache.set(id, p);
+    p.catch(() => metaCache.delete(id)); // a failed read (RPC down) must not stick: Retry has to ask again
+  }
   return metaCache.get(id);
 }
 
@@ -301,8 +309,8 @@ export function renderChrome(active) {
       <a href="robot.html" data-k="robot">Robot Link</a>
       <a href="gallery.html" data-k="gallery">Gallery</a>
       <a href="agents.html" data-k="mine">My agents</a>
-      <a class="btn sm magenta" id="mintNav" href="${CONFIG.openseaDropUrl}" target="_blank" rel="noopener">Mint on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
-      <button class="btn sm" id="connectBtn">Connect wallet</button>
+      <a class="btn sm magenta" id="mintNav" href="${CONFIG.openseaDropUrl}" target="_blank" rel="noopener" title="Optional: the lab is free without an agent">Mint on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+      <button class="btn sm" id="connectBtn" title="Optional: the lab works without a wallet">Connect wallet</button>
     </div></div>`;
   const skip = document.querySelector(".skip"); // the skip link stays first, so it can skip the nav
   if (skip) skip.after(nav);
@@ -320,7 +328,7 @@ export function renderChrome(active) {
   nav.querySelector("#mintNav").before(soundsButton(), musicButton(), themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
   const btn = nav.querySelector("#connectBtn");
   btn.onclick = () => connect();
-  onWallet((s) => s && (btn.textContent = short(s.addressChecksum)));
+  onWallet((s) => s && ((btn.textContent = short(s.addressChecksum)), btn.removeAttribute("title")));
 
   const foot = document.createElement("footer");
   foot.innerHTML = `<div class="wrap">

@@ -5,9 +5,32 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Agent — OpenForge AX</title>
+<meta name="description" content="An OpenForge AX agent: its robot class, its own wallet and its verified lab-mission record.">
 <link rel="icon" href="assets/favicon.svg">
 <script src="js/theme-boot.js"></script>
 <link rel="stylesheet" href="css/style.css">
+<!--preload-->
+<link rel="modulepreload" href="js/agent.js">
+<link rel="modulepreload" href="vendor/ethers.min.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="Agent — OpenForge AX">
+<meta property="og:description" content="An OpenForge AX agent: its robot class, its own wallet and its verified lab-mission record.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4efe6">
+<meta name="robots" content="noindex, follow">
+<!--/seo-->
 </head>
 <body class="app">
 <main class="wrap pg">
@@ -23,22 +46,23 @@
       </div>
     </div>
     <div class="app-scroll agent-info">
-      <div class="kicker" id="kicker">FIG. 08 · Agent</div>
+      <div class="kicker" id="kicker">FIG. 12 · Agent</div>
       <h1 class="pg-title" id="name">Loading…</h1>
       <p class="muted" id="desc"></p>
-      <p class="agent-what">This agent flies its robot's missions in the <a href="arena.html">Proving Grounds</a>; passed runs go to its on-chain record. <a href="index.html#lore">What an agent does →</a></p>
+      <p class="agent-what">This agent can fly lab missions in the <a href="arena.html">Proving Grounds</a>. Passed runs are verified and added to its on-chain record. No real-robot records yet. <a href="index.html#lore">What is an agent? →</a></p>
       <div id="badges" class="row"></div>
       <div class="kv" id="traits"></div>
 
       <div class="panel">
         <h3>Agent wallet</h3>
+        <p class="muted small">This wallet belongs to the agent, not to a person. Whoever holds the agent controls it.</p>
         <p class="mono" id="acct">—</p>
         <div class="kv">
           <div><small>Balance</small><b id="bal">—</b></div>
           <div><small>Mode</small><b id="lvl">—</b></div>
-          <div><small>Reputation</small><b id="rep">—</b></div>
-          <div><small>Tasks / Data</small><b id="tasks">—</b></div>
-          <div><small>Sim wins / runs</small><b id="sim">—</b></div>
+          <div><small>Reputation (from verified runs)</small><b id="rep">—</b></div>
+          <div><small>Verified tasks / data points</small><b id="tasks">—</b></div>
+          <div><small>Lab missions passed / tried</small><b id="sim">—</b></div>
         </div>
         <p class="muted small">Owner: <span class="mono" id="owner">—</span></p>
       </div>
@@ -48,17 +72,17 @@
           <h3>Agent mode</h3>
           <div class="modes" role="group" aria-label="Agent mode">
             <button class="mode" data-l="1"><b>MANUAL</b><span>Proposes actions, you approve. Recommended.</span></button>
-            <button class="mode" data-l="2"><b>ASSISTED</b><span>Acts alone, only on authorized services, within a daily limit.</span></button>
-            <button class="mode" data-l="3"><b>AUTONOMOUS</b><span>Acts freely within the daily limit.</span></button>
+            <button class="mode" data-l="2"><b>ASSISTED</b><span>Will act alone within a daily limit. Needs agent software that isn't released yet.</span></button>
+            <button class="mode" data-l="3"><b>AUTONOMOUS</b><span>Will act freely within the daily limit. Needs agent software that isn't released yet.</span></button>
           </div>
           <div class="row" id="modeOpts" hidden>
             <label class="small">Daily limit
               <select id="limit"><option value="0.01">0.01 ETH</option><option value="0.05" selected>0.05 ETH</option><option value="0.1">0.1 ETH</option><option value="0.5">0.5 ETH</option></select>
             </label>
-            <input type="text" id="operator" placeholder="Runtime address (0x…)" style="flex:1;min-width:220px" aria-label="Operator address">
+            <input type="text" id="operator" placeholder="Agent software address (0x…)" style="flex:1;min-width:220px" aria-label="Agent software address">
             <button class="btn sm primary" id="applyMode">Apply</button>
           </div>
-          <p class="muted small" style="margin-top:12px">In no mode can the agent move your tokens or NFTs, or sign messages for you.</p>
+          <p class="muted small" style="margin-top:12px">In no mode can the agent move your other tokens or NFTs, or sign messages for you. Approvals you gave other apps still stand: check them before selling.</p>
         </div>
 
         <div class="panel">
