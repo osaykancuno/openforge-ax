@@ -286,6 +286,13 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       overlay.addEventListener("beforexrselect", overlayGuard);
       renderer.xr.enabled = true;
       renderer.xr.setReferenceSpaceType("local");
+      // Chrome on recent Android phones exposes WebXR Layers (renderState.layers) even though this session did not ask
+      // for them, and three r160 then draws into a projection layer that the AR compositor never shows (measured on a
+      // Galaxy S24: frames, draw calls and triangles, nothing on screen). Hidden on this session only, three uses the
+      // classic XRWebGLLayer, which AR shows. three reads it once, here.
+      try {
+        Object.defineProperty(s.renderState, "layers", { value: undefined, configurable: true });
+      } catch {} // a browser that refuses: three keeps its own choice
       await renderer.xr.setSession(s);
       refSpace = renderer.xr.getReferenceSpace();
       const viewer = await s.requestReferenceSpace("viewer");

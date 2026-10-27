@@ -222,6 +222,12 @@ describe("AR page: js/ar/ar.js and js/ar/ar-view.js", () => {
     expect(xr).to.match(/requiredFeatures:\s*\["hit-test"\]/);
     expect(xr).to.match(/wantObjects\s*\?\s*\["camera-access"\]\s*:\s*\[\]/);
     expect(xr).to.match(/domOverlay:\s*\{\s*root:\s*overlay\s*\}/);
+    // three must draw into the classic XRWebGLLayer: a projection layer the session did not ask for is never shown in AR
+    // (Galaxy S24, Chrome). The session's renderState.layers is hidden before three reads it in setSession.
+    const hide = xr.indexOf('Object.defineProperty(s.renderState, "layers", { value: undefined');
+    expect(hide, "renderState.layers hidden").to.be.greaterThan(-1);
+    expect(hide).to.be.lessThan(xr.indexOf("await renderer.xr.setSession(s)"));
+    expect(xr).to.not.match(/Features:\s*\[[^\]]*"layers"/); // and the session never asks for the layers feature
 
     const cam = fnBody(viewJs, "startCamera");
     expect(cam.slice(0, cam.indexOf("await"))).to.match(/navigator\.mediaDevices\.getUserMedia\(/);
