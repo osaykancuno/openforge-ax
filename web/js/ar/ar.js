@@ -403,7 +403,7 @@ function showMic() {
   const priv = $("arPrivacy");
   if (model.voiceNote) setText(priv, model.voiceNote);
   else if (!voice.supported) setText(priv, "Your browser has no speech recognition. Chrome on Android and Safari on iPhone have it. The quick buttons work everywhere.");
-  else setText(priv, "Your browser's speech service hears this (Google in Chrome, Apple in Safari). Camera pictures stay on this phone.");
+  else setText(priv, "Your browser's speech service hears the mic (Google in Chrome, Apple in Safari).");
 }
 
 function steps(plan) {
@@ -452,6 +452,8 @@ function showTalk() {
     plan.dataset.sig = key;
     plan.replaceChildren(...out);
   }
+  // the panel only takes room when it has something to say: the middle of the screen is where the Rover is
+  show("arTalk", Boolean($("arHeard").textContent) || out.length > 0);
   // the step that runs now: an attribute, so the list is not read out again on every step
   const running = msgs
     .slice(at + 1)
@@ -486,6 +488,7 @@ function render() {
   setChip($("arLink"), link[0], link[1]);
   $("arArm").disabled = !model.canArm;
   show("arPlaceBtn", st === "PLACING");
+  body.classList.toggle("ar-placing", st === "PLACING"); // placing: only Place and STOP, the floor ring stays in view
   showMic();
   showObstacle();
   showTalk();

@@ -63,10 +63,15 @@ body.ar-xr .ar-overlay { position: fixed; inset: 0; width: 100%; height: 100%; b
 
 /* ---------------------------------------------------------------- driving HUD */
 /* minmax(0, 1fr): an implicit auto column would take the chip row's full width and push the HUD off screen */
-.ar-hud { grid-area: hud; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-height: 0; pointer-events: none; }
-.ar-talk { max-height: 24dvh; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px; }
+/* padding 0: it is a <section>, and the site's sections carry 72 px above and below (invisible here, but over the Rover) */
+.ar-hud { grid-area: hud; align-self: end; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-height: 0; padding: 0; pointer-events: none; }
+/* The Rover and the floor ring sit in the middle of the screen (where the phone points): the HUD stays in the lower part.
+   The talk panel shows only when it has text; while placing, only Place and STOP are shown. */
+.ar-talk { max-height: 16dvh; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px; }
 .ar-heard { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.ar-heard:empty::before { content: "Tap the mic and say what the Rover should do."; color: var(--muted); font-weight: 500; }
+.ar-heard:empty { display: none; }
+body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-row > :not(#arPlaceBtn) { display: none; }
+.ar-privacy { font-size: 12px; line-height: 1.3; }
 .ar-plan:empty { display: none; }
 .ar-plan .pl-ai-steps { margin: 2px 0 2px; padding-left: 1.3em; }
 .ar-plan .pl-ai-note { margin: 2px 0 0; }

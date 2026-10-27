@@ -166,6 +166,19 @@ describe("AR page: css/ar.css", () => {
     for (const m of css.matchAll(/[^{}]*:xr-overlay[^{]*\{/g)) expect(m[0].trim().split(",").length, m[0]).to.equal(1);
   });
 
+  it("keeps the middle of the screen clear: that is where the floor ring and the Rover are", () => {
+    // the HUD is a <section>: the site's 72 px section padding must not apply, and it sits at the bottom of its row
+    expect(css).to.match(/\.ar-hud\s*\{[^}]*align-self:\s*end[^}]*padding:\s*0[;\s]/);
+    // placing: only Place and STOP; the talk panel shows only with text
+    expect(css).to.match(/body\.ar-placing \.ar-privacy, body\.ar-placing \.ar-chips, body\.ar-placing \.ar-mic-row > :not\(#arPlaceBtn\)\s*\{\s*display:\s*none/);
+    expect(html).to.match(/id="arTalk" hidden/);
+    expect(arJs).to.match(/body\.classList\.toggle\("ar-placing", st === "PLACING"\)/);
+    expect(arJs).to.match(/show\("arTalk", /);
+    // AR: the floor finder looks above the middle of the screen, clear of the controls
+    expect(viewJs).to.match(/requestHitTestSource\(\{ space: viewer, offsetRay: new XRRay\(/);
+    expect(viewJs).to.match(/const HIT_TILT_DEG = [5-9];/);
+  });
+
   it("has a big STOP, 44 px targets, visible focus and respects reduced motion", () => {
     expect(css).to.match(/\.ar-stop\s*\{[^}]*min-height:\s*(?:6[4-9]|[7-9]\d)px/);
     expect(css).to.match(/\.ar-chips \.pl-btn\s*\{[^}]*min-height:\s*44px/);

@@ -20,6 +20,7 @@ const RAY_TURN = (10 * Math.PI) / 180; // ...or turned this much
 const CAMERA_CB_MS = 100; // object finding looks at 10 Hz at most (the detector slows itself down further)
 const WARM_SCALE = 1e-4; // the Rover is drawn this small before it is placed, so its shaders are compiled before the drive loop runs
 const HIT_FRESH_MS = 400; // a tap places the Rover only if the floor was seen this recently
+const HIT_TILT_DEG = 7; // the floor ring sits about 10% of the screen above the middle, clear of the controls
 const DEPTH_MISS_FRAMES = 45; // frames without a depth picture before the chip says sensing is off
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -282,7 +283,10 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
       await renderer.xr.setSession(s);
       refSpace = renderer.xr.getReferenceSpace();
       const viewer = await s.requestReferenceSpace("viewer");
-      hitSource = await s.requestHitTestSource({ space: viewer });
+      // the floor finder looks a little above the middle of the screen: the controls take the lower part, so the ring
+      // and the Rover placed on it land where the camera picture is clear
+      const tilt = (HIT_TILT_DEG * Math.PI) / 180;
+      hitSource = await s.requestHitTestSource({ space: viewer, offsetRay: new XRRay({ x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: Math.sin(tilt), z: -Math.cos(tilt), w: 0 }) });
       if (!session) throw new Error("AR closed before it started"); // the person left while the floor finder started
     } catch (e) {
       s.removeEventListener("end", onXrEnd); // the caller reports the failure itself

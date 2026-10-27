@@ -133,7 +133,7 @@
 
     <!-- driving: transcript, plan, mic, chips -->
     <section class="ar-hud" id="arHud" aria-label="Drive the twin" hidden>
-      <div class="ar-panel ar-talk">
+      <div class="ar-panel ar-talk" id="arTalk" hidden>
         <p class="ar-heard" id="arHeard" role="status" aria-live="polite"></p>
         <div class="ar-plan" id="arPlan" role="status" aria-live="polite" aria-atomic="false"></div>
       </div>
@@ -143,7 +143,7 @@
           <button class="pl-btn pl-primary ar-micbtn" id="arMic" type="button" aria-pressed="false"><span aria-hidden="true" class="ar-micdot"></span><span id="arMicText">Tap to talk</span></button>
           <button class="pl-btn ar-armbtn" id="arArm" type="button" disabled>ARM</button>
         </div>
-        <p class="pl-small ar-privacy" id="arPrivacy">Your browser's speech service hears this (Google in Chrome, Apple in Safari). Camera pictures stay on this phone.</p>
+        <p class="pl-small ar-privacy" id="arPrivacy">Your browser's speech service hears the mic (Google in Chrome, Apple in Safari).</p>
         <div class="ar-chips" id="arChips" role="group" aria-label="Quick commands"></div>
       </div>
     </section>
