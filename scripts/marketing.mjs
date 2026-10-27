@@ -23,7 +23,7 @@ const ffmpeg = (args) =>
     p.on("exit", (code) => (code === 0 ? ok() : ko(new Error(`ffmpeg exited ${code}`))));
   });
 
-const STILLS = { hero: "ax1-hero-1600x900.png", portrait: "ax1-portrait-1080x1350.png", story: "ax1-story-1080x1920.png", lineup: "class-lineup-1600x900.png", whyphone: "why-a-phone-1080x1350.png" };
+const STILLS = { hero: "ax1-hero-1600x900.png", portrait: "ax1-portrait-1080x1350.png", story: "ax1-story-1080x1920.png", lineup: "class-lineup-1600x900.png", whyphone: "why-a-phone-1080x1350.png", ref: "ref-ax1-rover-1080x1920.png", refdesk: "ref-ax1-desk-1080x1920.png" };
 // name -> [asset, seconds, fps, outputs]
 const ANIMS = {
   turntable: ["turntable", 4, 20, ["ax1-turntable.gif", "ax1-turntable.mp4"]],

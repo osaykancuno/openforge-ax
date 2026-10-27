@@ -201,6 +201,56 @@ const builders = {
       d.style.fontSize = "15px";
     });
   },
+  ref() { // 1080 × 1920, no text: the clean AX-1 Rover reference for photoreal keyframes (AI image/video tools)
+    size(1080, 1920);
+    art.style.background = "#efe9df";
+    stage3d({ x: 0, y: 360, w: 1080, h: 1200, fov: 18, elev: 0.3, items: [{ id: "ax1-rover", rotY: -0.55, pose: { head_pan: 12, head_tilt: -4 }, look: [0.3, 0] }] });
+  },
+  refdesk() { // 1080 × 1920, no text: AX-1 Desk reference
+    size(1080, 1920);
+    art.style.background = "#efe9df";
+    stage3d({ x: 0, y: 360, w: 1080, h: 1200, fov: 18, elev: 0.25, items: [{ id: "ax1-desk", rotY: -0.35, pose: { head_pan: -15, head_tilt: 6 }, look: [-0.4, 0.1], mood: "happy" }] });
+  },
+  // ---------------------------------------------------------------- hero film parts (scripts/hero-film.mjs)
+  twinopen() { // 1080 × 1920, 2.6 s: the digital twin on the lab grid turns into the exact angle of the real keyframe
+    size(1080, 1920, "grid");
+    art.style.backgroundSize = "54px 54px";
+    const st = stage3d({ x: 0, y: 380, w: 1080, h: 1200, fov: 18, elev: 0.3, dist: 1.1, items: [{ id: "ax1-rover", rotY: -0.55, pose: { head_pan: 12, head_tilt: -4 }, look: [0.3, 0] }] });
+    el(`<div class="fig" style="font-size:26px">FIG. 01 · <b>AX-1 Rover</b> · twin</div>`, "left:72px;top:120px");
+    el(`<div class="note" style="font-size:22px;border:2px solid #23211e;padding:6px 14px;border-radius:999px;color:#23211e">TWIN · 3D LAB</div>`, "right:72px;top:112px");
+    // blueprint ticks around the robot: it is a design, not yet a thing
+    el(`<svg width="1080" height="1920" style="position:absolute;left:0;top:0"><g stroke="#b4472f" stroke-width="3" fill="none" opacity=".75"><path d="M110 520v-40h40M970 520v-40h-40M110 1500v40h40M970 1500v40h-40"/></g><g stroke="#23211e" stroke-width="1.5" opacity=".35" stroke-dasharray="6 8"><path d="M110 1010H970M540 480V1540"/></g></svg>`, "left:0;top:0");
+    return (t) => {
+      const k = ease(Math.min(1, t / 2.2));
+      st.rigs[0].group.rotation.y = -0.55 - (1 - k) * 1.4;
+      st.rigs[0].face?.tick(t + 1);
+      st.render();
+    };
+  },
+  endcard() { // 1080 × 1920, 3.4 s
+    size(1080, 1920, "grid");
+    art.style.backgroundSize = "54px 54px";
+    const mark = el(markSVG({ size: 420, bg: null, mood: "happy" }), "left:330px;top:430px;opacity:0");
+    const h = el(`<h1 class="h" style="font-size:112px;text-align:center">Your phone<br><em>is the brain.</em></h1>`, "left:0;right:0;top:930px;opacity:0");
+    const sub = el(`<p class="p" style="font-size:38px;text-align:center">From the 3D lab to your desk.</p>`, "left:0;right:0;top:1200px;opacity:0");
+    const brand = el(`<div class="word" style="font-size:52px;justify-content:center">${markSVG({ size: 70, bg: null })}OpenForge <b>AX</b></div><p class="note" style="text-align:center;margin-top:22px;font-size:24px">Coming soon · 1,024 agents</p>`, "left:0;right:0;top:1500px;opacity:0");
+    return (t) => {
+      mark.style.opacity = seg(t, 0, 0.5);
+      mark.style.transform = `translateY(${(1 - seg(t, 0, 0.6)) * 30}px)`;
+      mark.innerHTML = markSVG({ size: 420, bg: null, mood: t > 1.6 && t < 1.75 ? "idle" : "happy", look: [0, 0] });
+      h.style.opacity = seg(t, 0.4, 0.9);
+      sub.style.opacity = seg(t, 1.0, 1.5);
+      brand.style.opacity = seg(t, 1.5, 2.0);
+    };
+  },
+  caption() { // 1080 × 1920 transparent overlay: ?text=…&y=…&label=1
+    size(1080, 1920);
+    art.style.background = "transparent";
+    const q = new URLSearchParams(location.search);
+    const text = q.get("text");
+    if (text) el(`<div style="display:inline-block;max-width:1000px;padding:18px 30px;border-radius:22px;background:rgba(20,19,18,.62);color:#f4efe6;font:800 52px/1.12 'Inter Tight',sans-serif;letter-spacing:-.02em;text-align:center">${text}</div>`, `left:0;right:0;top:${q.get("y") || 260}px;text-align:center`);
+    if (q.get("label")) el(`<div class="note" style="font-size:20px;color:rgba(244,239,230,.85);background:rgba(20,19,18,.45);padding:6px 12px;border-radius:8px">Concept film · AI-generated · first build in progress</div>`, "left:48px;bottom:56px");
+  },
   whyphone() { // 1080 × 1350: why a phone, as a diagram (the last frame of the video)
     size(1080, 1350, "grid");
     whyPhoneScene(12, true);
