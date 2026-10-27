@@ -1,0 +1,637 @@
+{
+ "proto": {
+  "major": 1,
+  "minor": 0
+ },
+ "uuid": {
+  "SERVICE": "7a3e0000-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "INFO": "7a3e0001-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "CMD": "7a3e0002-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "STOP": "7a3e0003-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "ARM": "7a3e0004-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "STATE": "7a3e0005-4f1b-4c2a-9d0e-5b6c7d8e9fa1",
+  "CONFIG": "7a3e0006-4f1b-4c2a-9d0e-5b6c7d8e9fa1"
+ },
+ "consts": {
+  "WD_HOLD_MS": 250,
+  "WD_RELAX_MS": 3000,
+  "MAX_DEG_S": 90,
+  "CONTROL_MS": 20,
+  "STATE_MS": 100,
+  "PAIR_WINDOW_MS": 60000,
+  "MIN_MTU": 64,
+  "SEQ_WINDOW": 1024,
+  "DRIVE_MAX": 1000,
+  "DRIVE_SLEW": 40
+ },
+ "limits": [
+  {
+   "body": 1,
+   "joints": [
+    {
+     "name": "head_pan",
+     "min": -900,
+     "max": 900,
+     "home": 0
+    },
+    {
+     "name": "head_tilt",
+     "min": -300,
+     "max": 300,
+     "home": 0
+    }
+   ],
+   "hash": 3580115954
+  },
+  {
+   "body": 2,
+   "joints": [
+    {
+     "name": "torso_yaw",
+     "min": -1200,
+     "max": 1200,
+     "home": 0
+    },
+    {
+     "name": "head_pan",
+     "min": -1000,
+     "max": 1000,
+     "home": 0
+    },
+    {
+     "name": "head_tilt",
+     "min": -250,
+     "max": 350,
+     "home": 0
+    },
+    {
+     "name": "l_shoulder",
+     "min": -1700,
+     "max": 400,
+     "home": 0
+    },
+    {
+     "name": "l_elbow",
+     "min": -1200,
+     "max": 0,
+     "home": -200
+    },
+    {
+     "name": "r_shoulder",
+     "min": -1700,
+     "max": 400,
+     "home": 0
+    },
+    {
+     "name": "r_elbow",
+     "min": -1200,
+     "max": 0,
+     "home": -200
+    }
+   ],
+   "hash": 1406578520
+  },
+  {
+   "body": 3,
+   "joints": [
+    {
+     "name": "l_hip_yaw",
+     "min": -300,
+     "max": 300,
+     "home": 0
+    },
+    {
+     "name": "l_hip_roll",
+     "min": -250,
+     "max": 250,
+     "home": 0
+    },
+    {
+     "name": "l_hip_pitch",
+     "min": -900,
+     "max": 600,
+     "home": 0
+    },
+    {
+     "name": "l_knee",
+     "min": 0,
+     "max": 1300,
+     "home": 0
+    },
+    {
+     "name": "l_ankle_pitch",
+     "min": -600,
+     "max": 600,
+     "home": 0
+    },
+    {
+     "name": "l_ankle_roll",
+     "min": -250,
+     "max": 250,
+     "home": 0
+    },
+    {
+     "name": "r_hip_yaw",
+     "min": -300,
+     "max": 300,
+     "home": 0
+    },
+    {
+     "name": "r_hip_roll",
+     "min": -250,
+     "max": 250,
+     "home": 0
+    },
+    {
+     "name": "r_hip_pitch",
+     "min": -900,
+     "max": 600,
+     "home": 0
+    },
+    {
+     "name": "r_knee",
+     "min": 0,
+     "max": 1300,
+     "home": 0
+    },
+    {
+     "name": "r_ankle_pitch",
+     "min": -600,
+     "max": 600,
+     "home": 0
+    },
+    {
+     "name": "r_ankle_roll",
+     "min": -250,
+     "max": 250,
+     "home": 0
+    },
+    {
+     "name": "torso_yaw",
+     "min": -600,
+     "max": 600,
+     "home": 0
+    }
+   ],
+   "hash": 3430772696
+  }
+ ],
+ "info": [
+  {
+   "in": {
+    "fwVer": 1,
+    "body": 2,
+    "nJoints": 7,
+    "limitsHash": 1406578520
+   },
+   "hex": "01000100020758afd653"
+  },
+  {
+   "in": {
+    "fwVer": 515,
+    "body": 3,
+    "nJoints": 13,
+    "limitsHash": 3735928559
+   },
+   "hex": "01000302030defbeadde"
+  }
+ ],
+ "joints": [
+  {
+   "in": {
+    "seq": 1,
+    "mask": 3,
+    "targets": [
+     450,
+     -300
+    ],
+    "speed": 100
+   },
+   "hex": "010101000300c201d4fe64"
+  },
+  {
+   "in": {
+    "seq": 65535,
+    "mask": 69,
+    "targets": [
+     -1700,
+     0,
+     32767
+    ],
+    "speed": 37
+   },
+   "hex": "0101ffff45005cf90000ff7f25"
+  },
+  {
+   "in": {
+    "seq": 4660,
+    "mask": 8191,
+    "targets": [
+     -666,
+     -555,
+     -444,
+     -333,
+     -222,
+     -111,
+     0,
+     111,
+     222,
+     333,
+     444,
+     555,
+     666
+    ],
+    "speed": 5
+   },
+   "hex": "01013412ff1f66fdd5fd44feb3fe22ff91ff00006f00de004d01bc012b029a0205"
+  },
+  {
+   "in": {
+    "seq": 9,
+    "mask": 1,
+    "targets": [
+     -32768
+    ],
+    "speed": 250
+   },
+   "hex": "010109000100008064"
+  }
+ ],
+ "drive": [
+  {
+   "in": {
+    "seq": 2,
+    "mask": 7,
+    "left": 1000,
+    "right": -1000,
+    "pan": 300,
+    "tilt": -150,
+    "speed": 60
+   },
+   "hex": "010202000700e80318fc2c016aff3c"
+  },
+  {
+   "in": {
+    "seq": 40000,
+    "mask": 1,
+    "left": 2500,
+    "right": -7,
+    "pan": 0,
+    "tilt": 0,
+    "speed": 100
+   },
+   "hex": "0102409c0100e803f9ff0000000064"
+  }
+ ],
+ "stop": [
+  {
+   "reason": 0,
+   "hex": "0100"
+  },
+  {
+   "reason": 1,
+   "hex": "0101"
+  }
+ ],
+ "arm": [
+  {
+   "in": {
+    "nonce": 2712847316,
+    "seqBase": 65530
+   },
+   "hex": "01d4c3b2a1faff"
+  },
+  {
+   "in": {
+    "nonce": 1,
+    "seqBase": 0
+   },
+   "hex": "01010000000000"
+  }
+ ],
+ "config": [
+  {
+   "in": {
+    "op": 1,
+    "joint": 3,
+    "min": -900,
+    "max": 300
+   },
+   "hex": "0101037cfc2c01"
+  },
+  {
+   "in": {
+    "op": 2
+   },
+   "hex": "01020000000000"
+  }
+ ],
+ "state": [
+  {
+   "in": {
+    "state": 2,
+    "latch": 0,
+    "flags": 1,
+    "fault": 0,
+    "battMv": 7810,
+    "lastSeq": 513,
+    "positions": [
+     100,
+     -250,
+     600,
+     600
+    ]
+   },
+   "hex": "010200010000821e010204640006ff58025802"
+  },
+  {
+   "in": {
+    "state": 1,
+    "latch": 3,
+    "flags": 5,
+    "fault": 3,
+    "battMv": 6300,
+    "lastSeq": 65535,
+    "positions": [
+     0,
+     -10,
+     -20,
+     -30,
+     -40,
+     -50,
+     -60,
+     -70,
+     -80,
+     -90,
+     -100,
+     -110,
+     -120
+    ]
+   },
+   "hex": "0101030503009c18ffff0d0000f6ffecffe2ffd8ffceffc4ffbaffb0ffa6ff9cff92ff88ff"
+  }
+ ],
+ "cmdErrors": [
+  {
+   "hex": "0101000001",
+   "err": 1
+  },
+  {
+   "hex": "020101000100000064",
+   "err": 2
+  },
+  {
+   "hex": "010901000100000064",
+   "err": 3
+  },
+  {
+   "hex": "01010100000064",
+   "err": 4
+  },
+  {
+   "hex": "010101000300000064",
+   "err": 1
+  },
+  {
+   "hex": "010201000800000000000000000064",
+   "err": 4
+  },
+  {
+   "hex": "0102010001000000000000000000",
+   "err": 1
+  }
+ ],
+ "seqNewer": [
+  {
+   "seq": 1,
+   "last": 0,
+   "newer": true
+  },
+  {
+   "seq": 0,
+   "last": 0,
+   "newer": false
+  },
+  {
+   "seq": 0,
+   "last": 1,
+   "newer": false
+  },
+  {
+   "seq": 5,
+   "last": 65530,
+   "newer": true
+  },
+  {
+   "seq": 65530,
+   "last": 5,
+   "newer": false
+  },
+  {
+   "seq": 1024,
+   "last": 0,
+   "newer": true
+  },
+  {
+   "seq": 1025,
+   "last": 0,
+   "newer": false
+  },
+  {
+   "seq": 0,
+   "last": 65535,
+   "newer": true
+  },
+  {
+   "seq": 32768,
+   "last": 0,
+   "newer": false
+  }
+ ],
+ "deciToSteps": [
+  {
+   "deci": 0,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2048
+  },
+  {
+   "deci": 10,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2059
+  },
+  {
+   "deci": -10,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2037
+  },
+  {
+   "deci": 900,
+   "center": 2048,
+   "dir": 1,
+   "steps": 3072
+  },
+  {
+   "deci": -900,
+   "center": 2048,
+   "dir": -1,
+   "steps": 3072
+  },
+  {
+   "deci": 1800,
+   "center": 2048,
+   "dir": 1,
+   "steps": 4095
+  },
+  {
+   "deci": -1800,
+   "center": 2048,
+   "dir": 1,
+   "steps": 0
+  },
+  {
+   "deci": 3,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2051
+  },
+  {
+   "deci": -3,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2045
+  },
+  {
+   "deci": 4,
+   "center": 2048,
+   "dir": 1,
+   "steps": 2053
+  },
+  {
+   "deci": -1200,
+   "center": 1900,
+   "dir": -1,
+   "steps": 3265
+  },
+  {
+   "deci": 32767,
+   "center": 2048,
+   "dir": 1,
+   "steps": 4095
+  }
+ ],
+ "stepsToDeci": [
+  {
+   "steps": 2048,
+   "center": 2048,
+   "dir": 1,
+   "deci": 0
+  },
+  {
+   "steps": 2059,
+   "center": 2048,
+   "dir": 1,
+   "deci": 10
+  },
+  {
+   "steps": 2037,
+   "center": 2048,
+   "dir": 1,
+   "deci": -10
+  },
+  {
+   "steps": 3072,
+   "center": 2048,
+   "dir": -1,
+   "deci": -900
+  },
+  {
+   "steps": 0,
+   "center": 2048,
+   "dir": 1,
+   "deci": -1800
+  },
+  {
+   "steps": 2050,
+   "center": 2048,
+   "dir": 1,
+   "deci": 2
+  }
+ ],
+ "maxStepDeci": [
+  {
+   "dt": 20,
+   "speed": 100,
+   "step": 18
+  },
+  {
+   "dt": 20,
+   "speed": 50,
+   "step": 9
+  },
+  {
+   "dt": 20,
+   "speed": 1,
+   "step": 1
+  },
+  {
+   "dt": 20,
+   "speed": 0,
+   "step": 0
+  },
+  {
+   "dt": 20,
+   "speed": 150,
+   "step": 18
+  },
+  {
+   "dt": 33,
+   "speed": 60,
+   "step": 17
+  }
+ ],
+ "driveStep": [
+  {
+   "cur": 0,
+   "want": 600,
+   "out": 40
+  },
+  {
+   "cur": 600,
+   "want": 0,
+   "out": 0
+  },
+  {
+   "cur": 600,
+   "want": 300,
+   "out": 300
+  },
+  {
+   "cur": 300,
+   "want": 600,
+   "out": 340
+  },
+  {
+   "cur": 580,
+   "want": 600,
+   "out": 600
+  },
+  {
+   "cur": 600,
+   "want": -600,
+   "out": 0
+  },
+  {
+   "cur": -200,
+   "want": -600,
+   "out": -240
+  },
+  {
+   "cur": 0,
+   "want": -30,
+   "out": -30
+  }
+ ]
+}

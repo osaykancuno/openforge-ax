@@ -1,0 +1,252 @@
+/* Workbench: a lab-notebook plate (docs/12-OPENFORGE-LAB.md §3–4). Tokens come from css/style.css. */
+
+.bench { background: var(--paper); }
+.bn { max-width: 1360px; margin: 0 auto; padding: 12px 20px 40px; }
+
+/* ---------- shelf of robots */
+.bn-shelf { margin: 4px 0 14px; }
+.bn-shelf ul { display: flex; gap: 6px; list-style: none; margin: 0; padding: 4px 2px 8px; overflow-x: auto; scrollbar-width: thin; }
+.bn-tab {
+  display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; min-height: 40px; padding: 9px 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  font: 600 14px/1.2 var(--sans); text-decoration: none;
+}
+.bn-tab:hover { border-color: var(--ink); }
+.bn-tab[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.bn-tab-n { font: 500 11px var(--mono); color: var(--muted); }
+.bn-tab[aria-current="page"] .bn-tab-n { color: inherit; opacity: .75; }
+.bn-tab-prog { font: 600 11px var(--mono); color: var(--accent-ink); }
+.bn-tab[aria-current="page"] .bn-tab-prog { color: inherit; }
+.bn-tab:focus-visible, .bn-stage:focus-visible, .bn-level:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- the plate */
+.bn-plate {
+  display: grid; gap: 14px 22px;
+  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-areas: "head head" "stages figure" "stages chips" "idea idea";
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px 18px;
+  box-shadow: var(--shadow);
+}
+.bn-plate.has-panel {
+  grid-template-columns: 210px minmax(0, 1fr) minmax(300px, 380px);
+  grid-template-areas: "head head head" "stages figure panel" "stages chips panel" "idea idea idea";
+}
+.bn-head { grid-area: head; }
+.bn-fig { margin: 0; font: 600 12px/1.4 var(--mono); letter-spacing: .12em; color: var(--accent-ink); text-transform: uppercase; }
+.bn-head h1 { margin: 2px 0 2px; font: 800 clamp(28px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.02em; color: var(--ink); }
+.bn-platform { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+.bn-platform a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.bn-caption { margin: 0; max-width: 70ch; font: 500 18px/1.45 var(--sans); color: var(--ink); min-height: 1.45em; }
+
+/* ---------- stage list */
+.bn-stages { grid-area: stages; }
+.bn-stages ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: none; }
+.bn-stage {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; text-align: left;
+  border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); font: 600 15px/1.2 var(--sans); cursor: pointer;
+}
+.bn-stage:hover { background: var(--paper-2); }
+.bn-stage-n {
+  flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--line-2, var(--line)); font: 600 12px var(--mono); color: var(--muted);
+}
+.bn-stage[aria-current="step"] { background: var(--paper); border-color: var(--line-2, var(--line)); font-weight: 650; }
+.bn-stage[aria-current="step"] .bn-stage-n { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- figure */
+.bn-figure {
+  grid-area: figure; position: relative; min-height: 420px; height: min(62vh, 620px);
+  border-radius: 12px; overflow: hidden; background: var(--paper); border: 1px solid var(--line);
+}
+.bn-figure canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bn-labels { position: absolute; inset: 0; pointer-events: none; }
+.bn-leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.bn-leaders line { stroke: var(--ink); stroke-width: 1; opacity: .55; }
+.bn-leaders circle { fill: var(--paper); stroke: var(--ink); stroke-width: 1.2; }
+.bn-labels-list { list-style: none; margin: 0; padding: 0; }
+.bn-label {
+  position: absolute; left: 0; top: 0; max-width: 220px; padding: 2px 8px; border-radius: 6px;
+  background: color-mix(in srgb, var(--card) 88%, transparent); color: var(--ink);
+  font: italic 500 13px/1.35 var(--sans); white-space: nowrap; border-left: 3px solid var(--muted);
+  transition: transform .12s linear;
+}
+@media (prefers-reduced-motion: reduce) { .bn-label { transition: none; } }
+.bn-label.k-sensor { border-color: var(--sky); }
+.bn-label.k-brain { border-color: var(--accent); }
+.bn-label.k-actuator { border-color: var(--sage); }
+.bn-label.k-power { border-color: var(--sun); }
+.bn-label.k-part { border-color: var(--plum); font-style: normal; font-family: var(--mono); font-size: 12px; }
+.bn-labels-list.static { position: static; padding: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.bn-labels-list.static .bn-label { position: static; white-space: normal; }
+.bn-motion { position: absolute; right: 10px; top: 10px; background: var(--card); }
+.bn-phone {
+  position: absolute; right: 12px; bottom: 12px; width: min(38%, 300px); aspect-ratio: 4 / 3;
+  border: 2px solid var(--ink); border-radius: 12px; pointer-events: none; box-shadow: var(--shadow);
+}
+.bn-phone span { position: absolute; left: 8px; top: 6px; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #fff; background: rgba(35, 33, 30, .7); padding: 1px 6px; border-radius: 4px; }
+.bn-nogl { position: relative; margin: 16px; padding: 12px 14px; border: 1px dashed var(--line-2, var(--line)); border-radius: 10px; color: var(--muted); background: var(--card); }
+.no-gl .bn-figure { height: auto; min-height: 0; align-self: start; }
+.no-gl .bn-labels { position: static; pointer-events: auto; }
+.no-gl .bn-figure canvas { display: none; }
+
+/* ---------- chips */
+.bn-chips { grid-area: chips; align-self: start; align-content: flex-start; display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.bn-chip {
+  display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); font: 500 12px/1.2 var(--mono);
+}
+.bn-chip-k { color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.bn-chip-v { color: var(--ink); font-weight: 650; }
+.bn-chip.is-new { border-color: var(--accent); background: var(--accent-soft, #f1d9cf); }
+@media (prefers-reduced-motion: no-preference) {
+  .bn-chip.is-new { animation: bn-pop .5s ease-out; }
+  @keyframes bn-pop { from { transform: translateY(4px); opacity: .2; } to { transform: none; opacity: 1; } }
+}
+
+/* ---------- side panel (Test, Build) */
+.bn-panel { grid-area: panel; min-width: 0; align-self: start; max-height: calc(min(62vh, 620px) + 80px); overflow: auto; padding: 2px 4px 2px 0; }
+.bn-panel h2 { margin: 0 0 8px; font: 750 20px/1.2 var(--display); }
+.bn-panel h3 { margin: 16px 0 6px; font: 700 14px/1.3 var(--sans); }
+.bn-note { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.bn-levels { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.bn-level {
+  width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; min-height: 44px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font: 600 14px var(--sans); text-align: left; cursor: pointer;
+}
+.bn-level[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.bn-level[aria-disabled="true"] { color: var(--muted); cursor: not-allowed; }
+.bn-level-n { font: 600 12px var(--mono); color: var(--accent-ink); }
+.bn-level-s { font: 500 12px var(--mono); color: var(--muted); }
+.bn-level.passed .bn-level-s { color: var(--ok, #3f7a52); }
+.bn-level.passed .bn-level-s::before { content: "✓ "; }
+.bn-goal { margin: 4px 0 10px; font-size: 14px; line-height: 1.45; }
+.bn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.bn-controls { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.bn-controls.idle { opacity: .85; }
+.bn-slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.bn-slider label { grid-column: 1 / -1; font: 600 13px var(--sans); }
+.bn-slider input[type=range] { width: 100%; min-height: 28px; accent-color: var(--accent); }
+.bn-slider output { font: 600 12px var(--mono); min-width: 6ch; text-align: right; }
+.bn-key { font: 500 11px var(--mono); color: var(--muted); }
+.bn-pad, .bn-mode { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.bn-pad legend, .bn-mode legend { font: 600 13px var(--sans); margin-bottom: 6px; padding: 0; }
+.bn-pad .btn { min-width: 84px; touch-action: none; user-select: none; }
+.bn-pad .btn.down, .bn-toggle[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.bn-mode label { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 14px; min-height: 32px; }
+.bn-readout { margin: 10px 0 4px; font: 500 12px/1.5 var(--mono); color: var(--ink-2, var(--ink)); min-height: 3em; }
+.bn-result { margin: 6px 0 0; font: 650 15px/1.4 var(--sans); }
+.bn-result.ok { color: var(--ok, #3f7a52); }
+.bn-result.fail { color: var(--danger); }
+.bn-kv { display: grid; grid-template-columns: minmax(110px, 40%) 1fr; gap: 6px 12px; margin: 0; font-size: 14px; }
+.bn-kv dt { color: var(--muted); }
+.bn-kv dd { margin: 0; }
+.bn-kv dd.verify, .bn-kv dd .verify { color: var(--warn, #8a6410); font-style: italic; }
+.bn-kv a { color: var(--accent-ink); text-decoration: underline; }
+.bn-dots { letter-spacing: .15em; color: var(--accent-ink); }
+.bn-parts { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.bn-parts a { color: var(--accent-ink); text-decoration: underline; }
+
+/* ---------- big idea */
+.bn-idea { grid-area: idea; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+.bn-idea p { margin: 0; max-width: 90ch; font-size: 15px; line-height: 1.55; }
+.bn-idea b { font-family: var(--display); }
+.bn-swatches { color: var(--muted); font: 500 12px var(--mono); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.bn-swatches span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.bn-swatches i { flex: none; display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.s-sensor { background: var(--sky); } .s-brain { background: var(--accent); } .s-actuator { background: var(--sage); } .s-power { background: var(--sun); }
+
+/* ---------- tablet and phone */
+@media (max-width: 1100px) {
+  .bn-plate.has-panel { grid-template-columns: 190px minmax(0, 1fr); grid-template-areas: "head head" "stages figure" "stages chips" "panel panel" "idea idea"; }
+  .bn-panel { max-height: none; }
+}
+@media (max-width: 760px) {
+  .bn { padding: 8px 12px 28px; }
+  .bn-plate, .bn-plate.has-panel { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stages" "figure" "chips" "panel" "idea"; padding: 14px; gap: 12px; }
+  .bn-stages ol { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .bn-stages li { flex: none; scroll-snap-align: start; }
+  .bn-stage { width: auto; padding: 6px 12px 6px 8px; border-color: var(--line); }
+  .bn-figure { height: 58vh; min-height: 320px; }
+  .bn-caption { font-size: 16px; }
+  .bn-label { font-size: 12px; max-width: 160px; }
+  .bn-phone { width: 46%; }
+}
+
+/* ---------- one screen (body.app): shelf, then the plate fills the rest; long panels scroll inside */
+body.app .bn { width: min(1640px, 100% - 40px); margin-inline: auto; }
+body.app .bn-shelf { margin: 0 0 10px; }
+body.app .bn-plate, body.app .bn-plate.has-panel {
+  flex: 1 1 auto; min-height: 0; padding: 16px 20px 12px; gap: 10px 20px;
+  grid-template-columns: 200px minmax(0, 1fr) minmax(280px, 360px); grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "head head idea" "stages figure figure" "stages chips chips"; /* the big idea sits top right */
+}
+body.app .bn-plate.has-panel { grid-template-areas: "head head idea" "stages figure panel" "stages chips panel"; }
+body.app .bn-idea { border-top: 0; border-left: 1px solid var(--line); padding: 2px 0 2px 16px; align-self: start; display: block; }
+body.app .bn-swatches { margin-top: 6px; }
+body.app .bn-head h1 { font-size: clamp(24px, 2.6vw, 34px); display: inline; margin-right: 12px; }
+body.app .bn-platform { display: inline; }
+body.app .bn-caption { margin-top: 6px; }
+body.app .bn-caption { font-size: 16px; }
+body.app .bn-stages { min-height: 0; overflow-y: auto; }
+body.app .bn-figure { height: auto; min-height: 0; }
+body.app .bn-panel { max-height: none; min-height: 0; align-self: stretch; overflow-y: auto; scrollbar-width: thin; }
+body.app .bn-idea p { font-size: 13.5px; line-height: 1.45; }
+body.app.no-gl .bn-figure { overflow-y: auto; }
+@media (max-width: 1100px) {
+  body.app .bn-plate, body.app .bn-plate.has-panel { grid-template-columns: 170px minmax(0, 1fr) minmax(260px, 320px); }
+  body.app .bn-swatches { display: none; }
+}
+/* tablet portrait and phones: the plate scrolls inside, the figure stays pinned on top of it */
+@media (max-width: 900px) {
+  body.app .bn-plate, body.app .bn-plate.has-panel {
+    display: block; overflow-y: auto; overscroll-behavior: contain; padding: 12px;
+    scroll-padding-top: calc(42dvh + 16px); /* focused controls never hide under the pinned figure (WCAG 2.4.11) */
+  }
+  body.app .bn-head { margin-bottom: 8px; }
+  body.app .bn-stages ol { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  body.app .bn-stages li { flex: none; }
+  body.app .bn-stage { width: auto; padding: 6px 12px 6px 8px; border-color: var(--line); }
+  body.app .bn-figure { position: sticky; top: -12px; z-index: 3; height: 42vh; height: 42dvh; min-height: 220px; margin: 8px 0 10px; box-shadow: var(--shadow); }
+  body.app .bn-panel { overflow: visible; margin-top: 10px; }
+  body.app .bn-idea { margin-top: 12px; border-left: 0; border-top: 1px solid var(--line); padding: 12px 0 0; }
+}
+/* short screens and 400% zoom (same breakpoint as style.css): the page scrolls, the plate opens up */
+@media (max-height: 560px), (max-width: 480px) and (max-height: 700px) {
+  body.app .bn-plate, body.app .bn-plate.has-panel { display: block; overflow: visible; }
+  body.app .bn-panel, body.app .bn-stages { overflow: visible; max-height: none; }
+  body.app .bn-figure { position: static; height: 60vh; height: 60dvh; min-height: 240px; margin: 8px 0; }
+  body.app .bn-idea { border-left: 0; padding-left: 0; margin-top: 12px; }
+}
+/* the visitor's camera: drag, wheel, pinch on the plate, plus zoom and reset buttons */
+.bn-figure canvas, .pg-stage canvas { cursor: grab; touch-action: none; }
+.bn-figure canvas:active, .pg-stage canvas:active { cursor: grabbing; }
+.bn-viewtools { position: absolute; left: 10px; bottom: 10px; z-index: 2; display: flex; gap: 6px; }
+.bn-viewtools .btn { background: var(--card); min-width: 36px; }
+.bn-viewtools .btn:hover { background: var(--ink); color: var(--paper); }
+.bn-figure:focus-visible, .pg-stage:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+/* more room for the robot and the controls (user request): compact shelf, title and stage list; in Test and Build
+   the big idea (the same on every stage) steps aside so the plate and the panel get the full height */
+@media (min-width: 901px) and (min-height: 561px) {
+  body.app .bn-shelf { margin-bottom: 8px; }
+  body.app .bn-shelf ul { padding-bottom: 4px; }
+  body.app .bn-tab { min-height: 34px; padding: 6px 12px; font-size: 13.5px; }
+  body.app .bn-plate, body.app .bn-plate.has-panel { grid-template-columns: 172px minmax(0, 1fr) clamp(300px, 24vw, 420px); padding: 12px 18px 10px; gap: 8px 18px; }
+  body.app .bn-head h1 { font-size: clamp(22px, 2.1vw, 30px); }
+  body.app .bn-platform { font-size: 13px; }
+  body.app .bn-caption { font-size: 15px; margin-top: 2px; }
+  body.app .bn-stage { min-height: 36px; padding: 5px 10px; font-size: 14px; gap: 8px; }
+  body.app .bn-stage-n { width: 22px; height: 22px; font-size: 11px; }
+  body.app .bn-idea p { font-size: 13px; }
+  body.app .bn-plate.has-panel { grid-template-areas: "head head head" "stages figure panel" "stages chips panel"; }
+  body.app .bn-plate.has-panel .bn-idea { display: none; }
+  body.app .bn-plate.has-panel .bn-caption { display: inline; margin-left: 8px; font-size: 14px; color: var(--ink-2); }
+  /* the robot is limited by the plate's height, not its width: the big idea moves beside the figure, so the head
+     row is one line and the figure gets the full height of the plate */
+  body.app .bn-plate:not(.has-panel) {
+    grid-template-columns: clamp(200px, 15vw, 260px) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "head head" "stages figure" "idea figure" "idea chips"; /* the big idea under the stage list */
+  }
+  body.app .bn-plate:not(.has-panel) .bn-idea { border-left: 0; border-top: 1px solid var(--line); padding: 10px 0 0; margin-top: 4px; }
+  body.app .bn-plate:not(.has-panel) .bn-caption { display: inline; margin-left: 8px; font-size: 14px; color: var(--ink-2); }
+  body.app .bn-plate:not(.has-panel) .bn-idea { align-self: stretch; min-height: 0; max-height: 100%; overflow-y: auto; scrollbar-width: thin; }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent — OpenForge AX</title>
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+<main class="wrap pg">
+  <div class="agent-grid app-fill">
+    <div class="agent-art">
+      <img class="agent-img" id="img" src="assets/placeholder.png" alt="">
+      <div class="row">
+        <a class="btn sm magenta" id="osLink" target="_blank" rel="noopener">View on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+        <a class="btn sm" id="scanLink" target="_blank" rel="noopener">Wallet on Etherscan<span class="sr-only"> (opens in a new tab)</span></a>
+        <a class="btn sm yellow" id="arenaLink" href="arena.html" hidden>Test in the Proving Grounds</a>
+        <a class="btn sm" id="robotLink" href="robot.html" hidden>Connect a real arm</a>
+        <a class="btn sm" href="bench.html">Open the Workbench</a>
+      </div>
+    </div>
+    <div class="app-scroll agent-info">
+      <div class="kicker" id="kicker">FIG. 08 · Agent</div>
+      <h1 class="pg-title" id="name">Loading…</h1>
+      <p class="muted" id="desc"></p>
+      <p class="agent-what">This agent flies its robot's missions in the <a href="arena.html">Proving Grounds</a>; passed runs go to its on-chain record. <a href="index.html#lore">What an agent does →</a></p>
+      <div id="badges" class="row"></div>
+      <div class="kv" id="traits"></div>
+
+      <div class="panel">
+        <h3>Agent wallet</h3>
+        <p class="mono" id="acct">—</p>
+        <div class="kv">
+          <div><small>Balance</small><b id="bal">—</b></div>
+          <div><small>Mode</small><b id="lvl">—</b></div>
+          <div><small>Reputation</small><b id="rep">—</b></div>
+          <div><small>Tasks / Data</small><b id="tasks">—</b></div>
+          <div><small>Sim wins / runs</small><b id="sim">—</b></div>
+        </div>
+        <p class="muted small">Owner: <span class="mono" id="owner">—</span></p>
+      </div>
+
+      <div id="ownerArea" hidden>
+        <div class="panel">
+          <h3>Agent mode</h3>
+          <div class="modes" role="group" aria-label="Agent mode">
+            <button class="mode" data-l="1"><b>MANUAL</b><span>Proposes actions, you approve. Recommended.</span></button>
+            <button class="mode" data-l="2"><b>ASSISTED</b><span>Acts alone, only on authorized services, within a daily limit.</span></button>
+            <button class="mode" data-l="3"><b>AUTONOMOUS</b><span>Acts freely within the daily limit.</span></button>
+          </div>
+          <div class="row" id="modeOpts" hidden>
+            <label class="small">Daily limit
+              <select id="limit"><option value="0.01">0.01 ETH</option><option value="0.05" selected>0.05 ETH</option><option value="0.1">0.1 ETH</option><option value="0.5">0.5 ETH</option></select>
+            </label>
+            <input type="text" id="operator" placeholder="Runtime address (0x…)" style="flex:1;min-width:220px" aria-label="Operator address">
+            <button class="btn sm primary" id="applyMode">Apply</button>
+          </div>
+          <p class="muted small" style="margin-top:12px">In no mode can the agent move your tokens or NFTs, or sign messages for you.</p>
+        </div>
+
+        <div class="panel">
+          <h3>Security</h3>
+          <div class="row">
+            <button class="btn sm danger" id="pauseBtn">Emergency pause</button>
+            <button class="btn sm yellow" id="lockBtn">Prepare for sale (lock 7 days)</button>
+          </div>
+          <p class="muted small" id="secInfo" style="margin-top:10px"></p>
+        </div>
+
+        <div class="panel">
+          <h3>Agent funds</h3>
+          <div class="row">
+            <input type="number" id="dep" min="0" step="0.001" placeholder="ETH" style="width:120px" aria-label="ETH to deposit">
+            <button class="btn sm" id="depBtn">Top up</button>
+            <button class="btn sm magenta" id="wdBtn">Withdraw all</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Agent proposals</h3>
+          <div id="proposals" class="muted small">No pending proposals.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="module" src="js/agent.js"></script>
+</body>
+</html>

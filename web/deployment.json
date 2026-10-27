@@ -1,0 +1,13 @@
+{
+  "chainId": 31337,
+  "chainName": "Hardhat Local",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "provingApi": "http://localhost:8787",
+  "worldWs": "ws://localhost:8788",
+  "explorer": "#",
+  "openseaDropUrl": "#demo-opensea",
+  "agents": "0xd9140951d8aE6E5F625a02F5908535e16e3af964",
+  "renderer": "0x56D13Eb21a625EdA8438F55DF2C31dC3632034f5",
+  "reputation": "0xE8addD62feD354203d079926a8e563BC1A7FE81e",
+  "fromBlock": 1157
+}

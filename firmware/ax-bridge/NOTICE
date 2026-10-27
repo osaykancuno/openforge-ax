@@ -1,0 +1,22 @@
+OpenForge AX-1 bridge firmware
+==============================
+
+The files in this folder (ax-bridge.ino, ax_proto.h, config.h, README.md, test/*.json) are dedicated to the
+public domain under CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+
+They are NOT bundled with any third-party code. To build them you install the following separately; each keeps
+its own licence, and a binary you build and distribute contains them under those terms:
+
+- NimBLE-Arduino (h2zero), Bluetooth LE stack for Arduino
+  https://github.com/h2zero/NimBLE-Arduino
+  Licence: Apache License 2.0 (includes Apache Mynewt NimBLE, Apache-2.0)
+  If you distribute a compiled firmware image, include the Apache-2.0 licence text and NimBLE's NOTICE file.
+
+- Arduino core for the ESP32 (Espressif Systems), including ESP-IDF, FreeRTOS and the Preferences library
+  https://github.com/espressif/arduino-esp32
+  Licence: LGPL-2.1 for the Arduino core; ESP-IDF components are Apache-2.0; FreeRTOS kernel is MIT.
+  Distributing a compiled image may carry obligations (for example LGPL relinking terms). Check the licences
+  shipped with the core version you use.
+
+The Feetech STS3215 bus protocol is implemented from public documentation and from this project's own
+web/js/robot/sts-bus.js (CC0). Feetech, Waveshare and other product names belong to their owners.

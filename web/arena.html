@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proving Grounds — OpenForge AX</title>
+<meta name="description" content="Test every OpenForge robot in the browser: the SO-101 Energy Cell and three lab trials per robot, replayed and verified, with passes saved to your agent's on-chain record.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/bench.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="app">
+<main class="wrap pg">
+  <header class="pg-head">
+  <div class="kicker">FIG. 05 · <b>Proving Grounds</b> · <span id="pgKicker">SO-101 twin</span></div>
+  <h1 class="pg-title" id="pgTitle">Mission: Energy Cell</h1>
+  <p class="muted pg-lead" id="pgLead">Pick up the cell and place it in the charging dock within 60 seconds. The arm is a digital twin of an SO-101: every run can be replayed on the real robot.</p>
+  </header>
+
+  <div class="pg-robots" role="group" aria-label="Robot to test">
+    <ul id="pgRobots"></ul>
+  </div>
+  <div class="pg-modes" id="pgModes" role="group" aria-label="Synth Arm trials">
+    <button class="btn sm" type="button" id="pgEnergy" aria-pressed="true">Energy Cell</button>
+    <button class="btn sm" type="button" id="pgArmLab" aria-pressed="false">Lab levels</button>
+  </div>
+
+  <div class="arena" id="armTrial">
+    <div class="stage">
+      <canvas id="view" role="img" aria-label="3D view of the robot arm"></canvas>
+      <div class="hud">
+        <span id="hudTime">60.0s</span>
+        <span id="hudState">READY</span>
+        <span id="hudGrip">GRIPPER OPEN</span>
+      </div>
+      <div class="overlay" id="overlay">
+        <div>
+          <h2 id="ovTitle">Ready</h2>
+          <p class="muted" id="ovText">Press Start, then use the controls below.</p>
+          <div class="row" style="justify-content:center">
+            <button class="btn primary" id="startBtn">Start</button>
+            <button class="btn sm" id="ghostBtn">Watch a demo run</button>
+            <button class="btn sm" id="recBtn" hidden>Record clip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side app-scroll">
+      <div class="panel" style="margin-top:0">
+        <h2>Pilot</h2>
+        <select id="pilot" aria-label="Agent" style="width:100%"><option value="0">Guest (runs are not recorded)</option></select>
+        <p class="muted small" id="pilotInfo" style="margin-top:8px">Connect your wallet to pilot your Synth Arm and earn on-chain reputation.</p>
+      </div>
+      <div class="panel">
+        <h2>Controls</h2>
+        <div class="row" style="margin-top:0" role="group" aria-label="Control mode">
+          <button class="btn sm" id="modeEasy">Easy</button>
+          <button class="btn sm" id="modePro">Pro</button>
+        </div>
+        <div id="helpEasy" class="small muted" style="margin-top:10px">
+          <b>← →</b> rotate · <b>↑ ↓</b> reach · <b>R / F</b> up / down · <b>Space</b> open / close gripper
+        </div>
+        <div id="helpPro" class="small muted" style="margin-top:10px" hidden>
+          <b>Q/A</b> pan · <b>W/S</b> shoulder · <b>E/D</b> elbow · <b>R/F</b> wrist · <b>T/G</b> roll · <b>Space</b> gripper
+        </div>
+        <div class="pad" id="pad">
+          <button data-k="ArrowLeft" aria-label="Rotate left">⟲</button><button data-k="ArrowUp" aria-label="Reach out">▲</button><button data-k="ArrowRight" aria-label="Rotate right">⟳</button>
+          <button data-k="KeyR" aria-label="Up">UP</button><button data-k="ArrowDown" aria-label="Reach back">▼</button><button data-k="KeyF" aria-label="Down">DOWN</button>
+          <button data-k="Space" class="wide" aria-label="Open or close the gripper">GRIP</button>
+        </div>
+      </div>
+      <div class="panel" id="resultPanel" hidden>
+        <h2>Result</h2>
+        <div class="kv" id="result"></div>
+        <div class="row">
+          <button class="btn sm primary" id="submitBtn">Save run on-chain</button>
+          <button class="btn sm primary magenta" id="trialBtn" hidden>Submit to the pilot ranking</button>
+          <a class="btn sm yellow" href="robot.html?run=last">Play on my real robot</a>
+          <button class="btn sm" id="downloadBtn">Download run file</button>
+        </div>
+        <p class="muted small" id="submitInfo"></p>
+      </div>
+      <div class="panel" id="trialPanel" hidden>
+        <h2>Pilot ranking</h2>
+        <p class="muted small" style="margin-top:0">No agent needed. Connect any wallet, dock the cell, and submit (a free signature). Allowlist spots go to steady pilots: <span id="trialRule"></span>. Your wallet address, times and best run are shown publicly here.</p>
+        <div id="trialBoard" class="small muted">Loading…</div>
+      </div>
+      <div class="panel">
+        <h2>Leaderboard</h2>
+        <div id="board" class="small muted">Loading…</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="arena" id="labTrial" hidden>
+    <div class="stage pg-stage">
+      <canvas id="labView" aria-hidden="true"></canvas>
+      <div class="bn-labels" id="labLabels"></div>
+      <div class="bn-phone" id="labPhone" hidden><span>Phone camera</span></div>
+      <p class="pg-nogl" id="labNoGL" hidden>The 3D view needs WebGL, which this browser does not offer. The trials, scores and verification still work.</p>
+    </div>
+    <aside class="side app-scroll">
+      <div class="panel" style="margin-top:0">
+        <h2>Pilot</h2>
+        <select id="labPilot" aria-label="Agent" style="width:100%"><option value="0">Guest (runs are not recorded)</option></select>
+        <p class="muted small" id="labPilotInfo" style="margin-top:8px"></p>
+      </div>
+      <div class="panel">
+        <h2 id="labTitle">Lab trials</h2>
+        <div id="labRunner"></div>
+      </div>
+      <div class="panel" id="labResultPanel" hidden>
+        <h2>Result</h2>
+        <div class="row">
+          <button class="btn sm primary" id="labSubmit" type="button">Save run on-chain</button>
+          <button class="btn sm" id="labDownload" type="button">Download run file</button>
+        </div>
+        <p class="muted small" id="labSubmitInfo"></p>
+      </div>
+      <div class="panel">
+        <h2>Leaderboard</h2>
+        <div id="labBoard" class="small muted">Loading…</div>
+      </div>
+    </aside>
+  </div>
+  <p class="sr-only" id="labStatus" role="status" aria-live="polite"></p>
+</main>
+<script type="module" src="js/arena.js"></script>
+</body>
+</html>

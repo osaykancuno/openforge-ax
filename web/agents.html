@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My agents — OpenForge AX</title>
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+<main class="wrap pg">
+  <header class="pg-head">
+  <div class="kicker">FIG. 08 · <b>My agents</b></div>
+  <h1 class="pg-title">My agents</h1>
+  </header>
+  <div id="state" class="empty">
+    <p>Connect your wallet to see your agents. Nothing to sign: it is read-only.</p>
+    <button class="btn primary" id="connectHere">Connect wallet</button>
+  </div>
+  <div class="app-scroll app-fill pg-list"><div class="gallery" id="grid"></div></div>
+</main>
+<script type="module" src="js/mine.js"></script>
+</body>
+</html>

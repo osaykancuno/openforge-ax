@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Codex — OpenForge AX</title>
+<meta name="description" content="Learn the OpenForge Lab by playing: a 3D pop-up book in 8 pages. Meet AX-1, then see how a robot senses, decides and moves, how to test it, build it, and what an on-chain agent is.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="lab codex">
+<main class="lab-app">
+  <canvas id="codexCanvas" aria-hidden="true" role="presentation"></canvas>
+  <noscript><p class="lab-noscript">The Codex needs JavaScript. Read the <a href="index.html#guide">guide</a> instead.</p></noscript>
+
+  <article class="codex-page" id="page" aria-labelledby="chTitle" tabindex="0">
+    <div class="kicker" id="chKicker"></div>
+    <h1 id="chTitle" tabindex="-1"></h1>
+    <div class="codex-body" id="chBody"></div>
+    <div class="codex-try" role="group" aria-labelledby="tryLabel">
+      <span class="codex-try-label" id="tryLabel">Try it</span>
+      <div class="row" id="chActions"></div>
+    </div>
+    <p class="codex-status" id="chStatus" role="status" aria-live="polite"></p>
+    <div class="row codex-end" id="chEnd" hidden>
+      <a class="btn sm primary" href="bench.html">Open the Workbench</a>
+      <a class="btn sm" href="pilot.html">Phone Brain</a>
+      <a class="btn sm" href="arena.html">Proving Grounds</a>
+      <a class="btn sm" href="index.html#faq">FAQ</a>
+      <a class="btn sm magenta" id="mintEnd" target="_blank" rel="noopener">Mint on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+    </div>
+  </article>
+
+  <nav class="codex-nav" aria-label="Codex pages">
+    <button class="btn sm" id="prevBtn" aria-label="Previous page" data-sound="move">←</button>
+    <div class="codex-dots" id="dots"></div>
+    <span class="codex-count" id="pageCount" aria-hidden="true"></span>
+    <button class="btn sm" id="nextBtn" aria-label="Next page" data-sound="move">→</button>
+  </nav>
+  <a class="btn sm codex-back" href="index.html">← Lab</a>
+  <button class="btn sm lab-pause" id="pauseBtn" aria-pressed="false" hidden><span aria-hidden="true">❚❚</span> Pause animation</button>
+  <p class="sr-only" id="pageStatus" role="status" aria-live="polite"></p>
+</main>
+<script type="module" src="js/codex.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-qJT9AxucFgd8gb+QtFH43MvFb3TsP+emEyKyM8chcbk='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CC0 License — OpenForge AX</title>
+<meta name="description" content="OpenForge AX is CC0: the art of all 1,024 agents, the metadata, the code and the docs are in the public domain. Anyone can use them for anything.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .legal { max-width: 820px; }
+  .legal h2 { margin-top: 1.6em; font-size: 20px; color: var(--accent-ink); }
+  .legal p, .legal li { color: var(--ink-2); }
+  .legal ul { padding-left: 1.3em; }
+  .legal li { margin: .35em 0; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 24px 0; }
+  .summary .card h3 { margin-top: 0; }
+</style>
+</head>
+<body class="app">
+<main class="wrap legal app-scroll" style="padding:24px 0 32px">
+  <div class="kicker">FIG. 09 · <b>License</b> · CC0</div>
+  <h1 style="font-size:clamp(26px,5vw,40px)">CC0: public domain</h1>
+  <p class="muted">OpenForge AX is open source all the way down. The art, the metadata, the code and the docs are dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 Universal</a>.</p>
+
+  <h2>At a glance</h2>
+  <div class="summary">
+    <div class="card"><h3>✔ Anyone can</h3><p class="muted">Copy, remix and use the art of any agent, the 10 Prime Constructs included, for any purpose, commercial too. The same goes for the code. No permission, no royalties, no attribution required (credit is always appreciated).</p></div>
+    <div class="card"><h3>◆ Holding an agent gives you</h3><p class="muted">The agent itself: its token, its own wallet, its on-chain reputation, its missions and the controls on its autonomy. Not exclusive rights to the image: the art belongs to everyone.</p></div>
+    <div class="card"><h3>✘ CC0 does not cover</h3><p class="muted">Trademarks: don't present your work as official OpenForge. Third-party components keep their own licenses. And nothing here is an investment or a promise of returns.</p></div>
+  </div>
+
+  <h2>Dedication</h2>
+  <p>To the extent possible under law, the creators of OpenForge AX have waived all copyright and related or neighboring rights to OpenForge AX. This includes:</p>
+  <ul>
+    <li>the artwork of all 1,024 agents, its traits and the art generator;</li>
+    <li>the token metadata and the on-chain renderer;</li>
+    <li>the smart contracts, the website, the Proving Grounds, the Workbench, Phone Brain, Robot Link and the retired Neo-Forge code;</li>
+    <li>the documentation.</li>
+  </ul>
+  <p>The binding text is the CC0 1.0 Universal legal code, included as <code>LICENSE</code> in the source repository and published at <a href="https://creativecommons.org/publicdomain/zero/1.0/legalcode" target="_blank" rel="noopener">creativecommons.org</a>.</p>
+
+  <h2>What CC0 does not do</h2>
+  <ul>
+    <li><b>Trademarks and patents.</b> CC0 does not waive trademark or patent rights (CC0, section 4(a)). Don't use the "OpenForge" name or logo in a way that suggests your work is official or endorsed.</li>
+    <li><b>Third-party parts.</b> Components we did not write keep their own licenses: the SeaDrop interfaces (MIT, OpenSea), OpenZeppelin Contracts (MIT), three.js (MIT), ethers (MIT) and the Inter, Inter Tight and JetBrains Mono fonts (SIL Open Font License).</li>
+    <li><b>Warranties.</b> Everything is provided as is, with no warranty of any kind (CC0, section 4(b)).</li>
+    <li><b>Returns.</b> An agent is a digital object with an operational use. OpenForge AX promises no returns or profits, and the market value of a token can go up or down.</li>
+  </ul>
+</main>
+<script type="module">
+  import { loadConfig, renderChrome } from "./js/chain.js";
+  await loadConfig();
+  renderChrome("license");
+</script>
+</body>
+</html>

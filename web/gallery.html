@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gallery — OpenForge AX</title>
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+<main class="wrap pg">
+  <header class="pg-head">
+  <div class="kicker">FIG. 07 · <b>Gallery</b> · every agent</div>
+  <h1 class="pg-title">Gallery</h1>
+  <p class="muted pg-lead" id="intro">Every minted agent, read straight from the blockchain.</p>
+  <p class="agent-what">Each agent: a robot class, its own wallet, a verified mission record, autonomy you control. <a href="index.html#lore">What an agent does →</a></p>
+  </header>
+  <div class="toolbar">
+    <input type="text" id="q" placeholder="Search by number (e.g. 42 or AX-0042)" aria-label="Search by number">
+    <select id="fClass" aria-label="Class"><option value="">All classes</option></select>
+    <select id="fFaction" aria-label="Faction"><option value="">All factions</option></select>
+    <select id="sort" aria-label="Sort by"><option value="id">Number</option><option value="rank">Rarity</option></select>
+  </div>
+  <div class="app-scroll app-fill pg-list">
+    <div class="gallery" id="grid"></div>
+    <div style="text-align:center;margin-top:20px"><button class="btn" id="more">Load more</button></div>
+  </div>
+</main>
+<script type="module" src="js/gallery.js"></script>
+</body>
+</html>

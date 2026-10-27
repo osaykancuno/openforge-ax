@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neo-Forge — OpenForge AX</title>
+<meta name="description" content="Neo-Forge is retired: the OpenForge Lab lives at index.html. This archived city still works for visitors.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="world-page app">
+<p role="note" style="margin:8px 16px;padding:8px 14px;background:var(--card,#fbf8f2);color:var(--ink,#23211e);border:1px solid var(--line,#d8cfbf);border-left:3px solid var(--accent,#b4472f);border-radius:8px;font-size:13.5px;line-height:1.4">Neo-Forge is retired; the lab lives at <a href="index.html">index.html</a>.</p>
+<div class="world">
+  <canvas id="view" aria-label="Neo-Forge, Rust Docks district"></canvas>
+  <div class="hud">
+    <span id="hudRoom">RUST DOCKS</span>
+    <span id="hudOnline">— ONLINE</span>
+  </div>
+  <button class="btn primary station-prompt" id="stationBtn" hidden>Enter the Proving Grounds [E]</button>
+  <div class="world-controls">
+    <div class="pad" id="movePad">
+      <button data-k="KeyA">⟲</button><button data-k="KeyW">▲</button><button data-k="KeyD">⟳</button>
+      <span></span><button data-k="KeyS">▼</button><span></span>
+    </div>
+    <div class="emotes">
+      <button data-e="wave" title="Wave [1]">👋</button><button data-e="spin" title="Spin [2]">⟳</button><button data-e="ping" title="Ping [3]">!</button><button data-e="gg" title="GG [4]">GG</button>
+    </div>
+  </div>
+  <div class="overlay" id="joinCard">
+    <div class="panel" style="max-width:420px;width:100%;text-align:left">
+      <div class="kicker">FIG. 10 · <b>Neo-Forge</b> · retired</div>
+      <h3 style="font-size:20px;margin-top:6px">Enter the city</h3>
+      <p class="muted small">Walk your agent through the docks, meet other agents and enter the Proving Grounds station.</p>
+      <select id="who" style="width:100%" aria-label="Enter as"><option value="0">Visitor (no wallet needed)</option></select>
+      <p class="muted small" id="whoInfo">Connect your wallet to enter as your agent. You sign once, free, no gas.</p>
+      <div class="row"><button class="btn primary" id="enterBtn">Enter Neo-Forge</button></div>
+      <p class="muted small" style="margin-top:14px"><b>W/S</b> or <b>↑/↓</b> move · <b>A/D</b> or <b>←/→</b> turn · <b>1–4</b> emotes · <b>E</b> enter station</p>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/world.js"></script>
+</body>
+</html>

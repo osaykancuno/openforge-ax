@@ -1,0 +1,337 @@
+import { themeButton } from "./theme.js";
+import { musicButton } from "./ambient.js";
+import { soundsButton } from "./ui-sounds.js";
+import { BrowserProvider, Contract, JsonRpcProvider, formatEther, getAddress } from "../vendor/ethers.min.js";
+import { CONFIG } from "./config.js";
+import { SERVERS_KEY, applyServers, validServerUrl } from "./servers.js";
+
+export { formatEther };
+
+export const ABI = {
+  agents: [
+    "function totalSupply() view returns (uint256)",
+    "function maxSupply() view returns (uint256)",
+    "function MAX_SUPPLY_CAP() view returns (uint256)",
+    "function TEAM_RESERVE() view returns (uint256)",
+    "function reserveMinted() view returns (uint256)",
+    "function seed() view returns (bytes32)",
+    "function revealBlock() view returns (uint64)",
+    "function revealDeadline() view returns (uint64)",
+    "function ownerOf(uint256) view returns (address)",
+    "function balanceOf(address) view returns (uint256)",
+    "function tokenURI(uint256) view returns (string)",
+    "function accountOf(uint256) view returns (address)",
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  ],
+  account: [
+    "function autonomyLevel() view returns (uint8)",
+    "function operator() view returns (address)",
+    "function paused() view returns (bool)",
+    "function lockedUntil() view returns (uint64)",
+    "function lockOwner() view returns (address)",
+    "function owner() view returns (address)",
+    "function periodLimit() view returns (uint128)",
+    "function spentInPeriod() view returns (uint128)",
+    "function proposalCount() view returns (uint256)",
+    "function proposalAt(uint256) view returns (address to, uint256 value, bytes data, bool done, bool valid)",
+    "function configure(address operator, uint8 level, uint128 limit, uint64 periodLen)",
+    "function setPaused(bool)",
+    "function lock(uint64 until)",
+    "function revokeOperator()",
+    "function approve(uint256 id)",
+    "function reject(uint256 id)",
+    "function execute(address to, uint256 value, bytes data, uint8 operation) payable returns (bytes)",
+  ],
+  reputation: [
+    "function statsOf(uint256) view returns (uint32 tasks, uint32 successes, uint32 failures, uint64 dataPoints)",
+    "function tierOf(uint256) view returns (uint8)",
+  ],
+};
+
+// ---------------------------------------------------------------- deployment override
+let ready;
+export function loadConfig() {
+  ready ??= fetch(new URL("../deployment.json", import.meta.url))
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({}))
+    .then((d) => Object.assign(CONFIG, applyServers({ ...CONFIG, ...pickDeployment(d) }, storedServers())));
+  return ready;
+}
+
+// only known keys, of the right kind, are taken from deployment.json (no __proto__, no javascript: links)
+const DEPLOYMENT_KEYS = ["chainId", "chainName", "rpcUrl", "provingApi", "worldWs", "explorer", "openseaDropUrl", "ipfsGateway", "agents", "renderer", "reputation", "defaultOperator", "fromBlock"];
+const isLink = (v) => typeof v === "string" && (/^https:\/\//.test(v) || /^(#|\.\/|\/)/.test(v) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(v)) && !/["'<>\s]/.test(v);
+function pickDeployment(d) {
+  const out = {};
+  if (!d || typeof d !== "object") return out;
+  for (const k of DEPLOYMENT_KEYS) {
+    if (!Object.hasOwn(d, k)) continue;
+    const v = d[k];
+    if (k === "chainId" || k === "fromBlock") Number.isSafeInteger(v) && v >= 0 && (out[k] = v);
+    else if (["agents", "renderer", "reputation", "defaultOperator"].includes(k)) (v === "" || /^0x[0-9a-fA-F]{40}$/.test(v)) && (out[k] = v);
+    else if (k === "chainName") typeof v === "string" && v.length < 60 && (out[k] = v);
+    else if (k === "provingApi" || k === "worldWs") (v === "" || (typeof v === "string" && /^(https|wss|http|ws):\/\/[^"'<>\s]+$/.test(v))) && (out[k] = v);
+    else if (isLink(v)) out[k] = v;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- connectors (self-hosted servers)
+function storedServers() {
+  try {
+    return JSON.parse(localStorage.getItem(SERVERS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function serversDialog() {
+  const d = document.createElement("dialog");
+  d.className = "servers";
+  d.innerHTML = `<form method="dialog">
+    <h3>Your servers</h3>
+    <p class="muted small">Running OpenForge AX yourself (<code>npm run selfhost</code>)? Point this site at your Proving Grounds and Neo-Forge servers. Leave empty to use the published ones. Saved only in this browser.</p>
+    <label>Proving Grounds <input type="text" name="proving" placeholder="https://proving.example.org or http://localhost:8787" autocomplete="off"></label>
+    <label>Neo-Forge <input type="text" name="world" placeholder="wss://world.example.org or ws://localhost:8788" autocomplete="off"></label>
+    <p class="small" role="status"></p>
+    <div class="row"><button class="btn sm primary" value="save">Save</button><button class="btn sm" value="reset">Use published servers</button><button class="btn sm" value="cancel">Cancel</button></div>
+  </form>`;
+  const f = d.querySelector("form");
+  const s = storedServers();
+  f.proving.value = s.provingApi || "";
+  f.world.value = s.worldWs || "";
+  f.onsubmit = (e) => {
+    const action = e.submitter?.value;
+    if (action === "cancel") return;
+    if (action === "reset") {
+      try {
+        localStorage.removeItem(SERVERS_KEY);
+      } catch {}
+      return location.reload();
+    }
+    const provingApi = f.proving.value.trim() ? validServerUrl("proving", f.proving.value) : "";
+    const worldWs = f.world.value.trim() ? validServerUrl("world", f.world.value) : "";
+    if (provingApi === null || worldWs === null) {
+      e.preventDefault();
+      d.querySelector("[role=status]").textContent = "Use https:// and wss:// (http:// and ws:// only for localhost), with no user, query or #.";
+      return;
+    }
+    try {
+      localStorage.setItem(SERVERS_KEY, JSON.stringify({ provingApi, worldWs }));
+    } catch {}
+    location.reload();
+  };
+  document.body.append(d);
+  return d;
+}
+
+// ---------------------------------------------------------------- provider
+let readProvider;
+export function reader() {
+  readProvider ??= new JsonRpcProvider(CONFIG.rpcUrl, CONFIG.chainId, { staticNetwork: true });
+  return readProvider;
+}
+
+export const agents = (runner = reader()) => new Contract(CONFIG.agents, ABI.agents, runner);
+export const account = (addr, runner = reader()) => new Contract(addr, ABI.account, runner);
+export const reputation = (runner = reader()) => new Contract(CONFIG.reputation, ABI.reputation, runner);
+export const isDeployed = () => CONFIG.agents && !/^0x0{40}$/i.test(CONFIG.agents);
+
+// ---------------------------------------------------------------- wallet
+let signer = null;
+const listeners = new Set();
+export const onWallet = (fn) => (listeners.add(fn), fn(signer));
+export const currentSigner = () => signer;
+
+export async function connect() {
+  if (!window.ethereum) {
+    toast("No wallet found. Install MetaMask or Rabby (see the home page FAQ): it takes 2 minutes.", true);
+    return null;
+  }
+  const bp = new BrowserProvider(window.ethereum);
+  try {
+    await bp.send("eth_requestAccounts", []);
+  } catch (e) {
+    toast(friendlyError(e), true);
+    return null;
+  }
+  const net = await bp.getNetwork();
+  if (Number(net.chainId) !== CONFIG.chainId) {
+    try {
+      await bp.send("wallet_switchEthereumChain", [{ chainId: "0x" + CONFIG.chainId.toString(16) }]);
+    } catch {
+      toast(`In your wallet, switch to the ${CONFIG.chainName} network and try again.`, true);
+      return null;
+    }
+  }
+  signer = await new BrowserProvider(window.ethereum).getSigner();
+  signer.addressChecksum = getAddress(await signer.getAddress());
+  localStorageSafe("set", "ofx-connected", "1");
+  listeners.forEach((fn) => fn(signer));
+  return signer;
+}
+
+export async function autoReconnect() {
+  if (!window.ethereum || localStorageSafe("get", "ofx-connected") !== "1") return;
+  const accs = await window.ethereum.request({ method: "eth_accounts" }).catch(() => []);
+  if (accs.length) await connect().catch(() => {});
+}
+
+if (window.ethereum?.on) {
+  window.ethereum.on("accountsChanged", () => location.reload());
+  window.ethereum.on("chainChanged", () => location.reload()); // a network switch must never leave the page signing for another chain
+}
+
+function localStorageSafe(op, k, v) {
+  try {
+    return op === "set" ? localStorage.setItem(k, v) : localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------- transactions with plain-language messages
+// One transaction at a time: buttons stay locked until the network confirms
+export async function send(label, fn) {
+  if (document.body.classList.contains("busy")) return false;
+  document.body.classList.add("busy");
+  try {
+    // the wallet must still be on our network: the user may have switched since connecting
+    if (signer && Number((await signer.provider.getNetwork()).chainId) !== CONFIG.chainId) throw new Error(`WRONG_NETWORK`);
+    toast(`${label}: confirm in your wallet…`);
+    const tx = await fn();
+    toast(`${label}: transaction sent, waiting for network confirmation…`);
+    await tx.wait();
+    toast(`${label}: done ✔`);
+    return true;
+  } catch (e) {
+    toast(friendlyError(e), true);
+    return false;
+  } finally {
+    document.body.classList.remove("busy");
+  }
+}
+
+export function friendlyError(e) {
+  const m = `${e?.shortMessage || ""} ${e?.message || ""} ${e?.info?.error?.message || ""}`;
+  if (/user rejected|denied|ACTION_REJECTED/i.test(m)) return "Cancelled in your wallet. No cost.";
+  if (/WRONG_NETWORK/.test(m)) return `Your wallet is on another network: switch to ${CONFIG.chainName} and try again. Nothing was sent.`;
+  if (/insufficient funds/i.test(m)) return "Not enough ETH to cover the network fee (gas).";
+  if (/AccountLocked/.test(m)) return "The agent wallet is locked for sale: wait for the lock to expire.";
+  if (/NotOwner|NotAuthorized/.test(m)) return "Only the agent's owner can do this.";
+  if (/SpendLimitExceeded/.test(m)) return "The agent's daily spend limit has been reached.";
+  return "Something went wrong: " + (e?.shortMessage || e?.message || "unknown error").slice(0, 160);
+}
+
+// ---------------------------------------------------------------- metadata
+export function decodeTokenURI(uri) {
+  if (uri.startsWith("data:application/json;base64,")) {
+    const bin = atob(uri.slice(29));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+  }
+  throw new Error("Unsupported tokenURI");
+}
+
+/** HTML-escapes chain or server data before it goes into innerHTML (metadata is only as trusted as the renderer). */
+export const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+export const ipfs = (u) =>
+  u?.startsWith("ipfs://") ? CONFIG.ipfsGateway + u.slice(7) : /^(https:\/\/|https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/|assets\/|demo-images\/)/.test(u || "") ? u : "assets/placeholder.png"; // https only (plain http: the local demo)
+export const attr = (meta, k) => meta?.attributes?.find((a) => a.trait_type === k)?.value;
+export const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
+
+const metaCache = new Map();
+/** Find the wallet's tokens from Transfer events; if the RPC limits logs, scan ownerOf instead. */
+export async function ownedBy(addr) {
+  const c = agents();
+  try {
+    const logs = await c.queryFilter(c.filters.Transfer(null, addr), CONFIG.fromBlock || 0);
+    const candidates = [...new Set(logs.map((l) => Number(l.args.tokenId)))];
+    const owners = await Promise.all(candidates.map((id) => c.ownerOf(id)));
+    return candidates.filter((_, i) => owners[i].toLowerCase() === addr.toLowerCase()).sort((a, b) => a - b);
+  } catch {
+    const supply = Number(await c.totalSupply());
+    const out = [];
+    for (let s = 1; s <= supply; s += 50) {
+      const ids = Array.from({ length: Math.min(50, supply - s + 1) }, (_, i) => s + i);
+      const owners = await Promise.all(ids.map((id) => c.ownerOf(id)));
+      ids.forEach((id, i) => owners[i].toLowerCase() === addr.toLowerCase() && out.push(id));
+    }
+    return out;
+  }
+}
+
+export async function tokenMeta(id) {
+  if (!metaCache.has(id)) metaCache.set(id, agents().tokenURI(id).then(decodeTokenURI));
+  return metaCache.get(id);
+}
+
+// ---------------------------------------------------------------- shared UI
+function toastEl() {
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.setAttribute("role", "status");
+    document.body.append(el);
+  }
+  return el;
+}
+if (typeof document !== "undefined") document.readyState === "loading" ? addEventListener("DOMContentLoaded", toastEl) : toastEl();
+
+export function toast(msg, isErr = false) {
+  const el = toastEl();
+  el.setAttribute("role", isErr ? "alert" : "status");
+  el.textContent = msg;
+  el.className = isErr ? "err" : "";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => (el.textContent = ""), isErr ? 9000 : 6000);
+}
+
+export function renderChrome(active) {
+  const nav = document.createElement("nav");
+  nav.className = "nav";
+  nav.innerHTML = `<div class="wrap">
+    <a class="logo" href="index.html" aria-label="OpenForge AX, home">OpenForge <b>AX</b></a>
+    <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">☰</button>
+    <div class="links" id="navLinks">
+      <a href="index.html" data-k="home">Lab</a>
+      <a href="bench.html" data-k="bench">Workbench</a>
+      <a href="pilot.html" data-k="pilot">Phone Brain</a>
+      <a href="arena.html" data-k="arena">Proving Grounds</a>
+      <a href="robot.html" data-k="robot">Robot Link</a>
+      <a href="gallery.html" data-k="gallery">Gallery</a>
+      <a href="agents.html" data-k="mine">My agents</a>
+      <a class="btn sm magenta" id="mintNav" href="${CONFIG.openseaDropUrl}" target="_blank" rel="noopener">Mint on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
+      <button class="btn sm" id="connectBtn">Connect wallet</button>
+    </div></div>`;
+  const skip = document.querySelector(".skip"); // the skip link stays first, so it can skip the nav
+  if (skip) skip.after(nav);
+  else document.body.prepend(nav);
+  nav.querySelector(`[data-k="${active}"]`)?.classList.add("active");
+  const burger = nav.querySelector(".burger");
+  const links = nav.querySelector(".links");
+  burger.onclick = () => burger.setAttribute("aria-expanded", String(links.classList.toggle("open")));
+  links.addEventListener("keydown", (e) => { // Escape closes the folded menu and returns to its button
+    if (e.key !== "Escape" || !links.classList.contains("open")) return;
+    links.classList.remove("open");
+    burger.setAttribute("aria-expanded", "false");
+    burger.focus();
+  });
+  nav.querySelector("#mintNav").before(soundsButton(), musicButton(), themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
+  const btn = nav.querySelector("#connectBtn");
+  btn.onclick = () => connect();
+  onWallet((s) => s && (btn.textContent = short(s.addressChecksum)));
+
+  const foot = document.createElement("footer");
+  foot.innerHTML = `<div class="wrap">
+    <div>OpenForge AX · an open robotics lab · CC0. No promise of returns.</div>
+    <div><a href="license.html">CC0</a> ·
+    <a href="#" id="serversLink">Servers${CONFIG.customServers ? " (yours)" : ""}</a> ·
+    <a href="${CONFIG.explorer}/address/${CONFIG.agents}" target="_blank" rel="noopener">Contract<span class="sr-only"> (opens in a new tab)</span></a> ·
+    <a href="${esc(CONFIG.social.x)}" target="_blank" rel="noopener">X<span class="sr-only"> (opens in a new tab)</span></a> ·
+    <a href="${esc(CONFIG.social.discord)}" target="_blank" rel="noopener">Discord<span class="sr-only"> (opens in a new tab)</span></a></div></div>`;
+  document.body.append(foot);
+  let dlg;
+  foot.querySelector("#serversLink").onclick = (e) => (e.preventDefault(), (dlg ??= serversDialog()).showModal());
+  autoReconnect();
+}

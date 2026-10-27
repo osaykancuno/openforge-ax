@@ -1,0 +1,17 @@
+{
+  "name": "OpenForge Phone Brain",
+  "short_name": "Phone Brain",
+  "description": "Turn your phone into the brain of OpenForge AX-1. Drive the 3D twin, or a real robot over Bluetooth.",
+  "start_url": "pilot.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4efe6",
+  "theme_color": "#f4efe6",
+  "icons": [
+    { "src": "assets/pilot-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pilot-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pilot-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/pilot-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

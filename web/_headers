@@ -1,0 +1,26 @@
+# Security headers for Cloudflare Pages (the "! Header" detach lines are its syntax; other hosts may merge the
+# per-page policy with the default, which turns serial/bluetooth off: safe, but set them in the host's settings).
+# On other hosts, set the same headers in the host's settings. The CSP itself is a <meta> tag in each page.
+/*
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), serial=(), bluetooth=()
+/robot.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
+/pilot.html
+  ! Permissions-Policy
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(), geolocation=(), serial=()
+/pilot
+  ! Permissions-Policy
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(), geolocation=(), serial=()
+/robot
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
+/pilot.webmanifest
+  Content-Type: application/manifest+json
+/deployment.json
+  Cache-Control: no-cache

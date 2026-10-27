@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Robot Link — OpenForge AX</title>
+<meta name="description" content="Play your OpenForge agent's Proving Grounds runs on a real SO-101 robot arm. Guided, in the browser, nothing to install.">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="app">
+<main class="wrap pg">
+  <header class="pg-head">
+  <div class="kicker">FIG. 06 · <b>Robot Link</b> · real SO-101</div>
+  <h1 class="pg-title">Run your agent on a real arm</h1>
+  <p class="muted pg-lead">Plug in an SO-101 robot arm and replay your agent's Proving Grounds runs on it. Step by step, in this page: no code, nothing to install. No arm yet? Try the virtual one.</p>
+  </header>
+
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li data-s="run">Run</li><li data-s="connect">Connect</li><li data-s="calibrate">Calibrate</li><li data-s="check">Check</li><li data-s="scene">Set up</li><li data-s="play">Play</li>
+  </ol>
+
+  <div class="arena">
+    <div class="stage">
+      <canvas id="view" role="img" aria-label="3D twin of the robot arm"></canvas>
+      <div class="hud">
+        <span id="hudMode">TWIN: INSTRUCTIONS</span>
+        <span id="hudArm">NO ARM</span>
+      </div>
+      <button class="btn danger stop" id="stopBtn" hidden>STOP <small>(Space)</small></button>
+    </div>
+
+    <aside class="side app-scroll">
+      <div class="panel step-card" style="margin-top:0">
+        <div class="kicker small" id="stepKicker"></div>
+        <h3 id="stepTitle"></h3>
+        <div id="stepBody" class="small"></div>
+        <div class="row" id="stepActions"></div>
+        <p class="small" id="stepMsg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="panel" id="handsPanel" hidden>
+        <h3>Your hands (virtual arm)</h3>
+        <p class="muted small">Move the virtual arm while its torque is off, like you would move a real one.</p>
+        <div id="hands" class="hands"></div>
+      </div>
+
+      <div class="panel small muted" id="armPanel" hidden>
+        <h3>Arm</h3>
+        <div id="armInfo"></div>
+        <div class="row">
+          <button class="btn sm" id="relaxBtn">Relax arm</button>
+          <button class="btn sm" id="restBtn">Return to rest</button>
+          <button class="btn sm" id="recalBtn">Recalibrate</button>
+        </div>
+      </div>
+
+      <details class="panel small muted" id="help">
+        <summary>Trouble connecting?</summary>
+        <ul>
+          <li>Use Chrome, Edge or Opera on a computer (phones and Firefox/Safari cannot talk to USB devices).</li>
+          <li>Power the arm with its own supply (5–7.4 V or 12 V, matching your servos) <b>and</b> plug in the USB cable.</li>
+          <li>Waveshare bus board: the jumper must be on <b>B</b> (USB).</li>
+          <li>No port in the list? Click "Show all ports". On Windows install the board's USB driver (usually "CH343" from WCH). On Linux add yourself to the <code>dialout</code> group and remove <code>brltty</code>.</li>
+          <li>Only one servo found, as ID 1? New servos all ship as ID 1: set the IDs once with LeRobot's motor setup, or ask your kit seller.</li>
+          <li>Comfortable with Python? <code>scripts/real/replay_so101.py</code> does the same through LeRobot.</li>
+        </ul>
+      </details>
+    </aside>
+  </div>
+</main>
+<script type="module" src="js/robot.js"></script>
+</body>
+</html>

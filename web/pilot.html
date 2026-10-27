@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Phone Brain · OpenForge AX-1</title>
+<meta name="description" content="Turn your phone into the brain of OpenForge AX-1: drive the 3D twin in the browser, or a real AX-1 over Bluetooth through an ESP32 bridge.">
+<meta name="theme-color" content="#f4efe6">
+<meta property="og:title" content="Phone Brain · OpenForge AX-1">
+<meta property="og:description" content="Your phone is the robot's brain. Try the 3D twin, then build the real one.">
+<meta property="og:image" content="assets/og.png">
+<link rel="manifest" href="pilot.webmanifest">
+<link rel="icon" href="assets/pilot-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/pilot-192.png">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pilot.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="pilot">
+<div class="pl-app">
+  <header class="pl-top">
+    <a class="pl-back" href="index.html">← Lab</a>
+    <p class="pl-fig">FIG. 01 · PHONE BRAIN</p>
+    <span class="pl-chip" id="linkChip">Twin · offline</span>
+  </header>
+
+  <!-- first in the tab order after the header: STOP is one Tab away from anywhere on the page -->
+  <button class="pl-stop" id="stopBtn" type="button" hidden><span>STOP</span><small>Space · Esc</small></button>
+
+  <noscript><p class="pl-card pl-noscript">Phone Brain needs JavaScript. The build guide is <span class="pl-mono">docs/13-PHONE-BRAIN.md</span> in the project repository. <a href="index.html">Back to the lab</a>.</p></noscript>
+
+  <section class="pl-card pl-caps" id="caps" aria-labelledby="capsTitle">
+    <p class="pl-label">FIG. 00 · WHAT THIS DEVICE CAN DO</p>
+    <h1 id="capsTitle">Your phone is the robot's brain</h1>
+    <p class="pl-lead">Phone Brain drives <b>OpenForge AX-1</b>: the phone does the seeing and deciding, a small ESP32 bridge moves the motors. No robot yet? Drive the 3D twin: it runs the same protocol and the same safety rules as the real bridge.</p>
+    <ul class="pl-caplist" id="capList"></ul>
+    <p class="pl-hint" id="desktopHint" hidden>Best on a phone. Open this page on your phone: <span class="pl-mono" id="pageUrl"></span></p>
+    <div class="pl-row">
+      <button class="pl-btn pl-primary" id="startTwin" type="button">Start with the twin</button>
+      <button class="pl-btn" id="startRobot" type="button" hidden>Connect a real AX-1</button>
+    </div>
+  </section>
+
+  <main class="pl-main" id="main" hidden>
+    <h1 class="sr-only" id="mainTitle" tabindex="-1">Drive AX-1</h1>
+    <figure class="pl-view pl-card">
+      <canvas id="twin" role="img" aria-label="3D twin of the AX-1 robot"></canvas>
+      <figcaption class="pl-overlay">
+        <span class="pl-chip" id="bodyChip">AX-1 Rover</span>
+        <span class="pl-chip" id="stateChip">offline</span>
+        <span class="pl-chip" id="battChip" hidden></span>
+      </figcaption>
+      <video id="cam" class="pl-cam" playsinline muted hidden aria-label="Camera preview (stays on this phone)"></video>
+      <p class="pl-nogl" id="noGl" hidden>3D is off on this device. The controls and the protocol still work; watch the numbers below.</p>
+    </figure>
+
+    <div class="pl-controls">
+      <div class="pl-col">
+        <section class="pl-card" aria-labelledby="linkTitle">
+          <h2 class="pl-label" id="linkTitle">LINK</h2>
+          <div class="pl-seg" role="radiogroup" aria-label="What to drive">
+            <label><input type="radio" name="mode" value="twin" checked> 3D twin</label>
+            <label><input type="radio" name="mode" value="ble"> Real robot (Bluetooth)</label>
+          </div>
+          <label class="pl-field" id="bodyField">Body
+            <select id="bodySel">
+              <option value="rover">AX-1 Rover · wheels + head</option>
+              <option value="desk">AX-1 Desk · neck + two arms</option>
+              <option value="walker">AX-1 Walker · poses only (experimental)</option>
+            </select>
+          </label>
+          <div class="pl-row">
+            <button class="pl-btn" id="connectBtn" type="button">Connect</button>
+            <button class="pl-btn pl-primary pl-arm" id="armBtn" type="button" disabled>ARM</button>
+          </div>
+          <p class="pl-msg" id="linkMsg" role="status" aria-live="polite"></p>
+          <div class="pl-chips" id="telemetry" aria-label="Telemetry"></div>
+          <p class="pl-small" id="bleNote" hidden></p>
+        </section>
+
+        <section class="pl-card" data-for="rover" aria-labelledby="driveTitle">
+          <h2 class="pl-label" id="driveTitle">DRIVE · HOLD TO MOVE</h2>
+          <div class="pl-drive">
+            <div class="pl-stick" id="stick" role="group" tabindex="0" aria-label="Joystick" aria-describedby="stickHint">
+              <span class="pl-knob" id="knob"></span>
+              <span class="pl-stick-label" id="stickLabel">hold</span>
+            </div>
+            <div class="pl-dpad" id="dpad" role="group" hidden aria-label="Direction buttons" aria-describedby="stickHint">
+              <button type="button" data-dir="0,1" aria-label="Forward">▲</button>
+              <button type="button" data-dir="-1,0" aria-label="Turn left">◀</button>
+              <button type="button" data-dir="1,0" aria-label="Turn right">▶</button>
+              <button type="button" data-dir="0,-1" aria-label="Back">▼</button>
+            </div>
+          </div>
+          <p class="pl-small" id="stickHint">Press and hold to drive; let go to stop. Keyboard, while armed: arrow keys, or W A S D with the joystick focused. Enter on a direction button drives for half a second.</p>
+          <div class="pl-row pl-wrap">
+            <label class="pl-check"><input type="checkbox" id="dpadToggle"> Buttons instead of joystick</label>
+            <label class="pl-check"><input type="checkbox" id="tiltToggle"> Tilt to steer</label>
+          </div>
+        </section>
+
+        <section class="pl-card" data-for="rover desk" aria-labelledby="headTitle">
+          <h2 class="pl-label" id="headTitle">HEAD</h2>
+          <div id="headSliders"></div>
+        </section>
+
+        <section class="pl-card" data-for="desk" aria-labelledby="armsTitle">
+          <h2 class="pl-label" id="armsTitle">ARMS · GESTURES</h2>
+          <div class="pl-row pl-wrap" id="gestures"></div>
+          <div id="armSliders"></div>
+        </section>
+
+        <section class="pl-card" data-for="walker" aria-labelledby="poseTitle">
+          <h2 class="pl-label" id="poseTitle">POSES · NO WALKING YET</h2>
+          <p class="pl-small">Walking needs a learned policy. The Walker body only takes still poses, rate-limited by the bridge.</p>
+          <div class="pl-row pl-wrap" id="poses"></div>
+          <div id="walkerSliders"></div>
+        </section>
+
+        <section class="pl-card" aria-labelledby="speedTitle">
+          <h2 class="pl-label" id="speedTitle">SPEED</h2>
+          <div id="speedSlider"></div>
+        </section>
+      </div>
+      <div class="pl-col">
+        <section class="pl-card pl-ai" id="aiPanel" aria-labelledby="aiTitle">
+          <h2 class="pl-label" id="aiTitle">AI PILOT</h2>
+          <p class="pl-ai-model"><span class="pl-chip plain" id="aiModelChip">No model: built-in parser</span></p>
+          <div class="pl-ai-log" id="aiLog" role="log" aria-live="polite" aria-label="AI Pilot conversation" tabindex="0"></div>
+          <p class="pl-ai-status" id="aiStatus" aria-live="off"></p>
+          <form class="pl-ai-form" id="aiForm" autocomplete="off">
+            <label class="pl-ai-lbl" for="aiInput">Tell the robot what to do</label>
+            <div class="pl-row">
+              <input id="aiInput" type="text" maxlength="500" placeholder="wave, then look left" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false">
+              <button class="pl-btn pl-primary" id="aiSend" type="submit">Send</button>
+            </div>
+          </form>
+          <p class="pl-small">Try: forward 2 s, then turn left. The AI never arms the robot: you press ARM first. STOP or Esc stops it at once (Space types in the box).</p>
+          <details class="pl-ai-more">
+            <summary>Set up a model (optional)</summary>
+            <p class="pl-small">Without a model, a built-in parser understands short commands. A local model understands free-form requests. Your words and the robot's joint angles go only to the model server you enter here, on your own computer. Nothing is sent to us.</p>
+            <ul class="pl-ai-list">
+              <li><b>Ollama</b> (<span class="pl-mono">http://localhost:11434</span>): install it, then run <span class="pl-mono">ollama pull qwen2.5:3b</span>. A page opened from localhost works as is. For any other site, set the environment variable <span class="pl-mono">OLLAMA_ORIGINS</span> to this page's address (<span class="pl-mono" id="aiOrigin"></span>) and restart Ollama.</li>
+              <li><b>LM Studio</b> (<span class="pl-mono">http://localhost:1234</span>): load a model, open the Developer tab, press Start Server, and turn on CORS.</li>
+              <li><b>llama.cpp</b> (<span class="pl-mono">http://localhost:8080</span>): start it with <span class="pl-mono">llama-server --jinja -m your-model.gguf</span>. The <span class="pl-mono">--jinja</span> flag turns on tool calling.</li>
+            </ul>
+            <p class="pl-small">Use an instruct model that can call tools, 3B or larger: Qwen2.5 3B or 7B Instruct, or Llama 3.2 3B Instruct. Smaller models often ignore the tools. Chrome may ask to allow this page to reach a service on your device: that is your own model server.</p>
+          </details>
+          <details class="pl-ai-more">
+            <summary>Model settings</summary>
+            <label class="pl-field">Server address
+              <input id="aiUrl" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="http://localhost:11434">
+            </label>
+            <label class="pl-field">Model name
+              <input id="aiModelName" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="qwen2.5:3b (empty = built-in parser)">
+            </label>
+            <label class="pl-check"><input type="checkbox" id="aiOther"> Allow other hosts (not this computer)</label>
+            <p class="pl-small" id="aiOtherNote" hidden>This page's security policy only lets it reach localhost. Another host works only if you host this page yourself and allow that address in its policy.</p>
+            <div class="pl-row pl-wrap">
+              <button class="pl-btn sm" id="aiSave" type="button">Save</button>
+              <button class="pl-btn sm" id="aiTest" type="button">Test connection</button>
+            </div>
+            <p class="pl-msg" id="aiSettingsMsg" role="status" aria-live="polite"></p>
+          </details>
+        </section>
+
+        <section class="pl-card" aria-labelledby="senseTitle">
+          <h2 class="pl-label" id="senseTitle">SENSES · ON THIS PHONE ONLY</h2>
+          <div class="pl-row pl-wrap">
+            <button class="pl-btn" id="camBtn" type="button" aria-pressed="false">Look at movement</button>
+            <label class="pl-check"><input type="checkbox" id="followToggle" checked> Head follows (when armed)</label>
+          </div>
+          <p class="pl-small" id="senseNote">The camera finds what moves in a 64 × 48 picture. Nothing is recorded or sent.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+</div>
+<script type="module" src="js/pilot/pilot.js"></script>
+</body>
+</html>

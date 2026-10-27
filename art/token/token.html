@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenForge AX token render</title>
+<link rel="icon" href="data:,">
+<!--
+  Token art, rendered by art/token-render.mjs in a headless browser: window.renderToken({ id, t, info }) draws one
+  1000 × 1000 lab plate in #art from the site's own models (web/js/models/). Deterministic: same traits, same image.
+  Traits: Class → robot, Finish → shell and trim colours, District → paper tint, Augment → a small 3D add-on,
+  Frame → how far the pose leaves home, Core / Sensor / Faction → the plate's labels. Prime Constructs are gold.
+-->
+<script type="importmap">
+{ "imports": { "three": "/web/vendor/three/three.module.js", "three/addons/": "/web/vendor/three/addons/" } }
+</script>
+<style>
+  @font-face { font-family: "Inter"; src: url("/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "Inter Tight"; src: url("/node_modules/@fontsource-variable/inter-tight/files/inter-tight-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2") format("woff2"); font-weight: 100 800; }
+  :root { --ink: #23211e; --ink-2: #3d3a35; --muted: #6b655c; --terra: #b4472f; --gold: #9c7a22; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; }
+  #art { position: relative; width: 1000px; height: 1000px; overflow: hidden; color: var(--ink); font-family: "Inter", sans-serif;
+    background-image: linear-gradient(rgba(35,33,30,.065) 1px, transparent 1px), linear-gradient(90deg, rgba(35,33,30,.065) 1px, transparent 1px);
+    background-size: 40px 40px; background-position: -1px -1px; }
+  #gl { position: absolute; left: 0; top: 96px; width: 1000px; height: 660px; display: block; }
+  .t { position: absolute; }
+  .fig { font: 600 19px/1.3 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .fig b { color: var(--terra); font-weight: 700; }
+  .name { font: 800 76px/1 "Inter Tight", sans-serif; letter-spacing: -.035em; margin: 0; white-space: nowrap; }
+  .sub { font: 500 22px/1.35 "Inter", sans-serif; color: var(--ink-2); margin: 10px 0 0; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip { padding: 6px 12px; border: 2px solid #c6bba8; border-radius: 999px; font: 700 15px/1.2 "JetBrains Mono", monospace; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); background: rgba(251,248,242,.85); }
+  .chip i { font-style: normal; color: var(--muted); font-weight: 600; margin-right: 8px; }
+  .badge { display: flex; align-items: center; gap: 10px; font: 700 17px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .badge span { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+  .frame { position: absolute; inset: 18px; border: 3px solid var(--gold); border-radius: 10px; pointer-events: none; }
+  .prime .fig b, .prime .name { color: var(--gold); }
+</style>
+</head>
+<body>
+<div id="art"><canvas id="gl"></canvas></div>
+<script type="module">
+import * as THREE from "three";
+import { makeRenderer, makeStage, mat, disposeObject } from "/web/js/models/look.js";
+import { ROBOTS, buildRobot } from "/web/js/models/robots.js";
+
+const W = 1000, H = 660;
+const art = document.getElementById("art");
+const canvas = document.getElementById("gl");
+const renderer = makeRenderer(canvas, { alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+const stage = makeStage(scene, renderer, { size: 1.2, floor: false, background: null });
+stage.key.position.set(0.9, 2.2, 1.6);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: 0.2 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const camera = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
+let current = null; // the token's robot + add-ons, freed before the next token
+
+// ---------------------------------------------------------------- trait tables (indices as in art/traits.mjs)
+/** Class index → robot id: the ROBOTS catalogue carries each robot's on-chain class. */
+const CLASS_ROBOT = Object.fromEntries(Object.entries(ROBOTS).filter(([, r]) => r.cls !== null).map(([id, r]) => [r.cls, id]));
+const FINISH = [
+  { shell: 0x3a3733, trim: 0xb9b5ad }, // Blacksteel
+  { shell: 0xf8f6f1, trim: 0x8f877b }, // Ghost White
+  { shell: 0xefeae0, trim: 0xd9772b }, // Hazard Orange
+  { shell: 0xe4e9ee, trim: 0x3f6f9e }, // Ice Cobalt
+  { shell: 0xefeae0, trim: 0x4f8a5e }, // Toxic Green
+  { shell: 0xefeae0, trim: 0xa8322a }, // Blood Red
+  { shell: 0xd6dae0, trim: 0x8a6a9e, metal: true }, // Holo Chrome
+];
+const GOLD = { shell: 0xe8d7a2, trim: 0xb8902f, metal: true }; // 24K Circuit (Prime Constructs)
+const PAPER = ["#f5e9ea", "#f4e9dd", "#e8efe6", "#e7ecf1", "#ede7f1", "#ece9e3"]; // per District
+const FORGE_CORE = "#f6edd2";
+const FACTION = ["#9a9286", "#c8553d", "#4f7ea8", "#8a6a9e", "#5f8a6e"];
+const CORE_DOT = ["#9a9286", "#5f8a6e", "#e2b04a", "#c8553d"];
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/** Swaps the rig's shell and trim plastics for the finish's (shared, cached materials). */
+function paint(group, f) {
+  const opts = f.metal ? { metalness: 0.6, roughness: 0.32 } : {};
+  const shell = mat(f.shell, opts), trim = mat(f.trim, opts);
+  const from = new Map([[mat("shell"), shell], [mat("accent"), trim]]);
+  group.traverse((o) => {
+    if (o.isMesh && from.has(o.material)) o.material = from.get(o.material);
+  });
+}
+
+/** The highest point of the posed robot (world space): antennas and halos sit on the robot, not on its bounding box. */
+function topPoint(group) {
+  const best = new THREE.Vector3(0, -Infinity, 0);
+  const v = new THREE.Vector3();
+  group.traverse((o) => {
+    if (!o.isMesh || !o.geometry.attributes.position) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      if (v.y > best.y) best.copy(v);
+    }
+  });
+  return best;
+}
+
+/** A small add-on placed from the posed robot (world space). kind = Augment index, or "crown" for a Prime Construct. */
+function augment(kind, box, trim, peak) {
+  const g = new THREE.Group();
+  const size = box.getSize(new THREE.Vector3());
+  const c = box.getCenter(new THREE.Vector3());
+  const s = Math.max(size.x, size.y, size.z);
+  const top = peak.y;
+  const add = (geo, material, x, y, z) => {
+    const m = new THREE.Mesh(geo, material);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    g.add(m);
+    return m;
+  };
+  if (kind === 1) { // Antenna Array
+    for (const [dx, h] of [[-0.12, 0.22], [0, 0.3], [0.12, 0.18]]) {
+      add(new THREE.CylinderGeometry(s * 0.006, s * 0.006, s * h, 8), mat("graphite"), peak.x + dx * s * 0.4, top + (s * h) / 2 - s * 0.01, peak.z);
+      add(new THREE.SphereGeometry(s * 0.018, 14, 10), mat(trim), peak.x + dx * s * 0.4, top + s * h - s * 0.01, peak.z);
+    }
+  } else if (kind === 2 || kind === "crown") { // Holo Halo, or the Prime Construct crown
+    const ring = add(new THREE.TorusGeometry(s * 0.2, s * 0.012, 10, 48), kind === "crown" ? mat(GOLD.trim, { metalness: 0.7, roughness: 0.3 }) : new THREE.MeshBasicMaterial({ color: 0x7fb6e0, transparent: true, opacity: 0.75 }), peak.x, top + s * 0.1, peak.z);
+    ring.rotation.x = Math.PI / 2;
+    if (kind === "crown") for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      add(new THREE.SphereGeometry(s * 0.022, 14, 10), mat(GOLD.trim, { metalness: 0.7, roughness: 0.3 }), peak.x + Math.cos(a) * s * 0.2, top + s * 0.13, peak.z + Math.sin(a) * s * 0.2);
+    }
+  } else if (kind === 3) { // Cable Spine
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(c.x - size.x * 0.25, top - size.y * 0.1, box.min.z - s * 0.02),
+      new THREE.Vector3(c.x, c.y + size.y * 0.1, box.min.z - s * 0.06),
+      new THREE.Vector3(c.x + size.x * 0.2, box.min.y + size.y * 0.25, box.min.z - s * 0.02),
+    ]);
+    add(new THREE.TubeGeometry(curve, 48, s * 0.012, 8), mat(trim), 0, 0, 0);
+  } else if (kind === 4) { // Visor Band
+    const band = add(new THREE.TorusGeometry(Math.max(size.x, size.z) * 0.56, s * 0.012, 8, 64), new THREE.MeshBasicMaterial({ color: 0x2f5f8a, transparent: true, opacity: 0.8 }), c.x, box.min.y + size.y * 0.78, c.z);
+    band.rotation.x = Math.PI / 2;
+  } else if (kind === 5) { // Exhaust Vents
+    for (const dx of [-0.08, 0.08]) {
+      const v = add(new THREE.CylinderGeometry(s * 0.03, s * 0.036, s * 0.09, 18), mat("alu"), c.x + dx * s, box.min.y + size.y * 0.55, box.min.z - s * 0.04);
+      v.rotation.x = Math.PI / 2;
+    }
+  }
+  return g;
+}
+
+window.renderToken = async ({ id, t, info }) => {
+  const prime = t.legendary > 0;
+  const robotId = CLASS_ROBOT[t.class];
+  if (!robotId) throw new Error(`no robot for class ${t.class}`);
+  const r = rng(id * 2654435761);
+
+  // ---------------------------------------------------------------- 3D
+  if (current) scene.remove(current), disposeObject(current);
+  current = new THREE.Group();
+  scene.add(current);
+  const rig = buildRobot(robotId);
+  rig.home();
+  const reach = 0.06 * t.frame; // Mk-I stands at home; each later frame leaves home a little more
+  for (const [name, j] of Object.entries(rig.joints)) rig.set(name, j.home + (r() - 0.5) * reach * (j.max - j.min));
+  rig.face?.setMood?.(prime ? "happy" : "idle");
+  rig.face?.setLook?.(r() * 1.2 - 0.6, r() * 0.4 - 0.1);
+  rig.face?.tick?.(0.5);
+  paint(rig.group, prime ? GOLD : FINISH[t.finish]);
+  const side = r() < 0.5 ? -1 : 1;
+  rig.group.rotation.y = side * (0.35 + r() * 0.45);
+  current.add(rig.group);
+  rig.group.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(rig.group);
+  const aug = augment(prime ? "crown" : t.augment, box, (prime ? GOLD : FINISH[t.finish]).trim, topPoint(rig.group));
+  current.add(aug);
+  const all = new THREE.Box3().setFromObject(current);
+  const c = all.getCenter(new THREE.Vector3());
+  const size = all.getSize(new THREE.Vector3());
+  const radius = (Math.max(size.y, size.x / (W / H)) / 2) / Math.tan((camera.fov * Math.PI) / 360) * 1.22;
+  camera.position.set(c.x, c.y + radius * 0.32, c.z + radius);
+  camera.lookAt(c);
+  renderer.render(scene, camera);
+
+  // ---------------------------------------------------------------- plate
+  for (const n of art.querySelectorAll(".t, .frame")) n.remove();
+  art.classList.toggle("prime", prime);
+  art.style.backgroundColor = prime ? FORGE_CORE : PAPER[t.district];
+  const el = (html, style) => {
+    const d = document.createElement("div");
+    d.className = "t";
+    d.style.cssText = style;
+    d.innerHTML = html;
+    art.append(d);
+  };
+  const tag = `AX-${String(id).padStart(4, "0")}`;
+  const robot = ROBOTS[robotId];
+  el(`<div class="fig">FIG. ${esc(String(id).padStart(4, "0"))} · <b>${esc(prime ? "Prime Construct · 1/1" : info.Class)}</b></div>`, "left:56px;top:50px");
+  el(`<div class="fig">${esc(tag)}</div>`, "right:56px;top:50px");
+  el(`<h1 class="name">${esc(info.name)}</h1><p class="sub">${esc(prime ? `${info.Class} · ` : "")}inspired by ${esc(robot.platform)} · ${esc(info.Frame)} frame</p>`, "left:56px;top:752px;width:888px");
+  el(`<div class="chips">${[["Core", info["Core Model"]], ["Sensor", info.Sensor], ["Finish", info.Finish], ["Augment", info.Augment]]
+    .map(([k, v]) => `<span class="chip"><i>${k}</i>${esc(v)}</span>`).join("")}</div>`, "left:56px;top:880px;width:888px");
+  el(`<div class="badge"><span style="background:${CORE_DOT[prime ? 3 : t.core]}"></span>${esc(info.District)}</div>`, "left:56px;top:96px");
+  el(`<div class="badge"><span style="background:${prime ? "#b8902f" : FACTION[t.faction]}"></span>${esc(info.Faction)}</div>`, "right:56px;top:96px");
+  if (prime) art.insertAdjacentHTML("beforeend", '<div class="frame"></div>');
+  await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); // layout and WebGL settle before the screenshot
+  return { robot: robotId };
+};
+
+await Promise.all(["800 76px 'Inter Tight'", "500 22px Inter", "700 16px 'JetBrains Mono'"].map((f) => document.fonts.load(f)));
+window.__ready = { ok: true };
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workbench · OpenForge Lab</title>
+<meta name="description" content="Learn how eleven open robots work, test them in lab missions in your browser, then build a real one: bill of materials, licences and upstream links.">
+<meta name="theme-color" content="#f4efe6">
+<meta property="og:title" content="Workbench · OpenForge Lab">
+<meta property="og:description" content="One robot at a time: take it apart, watch it move, pass three lab missions, then build the real thing.">
+<meta property="og:image" content="assets/og.png">
+<link rel="icon" href="assets/favicon.svg">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/bench.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body class="bench app">
+<a class="skip" href="#stageList">Skip to the stages</a>
+<main class="bn" id="main">
+  <nav class="bn-shelf" aria-label="Robots on the bench">
+    <ul id="shelf"></ul>
+  </nav>
+
+  <section class="bn-plate" aria-labelledby="figTitle">
+    <header class="bn-head">
+      <p class="bn-fig" id="figNo">FIG. —</p>
+      <h1 id="figTitle">Workbench</h1>
+      <p class="bn-platform" id="platform"></p>
+      <p class="bn-caption" id="caption"></p>
+    </header>
+
+    <nav class="bn-stages" aria-label="Stages">
+      <ol id="stageList"></ol>
+    </nav>
+
+    <div class="bn-figure" id="figure">
+      <canvas id="plate" aria-hidden="true"></canvas>
+      <div class="bn-labels" id="labels"></div>
+      <div class="bn-phone" id="phoneFrame" hidden><span>Phone camera</span></div>
+      <p class="bn-nogl" id="noGL" hidden>The 3D figure needs WebGL, which this browser does not offer. Every stage, label, mission and the bill of materials still work as text.</p>
+      <button class="btn sm bn-motion" id="motionBtn" type="button" aria-pressed="false">Pause motion</button>
+      <noscript><p class="bn-nogl">The Workbench needs JavaScript.</p></noscript>
+    </div>
+
+    <ul class="bn-chips" id="chips" aria-label="Specs for this stage"></ul>
+
+    <section class="bn-panel" id="panel" aria-labelledby="panelTitle" hidden>
+      <h2 id="panelTitle"></h2>
+      <div id="panelBody"></div>
+    </section>
+
+    <footer class="bn-idea">
+      <p><b>The big idea:</b> <span id="idea"></span></p>
+      <p class="bn-swatches" aria-hidden="true"><span><i class="s-sensor"></i>sensor</span> <span><i class="s-brain"></i>brain</span> <span><i class="s-actuator"></i>actuator</span> <span><i class="s-power"></i>power</span></p>
+    </footer>
+  </section>
+  <p class="sr-only" id="status" role="status" aria-live="polite"></p>
+</main>
+<script type="module" src="js/bench/bench.js"></script>
+</body>
+</html>
