@@ -69,6 +69,22 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 > 1,024 OpenForge agents on Ethereum are the lab's members and its on-chain record. Allowlist 0.01 ETH · public 0.015 ETH · max 3 per wallet · CC0. No promise of returns.
 > Mint only on OpenSea: [link]
 
+## AR announcement (Week 3, Day 17; see docs/17)
+
+**X:** AX-1's twin, standing on my floor at real size (~23 cm). I said "forward 1 second" and it rolled. Then a box got in the way and it stopped. Free in the lab, Android Chrome + ARCore. Twin only, no real robot. [link]
+
+**X reply:** Honest status: this is the 3D twin. The AX-1 firmware is experimental and untested on hardware until our first build. Planned: the same voice commands for a real AX-1. iPhone gets a camera view (no floor anchoring, no obstacle sensing).
+
+**Instagram / TikTok:** Say it. The twin moves. / AX-1's 3D twin on my real floor, 23 cm tall, driven by voice: forward, turn left, spin. It stops when something is in the way, on phones with ARCore depth sensing. / Free in the lab, link in bio. Android Chrome for AR; iPhone gets a camera view. / This is the twin, not a real robot. AX-1 firmware: experimental, untested on hardware. Real AX-1 by voice: planned.
+
+**Discord (#announcements):** **AX-1 in your room (new, free, no wallet).** Open `ar.html` on your phone and AX-1 Rover's 3D twin stands on your floor at real size (about 23 cm). Drive it by voice: "forward 1 second", "turn left", "spin", "what do you see?".
+- Android Chrome, ARCore phone: anchored to your floor; on phones with the ARCore Depth API it stops for real obstacles.
+- iPhone: Safari has no WebXR AR, so you get a camera view: voice works, but no floor anchoring and no obstacle sensing.
+- Optional "Look around" finds 80 everyday object types on your phone; nothing leaves the phone. Speech recognition is your browser's service: Chrome may process audio on Google's servers.
+- It is the twin, not a robot. Planned: command a real AX-1 the same way. Tell us in `#phone-brain`: phone, browser, what worked, what broke.
+
+**Never say:** "your robot is in your room", "works on any phone", "it never hits anything", "the AI understands your room", "everything stays on your phone" (speech may not), or any mint/allowlist tie-in.
+
 ## Safety notice (pin everywhere)
 
 > The only official links are on [site]. We will never DM you first, never ask for your seed phrase, and never run "surprise mints". If in doubt, ask in #support.

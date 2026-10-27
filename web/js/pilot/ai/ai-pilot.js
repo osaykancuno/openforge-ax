@@ -22,10 +22,10 @@ const MAX_INPUT = 500;
 const MAX_MESSAGES = 60;
 
 /**
- * createAiPilot({ getLoop, getBodyKey, getMode, clock, getModel, autoRunTwin, onChange, createExecutor })
+ * createAiPilot({ getLoop, getBodyKey, getMode, clock, getModel, autoRunTwin, onChange, createExecutor, parse })
  * getModel() returns a model client ({ plan }) or null for the built-in parser. onChange(view) fires on every change.
  */
-export function createAiPilot({ getLoop, getBodyKey, getMode = () => "twin", clock, getModel = () => null, autoRunTwin = () => true, onChange = () => {}, createExecutor = createPlanExecutor }) {
+export function createAiPilot({ getLoop, getBodyKey, getMode = () => "twin", clock, getModel = () => null, autoRunTwin = () => true, onChange = () => {}, createExecutor = createPlanExecutor, parse = parseCommand }) {
   let state = "idle";
   let generation = 0; // bumped by every interruption, STOP and reset: older replies and results are dropped
   let ctrl = null; // AbortController of the current request and plan
@@ -139,7 +139,7 @@ export function createAiPilot({ getLoop, getBodyKey, getMode = () => "twin", clo
 
     if (!usable) {
       if (fallbackWhy) push({ role: "notice", text: fallbackWhy });
-      const g = parseCommand(clean, bodyKey, { userSpeed });
+      const g = parse(clean, bodyKey, { userSpeed }); // the built-in parser, or a wrapper with the same result shape (the AR page adds an obstacle filter)
       steps = g.steps;
       rejected = g.rejected;
       if (g.say) push({ role: "pilot", text: g.say });

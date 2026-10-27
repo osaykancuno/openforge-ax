@@ -1,5 +1,11 @@
-# ethers 6.17.0, three 0.160.0, @noble/hashes 1.8.0 (noble/utils.js imports ./crypto.js instead of @noble/hashes/crypto; copied from node_modules by scripts/build-web.mjs)
+# ethers 6.17.0, three 0.160.0, @noble/hashes 1.8.0, @mediapipe/tasks-vision 1.1.1 + EfficientDet-Lite0 int8 model (noble/utils.js imports ./crypto.js instead of @noble/hashes/crypto; the mediapipe bundles lose their sourceMappingURL line; copied from node_modules by scripts/build-web.mjs)
 b016b0c3898c78fd8156466eb1ff1f42c9df951c2f0d64c9bdf799fe745b0a6c  ethers.min.js
+e62ac94b276937b38bdfcfe4cde957cfb37619045603005bb3f528c843b8a624  mediapipe/LICENSE
+0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb  mediapipe/efficientdet_lite0.tflite
+d76d0de010ef953f59137bfcdf184f70bcd4906407f6d6a3991c27b287819a7f  mediapipe/vision_bundle.js
+511d58e8ddf332750cee5904c891fccad2e0eca88018de19e7bfcc920a8f656f  mediapipe/vision_bundle.mjs
+6522286aa32dd93eff17c3da002b0649516f87abfec7a80b5bfe5c9625caa5f8  mediapipe/wasm/vision_wasm_internal.js
+0e101a010e262ef8e78f22e3c95b60a9705fd06962753c9acd6356d9fb56b7bd  mediapipe/wasm/vision_wasm_internal.wasm
 6689ae1660e03864120a4a084010cd546a9f40b573482debf0d9e6a436703938  noble/_u64.js
 87bea3ec8d754506a254c1bd8a311d68e97893ab856a435556b6508025aabdd7  noble/crypto.js
 09d141f13fcf5156195cbab2624f8786ba1bccbbbb64dfa5f36b80bfbfbd628d  noble/sha3.js
@@ -15,5 +21,6 @@ b3c6128340eaa37e40a6a2f1b738e894c855239417d50959759b34a2b5e89f92  three/addons/p
 8f09315c0cec117a0ca2494d3e3586035b3c4323d6dcb037537cc51b04c3cdba  three/addons/postprocessing/UnrealBloomPass.js
 4e3346db194db56a596cd074e9bdb39fb5eb52040c333e0d29dc4eb1324d3b1d  three/addons/shaders/CopyShader.js
 3d841cc594a0c1767d1b0185720b32761a0133c5f1b70b56658e28f2fb9b7900  three/addons/shaders/LuminosityHighPassShader.js
+218d36598cd69923572b948c7ec953e085a6622b9ae8294759dd46cc31b3016e  three/addons/webxr/XREstimatedLight.js
 76dea8151bc9352aef3528b4262e249b2604f62543828328db978d060d61a495  three/three.module.js
 3e690ac7d180b0aadf0891bea39eec643e29e2d3e75c99b18689518665f69ba6  three/three.module.min.js

@@ -79,6 +79,21 @@ describe("Self-hosting server hardening", () => {
       expect(await policy("/index.html")).to.include("microphone=()");
       expect(await policy("/robot.html")).to.include("microphone=()");
     });
+    it("the AR page gets exactly web/_headers' policy (camera, microphone, WebXR); every other page keeps WebXR off", async () => {
+      const policy = (p) => new Promise((ok, fail) => { const s = http.createServer(serve.createHandler(null)); s.listen(0, "127.0.0.1", () => http.get({ port: s.address().port, path: p }, (res) => { res.resume(); res.on("end", () => s.close(() => ok(res.headers))); }).on("error", fail)); });
+      const headersFile = require("fs").readFileSync(require("path").join(__dirname, "..", "web", "_headers"), "utf8");
+      const wanted = headersFile.match(/^\/ar\.html\r?\n {2}! Permissions-Policy\r?\n {2}Permissions-Policy: (.+?)\r?$/m)[1];
+      expect((await policy("/ar.html"))["permissions-policy"]).to.equal(wanted);
+      expect(wanted).to.include("xr-spatial-tracking=(self)").and.include("camera=(self)").and.include("microphone=(self)");
+      expect((await policy("/index.html"))["permissions-policy"]).to.include("xr-spatial-tracking=()");
+      expect((await policy("/pilot.html"))["permissions-policy"]).to.include("xr-spatial-tracking=()");
+      expect((await policy("/vendor/mediapipe/wasm/vision_wasm_internal.wasm"))["content-type"]).to.equal("application/wasm"); // instantiateStreaming needs it
+      // the object finder's worker does not inherit ar.html's <meta> CSP: it gets web/_headers' own, network same-origin only
+      const workerCsp = headersFile.match(/^\/js\/ar\/vision\/detect-worker\.js\r?\n {2}Content-Security-Policy: (.+?)\r?$/m)[1];
+      expect(workerCsp).to.include("connect-src 'self'").and.include("default-src 'none'");
+      expect((await policy("/js/ar/vision/detect-worker.js"))["content-security-policy"]).to.equal(`frame-ancestors 'none'; ${workerCsp}`);
+      expect((await policy("/js/ar/ar.js"))["content-security-policy"]).to.equal("frame-ancestors 'none'");
+    });
     it("sends the hardening headers", async () => {
       const res = await get(null, { host: "localhost" });
       expect(res.headers["x-content-type-options"]).to.equal("nosniff");

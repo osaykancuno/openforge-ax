@@ -67,6 +67,7 @@ Secrets scan: PASS (repo and every commit clean, no key rotation needed). `npm a
 - **Market page**: sales are read only from `OrderFulfilled` events of the official Seaport 1.5/1.6 contracts, with the token's `Transfer` in the same receipt.
 - **Agent page**: wallet and proposal data are re-read through the wallet's own provider before signing; Top up shows the recipient, and approvals show the operator and limit.
 - **Verifier and servers**: malformed URLs answer 400 instead of crashing, atomic file writes, coarser rate limits (/48, /24), a fee cap with same-nonce replacement, request timeouts, and RPC URLs redacted in logs.
+- **AR page (`ar.html`)**: the only page with `'wasm-unsafe-eval'` and camera / XR permissions, `connect-src 'self'`. MediaPipe 1.1.1 always tries to post usage logs to a Google endpoint with no off switch; the detection worker and its main-thread fallback reject every off-site `fetch`, `XMLHttpRequest` and `importScripts` locally and remove `WebSocket`, `EventSource` and `sendBeacon` (tested). A worker does not inherit the page's `<meta>` CSP, so `detect-worker.js` gets its own header (`default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'`, in `web/_headers` and `serve.mjs`) as the second layer. Camera frames never leave the phone.
 - **Site build**: GitHub Actions pinned by commit SHA, vendored files checked with `sha256sum -c`, loopback CSP sources stripped from the published build, `site:check` fails on a loopback CSP or `fromBlock` 0 outside the local chain.
 
 ## Accepted risks (by design, disclosed)

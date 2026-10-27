@@ -16,11 +16,13 @@ const chainId = (() => { try { return JSON.parse(readFileSync(join(root, "deploy
 const HOST = process.env.HOST || (chainId === 31337 ? "127.0.0.1" : "");
 const guard = HOST && isLoopbackHost(HOST) ? hostsOf([process.env.PUBLIC_URL, process.env.SITE]) : null;
 const OVERRIDES = process.env.SITE_OVERRIDES ? JSON.parse(process.env.SITE_OVERRIDES) : null;
-const PILOT_POLICY = "bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()";
+const PILOT_POLICY = "bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=(), xr-spatial-tracking=()";
+const WORKER_CSP = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'";
+const AR_POLICY = "camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()";
 const TYPES = {
   ".webmanifest": "application/manifest+json",
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json",
-  ".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8",
+  ".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".wasm": "application/wasm", ".txt": "text/plain; charset=utf-8",
 };
 // Same headers as web/_headers (static hosts); pages also carry a CSP meta tag.
 const SECURITY = {
@@ -28,7 +30,7 @@ const SECURITY = {
   "X-Frame-Options": "DENY",
   "Content-Security-Policy": "frame-ancestors 'none'",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), serial=(), bluetooth=()",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), serial=(), bluetooth=(), xr-spatial-tracking=()",
 };
 
 /** True for any spelling of web/deployment.json that reaches the same file (case-insensitive volumes, a trailing dot or space, an NTFS stream). */
@@ -48,10 +50,12 @@ export const createHandler = (guard, rootDir = root, overrides = OVERRIDES) => a
       const real = await stat(join(rootDir, "deployment.json"), { bigint: true }).catch(() => null);
       if (isDeploymentName(p) || (real && st.ino && st.ino === real.ino && st.dev === real.dev)) body = JSON.stringify({ ...JSON.parse(body), ...overrides });
     }
-    // Robot Link needs Web Serial and the camera (film mode); Phone Brain needs camera, Bluetooth, the microphone and
-    // motion sensors; other pages keep them off
+    // Robot Link needs Web Serial and the camera (film mode); Phone Brain needs camera, Bluetooth and motion sensors; the AR page camera,
+    // microphone, motion sensors and WebXR; other pages keep them off
     const camera = p === "robot.html" ? { "Permissions-Policy": SECURITY["Permissions-Policy"].replace("camera=()", "camera=(self)").replace("serial=()", "serial=(self)") }
-      : p === "pilot.html" ? { "Permissions-Policy": PILOT_POLICY } : {};
+      : p === "pilot.html" ? { "Permissions-Policy": PILOT_POLICY } : p === "ar.html" ? { "Permissions-Policy": AR_POLICY }
+      // the object finder's worker does not inherit ar.html's <meta> policy: it gets its own (same as web/_headers)
+      : p.replace(/\\/g, "/").toLowerCase() === "js/ar/vision/detect-worker.js" ? { "Content-Security-Policy": `${SECURITY["Content-Security-Policy"]}; ${WORKER_CSP}` } : {};
     res.writeHead(200, { ...SECURITY, ...camera, "Content-Type": TYPES[extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
     res.end(body);
   } catch (e) {

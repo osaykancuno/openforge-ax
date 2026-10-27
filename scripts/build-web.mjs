@@ -85,13 +85,25 @@ for (const f of ["sha3.js", "_u64.js", "utils.js", "crypto.js"]) {
   const src = readFileSync(join(nm, "@noble/hashes/esm", f), "utf8").replace(/^\/\/# sourceMappingURL=.*\r?\n?/gm, "");
   writeFileSync(join(web, "vendor/noble", f), src.replace(/(["'])@noble\/hashes\/crypto\1/g, "$1./crypto.js$1"));
 }
+// the AR page's on-phone object detector (Apache-2.0), loaded only when the visitor turns on "Look around". Only the
+// SIMD build: every phone with Chrome AR has WebAssembly SIMD; without it the page says object finding is unavailable.
+// The model (efficientdet_lite0.tflite, int8, from storage.googleapis.com/mediapipe-models) is not on npm: it is
+// committed in web/vendor/mediapipe/ and checked here, so a swapped file fails the build.
+const MP = join(nm, "@mediapipe/tasks-vision");
+mkdirSync(join(web, "vendor/mediapipe/wasm"), { recursive: true });
+// vision_bundle.js (IIFE, global `Vision`) for the classic detection worker; vision_bundle.mjs for the main-thread fallback.
+// The source-map comment is dropped: the .map files are not shipped.
+for (const f of ["vision_bundle.js", "vision_bundle.mjs"]) writeFileSync(join(web, "vendor/mediapipe", f), readFileSync(join(MP, f), "utf8").replace(/^\/\/# sourceMappingURL=.*\r?\n?/gm, ""));
+for (const f of ["vision_wasm_internal.js", "vision_wasm_internal.wasm"]) copyFileSync(join(MP, "wasm", f), join(web, "vendor/mediapipe/wasm", f));
+const MODEL_SHA = "0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb";
+if (createHash("sha256").update(readFileSync(join(web, "vendor/mediapipe/efficientdet_lite0.tflite"))).digest("hex") !== MODEL_SHA) throw new Error("web/vendor/mediapipe/efficientdet_lite0.tflite is not the pinned EfficientDet-Lite0 int8 model");
 // Checksums of every vendored file, so a reviewer can compare them with the upstream packages (`sha256sum -c`).
 const vendorFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? vendorFiles(join(dir, e.name)) : e.name === "SHA256SUMS" ? [] : [join(dir, e.name)]));
 const vendorDir = join(web, "vendor");
 const versionOf = (pkg) => JSON.parse(readFileSync(join(nm, pkg, "package.json"), "utf8")).version;
 writeFileSync(
   join(vendorDir, "SHA256SUMS"),
-  `# ethers ${versionOf("ethers")}, three ${versionOf("three")}, @noble/hashes ${versionOf("@noble/hashes")} (noble/utils.js imports ./crypto.js instead of @noble/hashes/crypto; copied from node_modules by scripts/build-web.mjs)\n` +
+  `# ethers ${versionOf("ethers")}, three ${versionOf("three")}, @noble/hashes ${versionOf("@noble/hashes")}, @mediapipe/tasks-vision ${versionOf("@mediapipe/tasks-vision")} + EfficientDet-Lite0 int8 model (noble/utils.js imports ./crypto.js instead of @noble/hashes/crypto; the mediapipe bundles lose their sourceMappingURL line; copied from node_modules by scripts/build-web.mjs)\n` +
     vendorFiles(vendorDir)
       .map((f) => [f.slice(vendorDir.length + 1).replace(/\\/g, "/"), f])
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -116,6 +128,9 @@ try {
 } catch {} // no deployment yet: the demo setup
 const NARROW = {
   "pilot.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self' http://localhost:* http://127.0.0.1:*" /* Chrome rejects http://[::1]:* as a CSP source */ },
+  // the AR page holds the camera and the microphone: no remote anything. Its on-phone object detector (MediaPipe) is
+  // WebAssembly served from this site, which needs 'wasm-unsafe-eval' (wasm compilation only: eval() stays blocked)
+  "ar.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self'", script: "'wasm-unsafe-eval'" },
 };
 // Search and link previews: every page gets Open Graph / Twitter tags from its own <title> and description; the
 // absolute ones (canonical, og:url, og:image, sitemap) only when the site's address is known (SITE_URL, else
@@ -125,7 +140,7 @@ try {
 } catch {} // no .env: no site address
 const SITE = (process.env.SITE_URL || process.env.EXTERNAL_URL || "").trim().replace(/\/+$/, "");
 if (SITE && !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?$/i.test(SITE)) throw new Error(`SITE_URL must be a bare https:// origin, got ${SITE}`);
-const INDEXABLE = ["index", "bench", "pilot", "arena", "robot", "codex", "gallery", "market", "license"];
+const INDEXABLE = ["index", "bench", "pilot", "ar", "arena", "robot", "codex", "gallery", "market", "license"];
 const urlFor = (name) => (name === "index" ? `${SITE}/` : `${SITE}/${name}`); // Cloudflare Pages serves clean URLs
 const attr = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 function seoBlock(name, html) {
@@ -168,6 +183,7 @@ const EAGER = {
   "index.html": ["js/lab/lab-view.js"],
   "bench.html": ["js/bench/bench-view.js", "js/bench/motions.js", "js/bench/test-scenes.js"],
   "codex.html": ["js/codex/codex-view.js"], // the book attaches after the text page paints
+  "ar.html": ["js/ar/ar-view.js"], // imported before Start shows, so requestSession is the click's first await
   "pilot.html": ["js/pilot/ai/ai-pilot.js", "js/pilot/ai/ai-panel.js", "js/pilot/ai/voice.js"], // the AI Pilot panel loads when the controls open
 };
 function preloadBlock(html, page) {

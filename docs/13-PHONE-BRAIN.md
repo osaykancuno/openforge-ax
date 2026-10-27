@@ -281,6 +281,55 @@ model nothing leaves the page at all.
   `Permissions-Policy` token for it is set: the headers in `web/_headers` and `scripts/serve.mjs` are unchanged.
 - The turn is open loop (a timed spin), so the angle is approximate; there is no feedback from the robot.
 
+## 9b. AR twin ("AX-1 in your room")
+
+`ar.html` puts the AX-1 Rover **twin** (never the real robot) in your room at real size (~23 cm) and drives it by voice
+or chips through the same AI Pilot, built-in parser and drive loop as `pilot.html`. Model servers are not used here.
+
+**Modes.** The page probes the phone and picks one:
+
+| Mode | Where | What you get |
+|---|---|---|
+| **AR** | Android Chrome on ARCore phones (WebXR `immersive-ar`) | The twin anchored to the floor (hit-test, anchors, light estimation, shadow), obstacle sensing |
+| **Camera view** | iPhone and browsers without WebXR AR | The twin drawn over the live camera; not anchored to the floor, no obstacle sensing (the page says both) |
+| **Desktop** | No phone | "Open this on your phone" with the page address and a link to the 3D twin |
+
+**Safety.** The same rules as §9a, plus:
+
+- Only placing the Rover (a tap on the floor, or the **Place the Rover here** button for keyboard and screen-reader
+  users) or the **ARM** button arms it, and only from a real tap or key press. Voice, chips and object requests never arm.
+- STOP, Esc, voice "stop" (also "halt", "freeze", "brake", "abort"), the page going to the background, the page being
+  closed and the AR session ending all latch it; nothing resumes until ARM.
+- A blurred AR session, an obstacle ahead or the edge of the 3 m play area **hold** it: the wheels go to zero within
+  one tick, the plan ends, the Rover stays armed.
+- **Obstacles** (AR mode, phones with the ARCore Depth API): the phone's depth is read along the twin's forward
+  corridor (60 cm ahead, Rover width, 5–26 cm above the floor). Three frames with hits block forward drives ("Something is
+  in my way (about 30 cm ahead)."); turns and backing up still work; eight clear frames unblock. Without depth a forward
+  hit-test ray is used. When the corridor is out of view the chip says so and nothing is blocked.
+
+**Look around (optional, off by default).** Finds the 80 COCO object types (cup, chair, person, …) with MediaPipe
+Tasks Vision 1.1.1 and the EfficientDet-Lite0 int8 model, both self-hosted under `vendor/mediapipe/` (Apache 2.0, the
+model checked by sha256 at build). Turning it on downloads up to about 19 MB once (about 8 MB if the host compresses).
+Requests: "what do you see", "go to the cup", "find the cup", "avoid the chair". Trips re-plan at most 5 times within
+45 s and end when the Rover arrives, loses the object for 2 s, or you say anything else. Detection runs in a Web Worker
+on 320 px frames, at most twice a second and one frame at a time (measured on a desktop: 105–125 ms per frame in the
+worker, no main-thread task over 50 ms). If the worker cannot start it falls back to the main thread only while the Rover
+is not armed, and turns itself off when the phone is too slow.
+
+**Privacy.**
+
+- Camera pictures never leave the phone: detection is on the device, and `ar.html` has `connect-src 'self'`.
+- **MediaPipe telemetry is blocked.** MediaPipe 1.1.1 always starts a usage logger that posts to a Google logging
+  endpoint and has no setting to turn it off. The worker (and the fallback) reject every `fetch`, `XMLHttpRequest` and
+  `importScripts` to another origin locally, before the network, and remove `WebSocket`, `EventSource` and
+  `sendBeacon`; the worker's own CSP header (`connect-src 'self'`) blocks it a second time.
+- **Voice:** the browser's speech service turns your words into text. In Chrome the audio may be processed on Google's
+  servers; in Safari, Apple's. The page says so next to the mic.
+
+**Not verified yet.** Built and tested in desktop Chrome and with emulated phones only: no real ARCore phone or iPhone
+yet. To check on hardware: the depth-buffer convention, stalls during placement and detection, the mic prompt inside an
+AR session, select vs overlay taps, and the iPhone camera view. Thin, dark, glossy or moving obstacles are untested.
+
 ## 10. Limitations
 
 - **iOS:** Safari and every iOS browser engine lack Web Bluetooth. iPhone users drive the twin, or try a

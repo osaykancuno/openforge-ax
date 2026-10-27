@@ -23,6 +23,7 @@ export const PAGES = [
   { path: "bench.html#so101/test" },
   { path: "bench.html#ax1-desk/test" },
   { path: "pilot.html", click: "#startTwin" },
+  { path: "ar.html" }, // no click: the start card (or the desktop hint) must load with no permission prompt
   { path: "arena.html" },
   { path: "robot.html" },
   { path: "codex.html#1" },

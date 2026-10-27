@@ -1,0 +1,762 @@
+// AX-1 in your room: the view. WebXR (immersive-ar) on Android Chrome, a camera view with a virtual camera everywhere
+// else. It draws the Rover twin, finds the floor, reads the phone's depth for the obstacle tracker and reports what the
+// person did (tap, visibility, end). It decides nothing about driving: ar.js wires it to the controller, and the
+// controller owns every arming and stopping rule. This file never arms and never stops anything by itself.
+//
+// Nothing here uses innerHTML or the network. Labels are canvas textures drawn with fillText.
+import * as THREE from "three";
+import { XREstimatedLight } from "three/addons/webxr/XREstimatedLight.js";
+import { makeRenderer, makeStage, disposeObject, PALETTE } from "../models/look.js";
+import { buildRobot } from "../models/robots.js";
+import { composePose, faceToward } from "../pilot/twin-pose.js";
+import { corridorSamples, createObstacleTracker, evaluateDepth, evaluateRays } from "./obstacle.js";
+import { orientationQuat, relativeQuat } from "./orientation.js";
+
+export const CAMERA_VIEW = { fov: 60, pos: [0, 1.25, 1.3], look: [0, 0.1, 0], radius: 1.5 }; // the virtual camera of the camera view
+const DEPTH_MS = 66; // obstacle evaluation from the phone's depth: about 15 Hz
+const RAY_MS = 200; // hit-test ray fallback: 5 Hz
+const RAY_MOVE = 0.05; // m: the ray source is created again after the Rover moved this far...
+const RAY_TURN = (10 * Math.PI) / 180; // ...or turned this much
+const CAMERA_CB_MS = 100; // object finding looks at 10 Hz at most (the detector slows itself down further)
+const WARM_SCALE = 1e-4; // the Rover is drawn this small before it is placed, so its shaders are compiled before the drive loop runs
+const HIT_FRESH_MS = 400; // a tap places the Rover only if the floor was seen this recently
+const DEPTH_MISS_FRAMES = 45; // frames without a depth picture before the chip says sensing is off
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/**
+ * createArView({ canvas, video, overlay, handlers }) -> view. Throws when WebGL is missing (ar.js shows a message).
+ * handlers (all optional, set or replaced at any time through view.handlers):
+ *   frame(dt, rig) -> { x, z, yaw } | null   local pose of the Rover (and the place to move its joints and wheels)
+ *   place(info) -> false to refuse          info = { gesture: true, source: "xr" | "tap", x, y, z, yaw }
+ *   obstacle(update)                        tracker result { state, distanceM, message }
+ *   visibility(state)                       XR session visibility: "visible" | "visible-blurred" | "hidden"
+ *   ended(reason)                           the session or the camera view is over
+ *   hint(text | null)                       what to tell the person while they look for a floor
+ */
+export function createArView({ canvas, video, overlay, handlers = {} }) {
+  const renderer = makeRenderer(canvas, { alpha: true });
+  renderer.setClearColor(0x000000, 0);
+  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 1.5));
+  renderer.xr.setReferenceSpaceType("local");
+  renderer.xr.setFramebufferScaleFactor(0.8);
+
+  const scene = new THREE.Scene();
+  scene.background = null;
+  const stage = makeStage(scene, renderer, { size: 0.6, floor: false, background: null });
+  const key = stage.key;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.radius = 4;
+  const sc = key.shadow.camera;
+  sc.left = sc.bottom = -0.4;
+  sc.right = sc.top = 0.4;
+  sc.near = 0.1;
+  sc.far = 6;
+  sc.updateProjectionMatrix();
+  scene.add(key.target); // the key light follows the Rover: its target must live in the scene
+  const keyHome = key.intensity;
+  const hemiHome = stage.hemi.intensity;
+
+  const camera = new THREE.PerspectiveCamera(CAMERA_VIEW.fov, 1, 0.02, 30);
+  camera.position.fromArray(CAMERA_VIEW.pos);
+  camera.lookAt(...CAMERA_VIEW.look);
+  const baseQ = camera.quaternion.clone();
+
+  // the Rover: real size (metres), +Z toward the person, under a root that carries the placement
+  const placeRoot = new THREE.Group();
+  placeRoot.visible = false;
+  scene.add(placeRoot);
+  const rig = buildRobot("ax1-rover");
+  placeRoot.add(rig.group);
+
+  // a shadow catcher on the real floor: only the shadow is drawn, the camera picture shows through
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.ShadowMaterial({ opacity: 0.28 }));
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.receiveShadow = true;
+  shadow.visible = false;
+  scene.add(shadow);
+
+  // the reticle: where a tap would put the Rover (the Rover's footprint and a ring)
+  const reticle = new THREE.Group();
+  reticle.matrixAutoUpdate = false;
+  reticle.visible = false;
+  const ringMat = new THREE.MeshBasicMaterial({ color: PALETTE.accent, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.09, 0.105, 40).rotateX(-Math.PI / 2), ringMat);
+  const foot = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.113, 0.002, -0.085), new THREE.Vector3(0.113, 0.002, -0.085), new THREE.Vector3(0.113, 0.002, 0.075), new THREE.Vector3(-0.113, 0.002, 0.075)]),
+    new THREE.LineBasicMaterial({ color: PALETTE.ink, transparent: true, opacity: 0.8 }),
+  );
+  reticle.add(ring, foot);
+  scene.add(reticle);
+
+  // soft labels (objects found around the room)
+  const labelGroup = new THREE.Group();
+  scene.add(labelGroup);
+  const labels = new Map(); // id -> { sprite, text }
+
+  const tracker = createObstacleTracker();
+  const view = {
+    handlers,
+    renderer,
+    scene,
+    camera,
+    rig,
+    mode: null, // null | "xr" | "camera"
+    placed: false,
+    cameraAccess: false, // camera-access granted (object finding inside AR)
+    depthSensing: false, // the phone gave us CPU depth
+    orientationOn: false, // camera view follows the phone's turning
+    get floorY() {
+      return placeRoot.position.y;
+    },
+    /** world pose of the Rover { x, y, z, yaw } (placement composed with the local odometry pose) */
+    worldPose() {
+      const w = composePose({ x: placeRoot.position.x, y: placeRoot.position.y, z: placeRoot.position.z, yaw: placeRoot.rotation.y }, local);
+      return w;
+    },
+    onCameraFrame(cb) {
+      cameraCb = typeof cb === "function" ? cb : null;
+    },
+    setLabels,
+    placeHere,
+    startXr,
+    startCamera,
+    exit,
+    dispose,
+  };
+
+  let local = { x: 0, z: 0, yaw: 0 };
+  let cameraCb = null;
+  let session = null;
+  let refSpace = null;
+  let hitSource = null;
+  let xrLight = null;
+  let anchor = null;
+  let anchorOn = false;
+  let endReason = "";
+  let lastT = 0;
+  let lastDepthT = 0;
+  let lastCbT = 0;
+  let depthMisses = 0;
+  let offSent = false;
+  let hit = null; // { x, y, z, t } the latest floor the phone saw
+  let pending = null; // a placement waiting for the first drawn frame with the Rover visible
+  let hintText;
+  let stream = null;
+  let oriQ0 = null;
+  let oriLatest = null;
+  let oriListener = null;
+  let pageUp = null;
+  const cam = { x: 0, y: 0, z: 0 }; // the phone's position in the room (XR)
+  const ray = { src: null, pending: false, dist: [], x: 0, z: 0, yaw: 0, t: 0, failed: false };
+  const tmpM = new THREE.Matrix4();
+  const invProj = new Float32Array(16);
+  const invM = new THREE.Matrix4();
+  let overlayGuard = null;
+
+  const say = (t) => {
+    if (t === hintText) return;
+    hintText = t;
+    view.handlers.hint?.(t);
+  };
+
+  // ---------------------------------------------------------------- size
+  const resize = () => {
+    if (renderer.xr.isPresenting) return;
+    const w = canvas.clientWidth || 1;
+    const h = canvas.clientHeight || 1;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  };
+  const ro = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
+  ro?.observe(canvas);
+  resize();
+
+  // ---------------------------------------------------------------- shared frame work
+  function step(t) {
+    const dt = lastT ? Math.min(0.1, Math.max(0, (t - lastT) / 1000)) : 0;
+    lastT = t;
+    return dt;
+  }
+
+  function updateRig(dt, t) {
+    const p = view.handlers.frame?.(dt, rig);
+    if (p) {
+      local = p;
+      rig.group.position.set(p.x, 0, p.z);
+      rig.group.rotation.y = p.yaw;
+    }
+    rig.update?.(dt, t / 1000);
+    // the key light, its shadow box and the shadow catcher follow the Rover
+    const w = placeRoot.visible ? view.worldPose() : null;
+    if (w) {
+      shadow.position.set(w.x, w.y + 0.001, w.z);
+      key.target.position.set(w.x, w.y + 0.1, w.z);
+      key.position.set(w.x + keyDir.x * 1.2, w.y + keyDir.y * 1.2, w.z + keyDir.z * 1.2);
+      key.target.updateMatrixWorld();
+    }
+  }
+  const keyDir = new THREE.Vector3(0.3, 0.8, 0.45).normalize();
+
+  function sendObstacle(update) {
+    view.handlers.obstacle?.(update);
+  }
+  function sendOff(message) {
+    if (offSent) return;
+    offSent = true;
+    sendObstacle({ state: "off", distanceM: null, message });
+  }
+
+  function afterRender(t, extra) {
+    if (pending) {
+      const info = pending;
+      pending = null;
+      const ok = view.handlers.place?.(info);
+      if (ok === false) unplace();
+      else {
+        view.placed = true;
+        tracker.reset();
+        offSent = false;
+        depthMisses = 0;
+        say(null);
+      }
+    }
+    if (cameraCb && t - lastCbT >= CAMERA_CB_MS) {
+      lastCbT = t;
+      try {
+        cameraCb({ kind: view.mode === "xr" ? "xr" : "video", t, video, ...extra, view });
+      } catch {} // object finding never breaks the picture
+    }
+  }
+
+  function unplace() {
+    view.placed = false;
+    pending = null;
+    shadow.visible = false;
+    dropAnchor();
+    placeRoot.visible = view.mode === "camera" || view.mode === "xr"; // in AR it waits at a tiny size (see WARM_SCALE)
+    placeRoot.scale.setScalar(view.mode === "xr" ? WARM_SCALE : 1);
+    tracker.reset();
+  }
+
+  // ---------------------------------------------------------------- WebXR
+  async function startXr({ wantObjects = false } = {}) {
+    if (session || view.mode) throw new Error("AR is already running");
+    const init = {
+      requiredFeatures: ["hit-test"],
+      optionalFeatures: ["dom-overlay", "light-estimation", "depth-sensing", "anchors", ...(wantObjects ? ["camera-access"] : [])],
+      domOverlay: { root: overlay },
+      depthSensing: { usagePreference: ["cpu-optimized", "gpu-optimized"], dataFormatPreference: ["luminance-alpha", "float32"] },
+    };
+    // requestSession is the first await: the browser needs the tap that started it
+    const s = await navigator.xr.requestSession("immersive-ar", init);
+    session = s;
+    endReason = "";
+    const on = (s.enabledFeatures || []).slice();
+    view.cameraAccess = on.includes("camera-access");
+    anchorOn = on.includes("anchors");
+    view.depthSensing = s.depthUsage === "cpu-optimized";
+    try {
+      if (on.includes("light-estimation")) {
+        // SH light and a directional light only (no environment cube: swapping the environment would recompile shaders mid-drive)
+        xrLight = new XREstimatedLight(renderer, false);
+        xrLight.addEventListener("estimationstart", () => {
+          estimating = true;
+          stage.hemi.intensity = hemiHome * 0.35;
+        });
+        xrLight.addEventListener("estimationend", () => {
+          estimating = false;
+          stage.hemi.intensity = hemiHome;
+          key.intensity = keyHome;
+          keyDir.set(0.3, 0.8, 0.45).normalize();
+        });
+        scene.add(xrLight); // present from the start (intensity 0): lights never change count while driving
+      }
+      s.addEventListener("end", onXrEnd);
+      s.addEventListener("select", onSelect);
+      s.addEventListener("visibilitychange", () => view.handlers.visibility?.(s.visibilityState));
+      overlayGuard = (e) => e.target?.closest?.("button, a, input, label, .ar-panel") && e.preventDefault(); // a tap on a control never places
+      overlay.addEventListener("beforexrselect", overlayGuard);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType("local");
+      await renderer.xr.setSession(s);
+      refSpace = renderer.xr.getReferenceSpace();
+      const viewer = await s.requestReferenceSpace("viewer");
+      hitSource = await s.requestHitTestSource({ space: viewer });
+      if (!session) throw new Error("AR closed before it started"); // the person left while the floor finder started
+    } catch (e) {
+      s.removeEventListener("end", onXrEnd); // the caller reports the failure itself
+      s.end().catch(() => {});
+      cleanupXr();
+      throw e;
+    }
+    view.mode = "xr";
+    video.hidden = true;
+    unplace();
+    placeRoot.visible = true; // drawn at a tiny size: shaders compile now, not when the Rover is placed
+    placeRoot.scale.setScalar(WARM_SCALE);
+    const warmLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture("·"), transparent: true, depthTest: false, depthWrite: false }));
+    warmLabel.scale.setScalar(WARM_SCALE);
+    labelGroup.add(warmLabel); // the labels' shader compiles now too, not at the first object found mid-drive
+    try {
+      renderer.compile(scene, camera);
+    } catch {}
+    labelGroup.remove(warmLabel);
+    warmLabel.material.map?.dispose();
+    warmLabel.material.dispose();
+    lastT = 0;
+    renderer.setAnimationLoop(onXrFrame);
+    say("Move your phone slowly to find the floor.");
+    return { cameraAccess: view.cameraAccess, depth: view.depthSensing, anchors: anchorOn, lightEstimation: Boolean(xrLight), gl: renderer.getContext(), session: s };
+  }
+
+  let estimating = false;
+
+  function onXrEnd() {
+    const reason = endReason || "AR closed";
+    cleanupXr();
+    view.handlers.ended?.(reason);
+  }
+
+  function cleanupXr() {
+    renderer.setAnimationLoop(null);
+    try {
+      hitSource?.cancel();
+      ray.src?.cancel();
+    } catch {}
+    hitSource = null;
+    ray.src = null;
+    ray.pending = false;
+    ray.failed = false;
+    dropAnchor();
+    if (overlayGuard) overlay.removeEventListener("beforexrselect", overlayGuard);
+    overlayGuard = null;
+    if (xrLight) {
+      scene.remove(xrLight);
+      xrLight.dispose?.();
+      xrLight = null;
+    }
+    estimating = false;
+    stage.hemi.intensity = hemiHome;
+    key.intensity = keyHome;
+    renderer.xr.enabled = false;
+    session = null;
+    refSpace = null;
+    hit = null;
+    reticle.visible = false;
+    view.mode = view.mode === "xr" ? null : view.mode;
+    view.cameraAccess = false;
+    view.depthSensing = false;
+    unplace();
+    placeRoot.visible = false;
+    placeRoot.scale.setScalar(1);
+    say(null);
+  }
+
+  function updateHit(frame, t) {
+    let shown = false;
+    const results = hitSource ? frame.getHitTestResults(hitSource) : [];
+    const pose = results.length ? results[0].getPose(refSpace) : null;
+    if (pose) {
+      const m = pose.transform.matrix;
+      if (m[5] > 0.8) {
+        // only floors and tables: the plane's up axis points up
+        reticle.matrix.fromArray(m);
+        reticle.matrixWorldNeedsUpdate = true;
+        hit = { x: m[12], y: m[13], z: m[14], t: globalThis.performance?.now?.() ?? t };
+        shown = true;
+      }
+    }
+    reticle.visible = shown;
+    if (!view.placed && !pending) {
+      if (shown) {
+        say("Tap to put the Rover here.");
+        // keep the warm-up Rover next to the reticle (it is invisible at this size)
+        placeRoot.position.set(hit.x, hit.y, hit.z);
+      } else say("Move your phone slowly to find the floor.");
+    }
+  }
+
+  function updateAnchor(frame) {
+    if (!anchor || !refSpace) return;
+    if (!frame.trackedAnchors || !frame.trackedAnchors.has(anchor)) return;
+    const p = frame.getPose(anchor.anchorSpace, refSpace);
+    if (p) placeRoot.position.set(p.transform.position.x, p.transform.position.y, p.transform.position.z);
+  }
+
+  function updateLight() {
+    if (!estimating || !xrLight) return;
+    const d = xrLight.directionalLight;
+    if (!d) return;
+    const dir = d.position;
+    if (dir.lengthSq() > 1e-6) {
+      keyDir.copy(dir).normalize();
+      keyDir.y = Math.max(keyDir.y, 0.35); // a low sun would throw a shadow metres long
+      keyDir.normalize();
+    }
+    key.color.copy(d.color);
+    key.intensity = Math.min(1.5, Math.max(0.3, d.intensity * 0.4)); // the estimate's own light adds the rest
+  }
+
+  function onSelect(e) {
+    const now = globalThis.performance?.now?.() ?? 0;
+    if (!hit || now - hit.t > HIT_FRESH_MS) {
+      say("I can't see the floor there. Move your phone slowly and tap again.");
+      return;
+    }
+    const yaw = faceToward({ x: hit.x, z: hit.z }, { x: cam.x, z: cam.z });
+    const info = { gesture: true, source: "xr", x: hit.x, y: hit.y, z: hit.z, yaw };
+    if (view.placed) {
+      // placing again: ask first, move only if the controller agrees
+      if (view.handlers.place?.(info) === false) return;
+      moveTo(info);
+      tracker.reset();
+      makeAnchor(e, info);
+      return;
+    }
+    // the first placement: show the Rover now, tell the controller after the first frame that drew it
+    moveTo(info);
+    pending = info;
+    makeAnchor(e, info);
+  }
+
+  /** Pins the placement to the real room, so it stays put while the phone refines its map. Needs the tap's frame. */
+  function makeAnchor(e, info) {
+    dropAnchor();
+    if (!anchorOn || !e.frame?.createAnchor) return;
+    try {
+      e.frame
+        .createAnchor(new XRRigidTransform({ x: info.x, y: info.y, z: info.z }, { x: 0, y: 0, z: 0, w: 1 }), refSpace)
+        .then((a) => {
+          if (!session || !(view.placed || pending)) return void a.delete();
+          dropAnchor();
+          anchor = a;
+        })
+        .catch(() => {});
+    } catch {}
+  }
+
+  function dropAnchor() {
+    try {
+      anchor?.delete();
+    } catch {}
+    anchor = null;
+  }
+
+  function moveTo(info) {
+    placeRoot.position.set(info.x, info.y, info.z);
+    placeRoot.rotation.y = info.yaw;
+    placeRoot.scale.setScalar(1);
+    placeRoot.visible = true;
+    shadow.visible = true;
+    reticle.visible = true;
+  }
+
+  function onXrFrame(t, frame) {
+    if (!frame || !session || !refSpace) return;
+    const dt = step(t);
+    const vp = frame.getViewerPose(refSpace);
+    if (vp) {
+      const p = vp.transform.position;
+      cam.x = p.x;
+      cam.y = p.y;
+      cam.z = p.z;
+    }
+    updateHit(frame, t);
+    updateAnchor(frame);
+    updateLight();
+    updateRig(dt, t);
+    if (view.placed) sense(frame, vp, t);
+    renderer.render(scene, camera);
+    afterRender(t, { frame, session, gl: renderer.getContext(), pose: vp, floorY: placeRoot.position.y, space: refSpace });
+  }
+
+  // ---------------------------------------------------------------- obstacle sensing (depth, or a hit-test ray)
+  function sense(frame, vp, t) {
+    const v = vp && vp.views && vp.views[0];
+    if (!v) return;
+    if (view.depthSensing) return senseDepth(frame, v, t);
+    senseRay(frame, t);
+  }
+
+  function senseDepth(frame, v, t) {
+    if (t - lastDepthT < DEPTH_MS) return;
+    let di = null;
+    try {
+      di = frame.getDepthInformation(v);
+    } catch {}
+    if (!di) {
+      if (++depthMisses > DEPTH_MISS_FRAMES) sendOff("Obstacle sensing is waiting for the phone's depth picture.");
+      return;
+    }
+    lastDepthT = t;
+    depthMisses = 0;
+    offSent = false;
+    invM.fromArray(v.projectionMatrix).invert().toArray(invProj);
+    const world = view.worldPose();
+    const floorY = placeRoot.position.y;
+    const res = evaluateDepth({
+      samples: corridorSamples(world, { floorY }),
+      getDepth: (u, w) => {
+        const d = di.getDepthInMeters(clamp01(u), clamp01(w));
+        return d > 0 && Number.isFinite(d) ? d : 0;
+      },
+      worldToView: v.transform.inverse.matrix,
+      viewToWorld: v.transform.matrix,
+      proj: v.projectionMatrix,
+      invProj,
+      worldPose: world,
+      floorY,
+    });
+    sendObstacle(tracker.update({ hits: res.hits, nearestM: res.nearestM, visibleFrac: res.visibleFrac, source: "depth" }));
+  }
+
+  function senseRay(frame, t) {
+    if (ray.failed) return sendOff("Obstacle sensing is not available on this phone.");
+    const w = view.worldPose();
+    const moved = Math.hypot(w.x - ray.x, w.z - ray.z) > RAY_MOVE || Math.abs(Math.atan2(Math.sin(w.yaw - ray.yaw), Math.cos(w.yaw - ray.yaw))) > RAY_TURN;
+    if ((moved || !ray.src) && !ray.pending && session && t - ray.t >= RAY_MS) {
+      ray.t = t;
+      ray.pending = true;
+      ray.x = w.x;
+      ray.z = w.z;
+      ray.yaw = w.yaw;
+      const y = placeRoot.position.y + 0.1;
+      try {
+        const offsetRay = new XRRay({ x: w.x, y, z: w.z, w: 1 }, { x: Math.sin(w.yaw), y: 0, z: Math.cos(w.yaw), w: 0 });
+        const s = session;
+        s.requestHitTestSource({ space: refSpace, offsetRay })
+          .then((src) => {
+            ray.pending = false;
+            if (session !== s) return void src.cancel();
+            try {
+              ray.src?.cancel();
+            } catch {}
+            ray.src = src;
+          })
+          .catch(() => {
+            ray.pending = false;
+            ray.failed = true;
+          });
+      } catch {
+        ray.pending = false;
+        ray.failed = true;
+      }
+    }
+    if (!ray.src) return;
+    const results = frame.getHitTestResults(ray.src);
+    ray.dist.length = 0;
+    for (const r of results) {
+      const p = r.getPose(refSpace);
+      if (!p) continue;
+      const d = Math.hypot(p.transform.position.x - ray.x, p.transform.position.z - ray.z);
+      ray.dist.push(d); // evaluateRays keeps only what is inside the look-ahead
+    }
+    if (t - lastDepthT < RAY_MS) return;
+    lastDepthT = t;
+    offSent = false;
+    const res = evaluateRays(ray.dist.slice());
+    sendObstacle(tracker.update({ hits: res.hits, nearestM: res.nearestM, visibleFrac: res.visibleFrac, source: "rays" }));
+  }
+
+  // ---------------------------------------------------------------- camera view (no WebXR AR: iPhone, desktop browsers)
+  /**
+   * startCamera({ orientation }) opens the back camera behind the canvas. Call it in the tap that starts the view, and
+   * request the motion permission in that same tap before any await; pass that promise as `orientation`.
+   * Resolves { orientation: boolean } (true when the view follows the phone's turning).
+   */
+  async function startCamera({ orientation = null } = {}) {
+    if (session || view.mode) throw new Error("The camera view is already running");
+    // getUserMedia is the first call (still inside the tap)
+    const gum = navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    let granted = null;
+    try {
+      stream = await gum;
+      granted = orientation ? await Promise.resolve(orientation).catch(() => "denied") : null;
+      if (document.hidden) throw new Error("The page went to the background before the camera opened");
+    } catch (e) {
+      if (stream) stopTracks();
+      throw e;
+    }
+    video.srcObject = stream;
+    video.muted = true;
+    video.hidden = false;
+    try {
+      await video.play();
+    } catch {} // a blocked autoplay shows a still first picture; the view still works
+    view.mode = "camera";
+    endReason = "";
+    camera.position.fromArray(CAMERA_VIEW.pos);
+    camera.quaternion.copy(baseQ);
+    view.orientationOn = granted === "granted" || granted === true;
+    oriQ0 = null;
+    oriLatest = null;
+    if (view.orientationOn) {
+      oriListener = (e) => {
+        if (e.alpha == null && e.beta == null && e.gamma == null) return;
+        oriLatest = { a: e.alpha || 0, b: e.beta || 0, g: e.gamma || 0 };
+      };
+      addEventListener("deviceorientation", oriListener);
+    }
+    placeRoot.position.set(0, 0, 0);
+    placeRoot.rotation.y = faceToward({ x: 0, z: 0 }, { x: CAMERA_VIEW.pos[0], z: CAMERA_VIEW.pos[2] });
+    placeRoot.scale.setScalar(1);
+    placeRoot.visible = true;
+    shadow.visible = true;
+    view.placed = false;
+    resize();
+    try {
+      renderer.compile(scene, camera);
+    } catch {}
+    canvas.addEventListener("click", onCanvasTap);
+    pageUp = () => {
+      if (document.hidden) exit("Camera paused");
+    };
+    document.addEventListener("visibilitychange", pageUp);
+    lastT = 0;
+    renderer.setAnimationLoop(onCameraFrame);
+    say("Tap anywhere to put the Rover down.");
+    return { orientation: view.orientationOn };
+  }
+
+  /**
+   * The "Place the Rover here" button (keyboard, switch and screen-reader users): the same as a tap at the reticle in AR
+   * (without an anchor: a button click has no XR frame) or on the picture in the camera view.
+   */
+  function placeHere() {
+    if (view.mode === "xr") onSelect({});
+    else if (view.mode === "camera") onCanvasTap();
+  }
+
+  function onCanvasTap(e) {
+    if (view.mode !== "camera" || (e && e.isTrusted === false)) return; // a scripted click is not a person's tap
+    const info = { gesture: true, source: "tap", x: 0, y: 0, z: 0, yaw: placeRoot.rotation.y };
+    if (view.placed) {
+      if (view.handlers.place?.(info) !== false) tracker.reset();
+      return;
+    }
+    pending = info;
+  }
+
+  function onCameraFrame(t) {
+    if (view.mode !== "camera") return;
+    const dt = step(t);
+    if (oriLatest) {
+      const sa = globalThis.screen?.orientation?.angle ?? globalThis.orientation ?? 0;
+      const q = orientationQuat(oriLatest.a, oriLatest.b, oriLatest.g, sa);
+      if (!oriQ0) oriQ0 = q;
+      const r = relativeQuat(oriQ0, q);
+      camera.quaternion.copy(baseQ).multiply(tmpQ.set(r[0], r[1], r[2], r[3]));
+    }
+    updateRig(dt, t);
+    renderer.render(scene, camera);
+    afterRender(t, {});
+  }
+  const tmpQ = new THREE.Quaternion();
+
+  function stopTracks() {
+    try {
+      stream?.getTracks().forEach((tr) => tr.stop());
+    } catch {}
+    stream = null;
+    video.srcObject = null;
+    video.hidden = true;
+  }
+
+  function cleanupCamera() {
+    renderer.setAnimationLoop(null);
+    stopTracks();
+    canvas.removeEventListener("click", onCanvasTap);
+    if (oriListener) removeEventListener("deviceorientation", oriListener);
+    oriListener = null;
+    if (pageUp) document.removeEventListener("visibilitychange", pageUp);
+    pageUp = null;
+    oriLatest = null;
+    oriQ0 = null;
+    view.orientationOn = false;
+    view.mode = null;
+    unplace();
+    placeRoot.visible = false;
+    say(null);
+  }
+
+  // ---------------------------------------------------------------- leave
+  /** Ends AR or the camera view (the camera tracks stop here). Safe to call twice. */
+  function exit(reason = "Closed") {
+    if (session) {
+      endReason = reason;
+      session.end().catch(() => {}); // the "end" event does the rest and calls handlers.ended
+      return;
+    }
+    if (view.mode === "camera") {
+      cleanupCamera();
+      view.handlers.ended?.(reason);
+    }
+  }
+
+  // ---------------------------------------------------------------- labels
+  function labelTexture(text) {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 64;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgba(251, 248, 242, 0.94)";
+    g.strokeStyle = "rgba(35, 33, 30, 0.8)";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.roundRect ? g.roundRect(3, 3, 250, 58, 14) : g.rect(3, 3, 250, 58);
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#23211e";
+    g.font = "600 28px Inter, system-ui, sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(text, 128, 33, 232);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  /** setLabels([{ id, text, x, y, z }]): soft paper labels at room positions (metres). An empty list clears them. */
+  function setLabels(list) {
+    const next = new Set();
+    for (const item of Array.isArray(list) ? list.slice(0, 8) : []) {
+      const id = String(item.id);
+      const text = String(item.text ?? "").replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, "").slice(0, 28);
+      if (!text || ![item.x, item.y, item.z].every(Number.isFinite)) continue;
+      next.add(id);
+      let rec = labels.get(id);
+      if (!rec || rec.text !== text) {
+        if (rec) disposeLabel(rec);
+        const mat = new THREE.SpriteMaterial({ map: labelTexture(text), transparent: true, depthTest: false, depthWrite: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.2, 0.05, 1);
+        sprite.renderOrder = 20;
+        labelGroup.add(sprite);
+        rec = { sprite, text };
+        labels.set(id, rec);
+      }
+      rec.sprite.position.set(item.x, item.y, item.z);
+    }
+    for (const [id, rec] of labels) {
+      if (next.has(id)) continue;
+      disposeLabel(rec);
+      labels.delete(id);
+    }
+  }
+  function disposeLabel(rec) {
+    labelGroup.remove(rec.sprite);
+    rec.sprite.material.map?.dispose();
+    rec.sprite.material.dispose();
+  }
+
+  function dispose() {
+    exit("Closed");
+    setLabels([]);
+    ro?.disconnect();
+    disposeObject(placeRoot);
+    renderer.dispose();
+  }
+
+  return view;
+}

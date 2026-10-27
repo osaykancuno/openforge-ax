@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AX-1 in your room · OpenForge AX</title>
+<meta name="description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with your voice. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
+<meta name="theme-color" content="#f4efe6">
+<link rel="icon" href="assets/pilot-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/pilot-192.png">
+<script src="js/theme-boot.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pilot.css">
+<link rel="stylesheet" href="css/ar.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.min.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+<!--preload-->
+<link rel="preload" as="fetch" crossorigin href="deployment.json">
+<link rel="modulepreload" href="js/ar/ar.js">
+<link rel="modulepreload" href="js/ar/ar-view.js">
+<link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/pilot/ai/tools.js">
+<link rel="modulepreload" href="js/pilot/ai/voice.js">
+<link rel="modulepreload" href="js/pilot/twin-transport.js">
+<link rel="modulepreload" href="js/pilot/ax-proto.js">
+<link rel="modulepreload" href="js/pilot/drive-loop.js">
+<link rel="modulepreload" href="js/pilot/twin-pose.js">
+<link rel="modulepreload" href="js/pilot/sensors.js">
+<link rel="modulepreload" href="js/pilot/ui.js">
+<link rel="modulepreload" href="js/ar/ar-caps.js">
+<link rel="modulepreload" href="js/ar/ar-controller.js">
+<link rel="modulepreload" href="js/ar/chips.js">
+<link rel="modulepreload" href="js/ar/seek.js">
+<link rel="modulepreload" href="js/ar/vision/detector.js">
+<link rel="modulepreload" href="js/ar/vision/vision-intents.js">
+<link rel="modulepreload" href="js/ar/vision/xr-camera.js">
+<link rel="modulepreload" href="js/ar/vision/world-objects.js">
+<link rel="modulepreload" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" href="vendor/three/addons/webxr/XREstimatedLight.js">
+<link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" href="js/ar/obstacle.js">
+<link rel="modulepreload" href="js/ar/orientation.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/audio-buttons.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="js/pilot/motions.js">
+<link rel="modulepreload" href="js/pilot/bridge-sim.js">
+<link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
+<link rel="modulepreload" href="js/ar/ar-parse.js">
+<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="modulepreload" href="js/robot/sts-bus.js">
+<link rel="modulepreload" href="js/pilot/ai/grammar.js">
+<link rel="modulepreload" href="js/pilot/ai/prompt.js">
+<link rel="modulepreload" href="js/pilot/ai/executor.js">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<!--/preload-->
+<!--seo-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenForge AX">
+<meta property="og:title" content="AX-1 in your room · OpenForge AX">
+<meta property="og:description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with your voice. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
+<meta name="twitter:card" content="summary_large_image">
+<!--/seo-->
+</head>
+<body class="pilot ar">
+<main class="ar-app" id="arApp" aria-labelledby="arTitle">
+  <video id="arVideo" class="ar-video" playsinline muted hidden aria-hidden="true" tabindex="-1"></video>
+  <canvas id="arCanvas" class="ar-canvas" role="img" aria-label="The AX-1 Rover twin, drawn over your camera picture"></canvas>
+
+  <!-- the dom-overlay root: in AR only this element stays on screen, so EVERY control lives inside it -->
+  <div id="arOverlay" class="ar-overlay">
+    <noscript><p class="ar-panel ar-noscript">AX-1 in your room needs JavaScript. <a href="index.html">Back to the lab</a>.</p></noscript>
+
+    <header class="ar-top" id="arTop" hidden>
+      <span class="pl-chip ar-twin" id="arTwin" data-tone="live" title="A digital twin: nothing here is a real robot">TWIN</span>
+      <span class="pl-chip" id="arLink" role="status" aria-live="polite">offline</span>
+      <span class="pl-chip" id="arObstacle" data-tone="">Obstacle sensing: waiting</span>
+      <span class="pl-chip" id="arLookChip" role="status" aria-live="polite" hidden></span>
+      <button class="pl-btn sm" id="arLookBtn" type="button" aria-pressed="false" hidden>Look around</button>
+      <button class="pl-btn sm ar-exit" id="arExit" type="button">Exit</button>
+    </header>
+
+    <!-- first in the tab order after the top bar; the grid draws it at the bottom, in thumb reach -->
+    <button class="ar-stop" id="arStop" type="button" aria-keyshortcuts="Escape" hidden><span>STOP</span><small aria-hidden="true">Esc</small></button>
+
+    <!-- what changed, for screen readers: always rendered, only the text changes -->
+    <p class="sr-only" id="arAnnounce" role="status" aria-live="polite"></p>
+    <p class="sr-only" id="arAlert" role="alert"></p>
+
+    <p class="ar-banner ar-panel" id="arBanner" hidden></p>
+
+    <!-- start card (before AR or the camera view begins) -->
+    <section class="ar-panel ar-start" id="arStart" aria-labelledby="arTitle" hidden>
+      <p class="pl-label">FIG. 01 · <b>The twin, in your room</b></p>
+      <h1 id="arTitle">AX-1 in your room</h1>
+      <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then tell it what to do. It is not a real robot.</p>
+      <ol class="ar-steps">
+        <li>Allow the camera when asked.</li>
+        <li>Point at the floor, then tap to put the Rover down.</li>
+        <li>Press the mic and say <span class="pl-mono">forward</span>, <span class="pl-mono">turn left</span> or <span class="pl-mono">spin</span>.</li>
+      </ol>
+      <label class="pl-check ar-look"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
+      <p class="pl-small" id="arLookNote">Off by default. Turning it on downloads the object-finding model once (up to about 19 MB) and runs it on your phone. Nothing leaves the phone.</p>
+      <p class="pl-small" id="arVoiceNote">Voice: your browser's speech service turns your words into text. In Chrome the audio may be processed on Google's servers; in Safari, Apple's. Camera pictures never leave this phone.</p>
+      <div class="pl-row pl-wrap">
+        <button class="pl-btn pl-primary" id="arStartBtn" type="button">Start</button>
+        <button class="pl-btn" id="arVoiceBtn" type="button" hidden>Enable voice</button>
+      </div>
+      <p class="pl-msg" id="arStartMsg" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- desktop and no-camera hint -->
+    <section class="ar-panel ar-desktop" id="arDesktop" aria-labelledby="arDesktopTitle" hidden>
+      <p class="pl-label">FIG. 01 · <b>Best on a phone</b></p>
+      <h1 id="arDesktopTitle">Open this on your phone</h1>
+      <p class="pl-lead" id="arDesktopWhy">AX-1 in your room uses your phone's camera. Open this page on your phone:</p>
+      <p class="pl-mono ar-url" id="arUrl"></p>
+      <p class="pl-small">No phone nearby? Drive the same Rover in the <a href="pilot.html">3D twin</a>.</p>
+    </section>
+
+    <!-- placing: aim at the floor and tap -->
+    <p class="ar-hint ar-panel" id="arHint" role="status" aria-live="polite" hidden></p>
+
+    <!-- driving: transcript, plan, mic, chips -->
+    <section class="ar-hud" id="arHud" aria-label="Drive the twin" hidden>
+      <div class="ar-panel ar-talk">
+        <p class="ar-heard" id="arHeard" role="status" aria-live="polite"></p>
+        <div class="ar-plan" id="arPlan" role="status" aria-live="polite" aria-atomic="false"></div>
+      </div>
+      <div class="ar-panel ar-mic">
+        <div class="pl-row ar-mic-row">
+          <button class="pl-btn pl-primary" id="arPlaceBtn" type="button" hidden>Place the Rover here</button>
+          <button class="pl-btn pl-primary ar-micbtn" id="arMic" type="button" aria-pressed="false"><span aria-hidden="true" class="ar-micdot"></span><span id="arMicText">Tap to talk</span></button>
+          <button class="pl-btn ar-armbtn" id="arArm" type="button" disabled>ARM</button>
+        </div>
+        <p class="pl-small ar-privacy" id="arPrivacy">Your browser's speech service hears this (Google in Chrome, Apple in Safari). Camera pictures stay on this phone.</p>
+        <div class="ar-chips" id="arChips" role="group" aria-label="Quick commands"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+<script type="module" src="js/ar/ar.js"></script>
+</body>
+</html>

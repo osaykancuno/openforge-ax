@@ -8,20 +8,28 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), serial=(), bluetooth=()
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), serial=(), bluetooth=(), xr-spatial-tracking=()
+/js/ar/vision/detect-worker.js
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'
+/ar.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
+/ar
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
 /robot.html
   ! Permissions-Policy
-  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=(), xr-spatial-tracking=()
 /pilot.html
   ! Permissions-Policy
-  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=(), xr-spatial-tracking=()
 /pilot
   ! Permissions-Policy
-  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=(), xr-spatial-tracking=()
 /robot
   ! Permissions-Policy
-  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
-# voice input (SpeechRecognition) needs the microphone: only on the Phone Brain page
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=(), xr-spatial-tracking=()
+# voice input (SpeechRecognition) needs the microphone: only on the Phone Brain and AR pages; AR (WebXR) only on /ar
 # the free *.pages.dev address is a preview: never indexed by search engines (the custom domain is not affected)
 https://:project.pages.dev/*
   X-Robots-Tag: noindex

@@ -11,6 +11,7 @@ import { bleSupported, createBleTransport } from "./ble-transport.js";
 import { capabilities, createWakeLock, startCamera, startTilt } from "./sensors.js";
 import { $, chip, dpad, el, joystick, renderCaps, slider } from "./ui.js";
 import { GESTURES, POSES } from "./motions.js";
+import { applyTwinState } from "./twin-pose.js";
 import { loadConfig, renderChrome } from "../chain.js";
 // The AI Pilot (ai/*, about 27 KB gz) loads when the controls open (see mountAi), not with the capability screen.
 
@@ -127,8 +128,6 @@ function setRig(key) {
   view.target.set(0, view.lookY, 0);
 }
 
-const VMAX = 0.35; // m/s at full wheel output
-const TRACK = 0.2; // m between wheels
 const ARENA = 1.6; // m
 
 const goal = new THREE.Vector3(); // the point the camera follows (reused: nothing is allocated per frame)
@@ -149,31 +148,7 @@ function applyState(dt) {
   if (!rig) return;
   const st = snap && snap.state;
   const body = P.bodyByKey(bodyKey);
-  if (st && snap.body === body) {
-    const names = P.stateChannels(body);
-    names.forEach((n, i) => {
-      if (n === "drive_l" || n === "drive_r") return;
-      if (i < st.positions.length) rig.set(n, st.positions[i] / 10);
-    });
-    if (P.BODIES[body].drive) {
-      const l = st.positions[names.indexOf("drive_l")] || 0;
-      const r = st.positions[names.indexOf("drive_r")] || 0;
-      rig.setSpin("wheel-l", (l / 1000) * 1.1);
-      rig.setSpin("wheel-r", (r / 1000) * 1.1);
-      const v = ((l + r) / 2000) * VMAX;
-      const w = ((r - l) / 1000) * (VMAX / TRACK);
-      const p = view.pose;
-      p.yaw += w * dt;
-      p.x += Math.sin(p.yaw) * v * dt;
-      p.z += Math.cos(p.yaw) * v * dt;
-      const d = Math.hypot(p.x, p.z);
-      if (d > ARENA) (p.x *= ARENA / d), (p.z *= ARENA / d); // the edge of the mat
-      rig.group.position.set(p.x, 0, p.z);
-      rig.group.rotation.y = p.yaw;
-    }
-  } else {
-    rig.setSpin("wheel", 0);
-  }
+  applyTwinState(rig, snap, body, view.pose, dt, { radius: ARENA }); // joints, wheel spins and the odometry (twin-pose.js, shared with the AR page); ARENA = the edge of the mat
   if (rig.face) {
     rig.face.setLook(look.x, look.y);
     const l = snap ? snap.link : LINK.DISCONNECTED;
