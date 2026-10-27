@@ -2,7 +2,7 @@
 //   node art/generate.mjs --preview 24                      # preview (dummy seed, 1 demo Prime Construct) + contact sheet
 //   node art/generate.mjs --seed 0x<seed> --supply 1000     # final build (seed = on-chain OpenForgeAgents.seed())
 //   ... --out <dir>                                         # write somewhere else than art/out (the rehearsal does)
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
@@ -10,6 +10,7 @@ import sharp from "sharp";
 import { keccak256 } from "ethers";
 import { traitsOf, legendaryIds, describe } from "./traits.mjs";
 import { GENERATOR_FILES, createTokenRenderer } from "./token-render.mjs";
+import { assertImageSet } from "../scripts/lib/art-files.mjs";
 
 const argv = process.argv.slice(2);
 const arg = (k) => {
@@ -29,7 +30,11 @@ if (!seed || !/^0x[0-9a-fA-F]{64}$/.test(seed) || !supply) {
   process.exit(1);
 }
 
-for (const d of ["images", "metadata", "agent-cards"]) mkdirSync(join(out, d), { recursive: true });
+// start clean: a leftover file from an earlier build would otherwise be pinned with the new ones
+for (const d of ["images", "metadata", "agent-cards"]) {
+  rmSync(join(out, d), { recursive: true, force: true });
+  mkdirSync(join(out, d), { recursive: true });
+}
 
 const legends = preview ? [7] : legendaryIds(seed, supply);
 const tokens = [];
@@ -69,6 +74,8 @@ for (let id = 1; id <= supply; id++) {
 } finally {
   await renderer.close();
 }
+
+assertImageSet(readdirSync(join(out, "images")), supply, join(out, "images")); // exactly 1..supply.png, before anything is pinned
 
 // rarity score (sum of 1/frequency of each trait), used by the site to sort the gallery
 for (const tk of tokens) {

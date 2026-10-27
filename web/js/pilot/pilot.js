@@ -11,10 +11,8 @@ import { bleSupported, createBleTransport } from "./ble-transport.js";
 import { capabilities, createWakeLock, startCamera, startTilt } from "./sensors.js";
 import { $, chip, dpad, el, joystick, renderCaps, slider } from "./ui.js";
 import { GESTURES, POSES } from "./motions.js";
-import { createAiPilot } from "./ai/ai-pilot.js";
 import { loadConfig, renderChrome } from "../chain.js";
-import { mountAiPanel } from "./ai/ai-panel.js";
-import { createVoiceInput } from "./ai/voice.js";
+// The AI Pilot (ai/*, about 27 KB gz) loads when the controls open (see mountAi), not with the capability screen.
 
 const caps = capabilities();
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -30,7 +28,7 @@ let tilt = null;
 let tiltVec = { x: 0, y: 0 };
 let camera = null;
 let look = { x: 0, y: 0 };
-let ai = null; // AI Pilot: plans text requests and runs them through this same loop
+let ai = null; // AI Pilot: plans text requests and runs them through this same loop (null until mountAi has loaded it)
 let aiPanel = null;
 let aiClient = null; // the user's own model server, or null for the built-in parser
 const human = () => ai && ai.takeover(); // the human touched a control: the AI lets go
@@ -103,6 +101,7 @@ function initView() {
 
 function resize() {
   if (!view.ok) return;
+  view.busy = BUSY_FRAMES; // resizing clears the canvas: draw at full rate until it is back
   const c = $("twin");
   const w = c.clientWidth || 1;
   const h = c.clientHeight || 1;
@@ -117,6 +116,8 @@ function setRig(key) {
   view.rig = buildRobot(`ax1-${key}`);
   view.scene.add(view.rig.group);
   view.pose = { x: 0, z: 0, yaw: 0 };
+  view.groundLeft = 4; // a new body: find its floor again
+  view.busy = BUSY_FRAMES;
   view.rig.group.position.set(0, 0, 0);
   view.rig.group.rotation.y = 0;
   const b = bounds(view.rig);
@@ -129,6 +130,19 @@ function setRig(key) {
 const VMAX = 0.35; // m/s at full wheel output
 const TRACK = 0.2; // m between wheels
 const ARENA = 1.6; // m
+
+const goal = new THREE.Vector3(); // the point the camera follows (reused: nothing is allocated per frame)
+const BUSY_FRAMES = 15; // frames of full-rate drawing after the last change; then the face's own 20 fps is all that is needed
+
+/** true when the joint positions changed since the last call (the robot's pose is new, the floor must be found again). */
+function poseMoved(st) {
+  if (!st) return false;
+  const p = st.positions;
+  let moved = !view.lastPos || view.lastPos.length !== p.length;
+  for (let i = 0; !moved && i < p.length; i++) moved = p[i] !== view.lastPos[i];
+  if (moved) view.lastPos = Array.from(p);
+  return moved;
+}
 
 function applyState(dt) {
   const rig = view.rig;
@@ -170,19 +184,24 @@ function applyState(dt) {
 function frame(t) {
   requestAnimationFrame(frame);
   if (document.hidden || !view.rig) return;
-  if (t - view.lastRender < 32) return; // ~30 fps is plenty and saves battery
+  // ~30 fps is plenty and saves battery; a robot at rest (nothing moving, camera arrived) only has its face to redraw, and that runs at 20 fps
+  if (t - view.lastRender < (view.busy > 0 ? 32 : 40)) return;
   const dt = Math.min(0.1, (t - (view.lastRender || t)) / 1000);
   view.lastRender = t;
   applyState(dt);
   view.rig.update(dt, t / 1000);
-  if (bodyKey === "walker" && (view.ground = (view.ground || 0) + 1) % 8 === 0) {
+  const moved = poseMoved(snap && snap.state);
+  if (moved) view.groundLeft = 4; // the pose is new: look for the floor a few times while it settles, not forever
+  if (bodyKey === "walker" && view.groundLeft > 0 && (view.ground = (view.ground || 0) + 1) % 8 === 0) {
     // no physics: keep the lowest foot on the floor so poses read right
+    view.groundLeft--;
     const g = view.rig.group;
     g.position.y -= bounds(view.rig).min.y;
   }
   const p = view.rig.group.position;
   const k = reduceMotion ? 1 : 0.08;
-  view.target.lerp(new THREE.Vector3(p.x, view.lookY, p.z), k);
+  view.target.lerp(goal.set(p.x, view.lookY, p.z), k);
+  view.busy = moved || view.target.distanceToSquared(goal) > 1e-7 || view.rig.spinners.some((s) => s.rate) ? BUSY_FRAMES : Math.max(0, view.busy - 1);
   view.camera.position.set(view.target.x + view.dist * 0.55, view.target.y + view.dist * 0.45, view.target.z + view.dist * 0.75);
   view.camera.lookAt(view.target);
   view.renderer.render(view.scene, view.camera);
@@ -515,6 +534,7 @@ function start(withRobot) {
   }
   resize();
   newLoop();
+  mountAi(); // the AI Pilot panel is on screen now
   if (!withRobot) loop.connect(); // the twin connects at once; ARM still needs your tap
   $("mainTitle").focus(); // the start button was just hidden: keep focus at the top of the controls
 }
@@ -527,6 +547,42 @@ function safeStorage() {
   }
 }
 
+// The AI Pilot: its code loads when the controls (and with them the panel) open, so the capability screen and the
+// twin start without it. Every use of `ai` above already allows it to be missing.
+let aiMounting = null;
+function mountAi() {
+  return (aiMounting ??= (async () => {
+    const [{ createAiPilot }, { mountAiPanel }, { createVoiceInput }] = await Promise.all([import("./ai/ai-pilot.js"), import("./ai/ai-panel.js"), import("./ai/voice.js")]);
+    ai = createAiPilot({ getLoop: () => loop, getBodyKey: () => bodyKey, getMode: () => mode, clock: realTimers, getModel: () => aiClient, onChange: (v) => aiPanel && aiPanel.render(v) });
+    aiPanel = mountAiPanel({ ai, storage: safeStorage(), setModel: (client) => (aiClient = client), origin: location.origin });
+    // voice: one spoken request becomes the same text request as the box (same plan card, same safety rules)
+    const voice = createVoiceInput({ lang: navigator.language || "en-US" });
+    if (voice.supported) {
+      const mic = $("aiVoice");
+      mic.hidden = false;
+      $("aiVoiceNote").hidden = false;
+      mic.addEventListener("click", () => {
+        if (voice.listening) return voice.stop();
+        voice.start(
+          (text) => {
+            $("aiInput").value = text;
+            $("aiForm").requestSubmit();
+          },
+          (state) => {
+            mic.setAttribute("aria-pressed", String(state === "listening"));
+            mic.textContent = state === "listening" ? "Listening…" : "Speak";
+            if (state.startsWith("error:")) $("aiStatus").textContent = state === "error:not-allowed" ? "Microphone blocked: allow it in the browser to speak a request." : "Voice did not catch that. Try again, or type it.";
+          }
+        );
+      });
+    }
+  })().catch((e) => {
+    aiMounting = null; // offline for a moment: opening the controls again asks again
+    console.warn("AI Pilot did not load", e);
+    $("aiStatus").textContent = "The AI Pilot could not load. Check your connection and reload the page.";
+  }));
+}
+
 function init() {
   showCaps();
   initView();
@@ -534,29 +590,8 @@ function init() {
   setRig(bodyKey);
   buildBodyControls();
   wireSafety();
-  ai = createAiPilot({ getLoop: () => loop, getBodyKey: () => bodyKey, getMode: () => mode, clock: realTimers, getModel: () => aiClient, onChange: (v) => aiPanel && aiPanel.render(v) });
-  aiPanel = mountAiPanel({ ai, storage: safeStorage(), setModel: (client) => (aiClient = client), origin: location.origin });
-  // voice: one spoken request becomes the same text request as the box (same plan card, same safety rules)
-  const voice = createVoiceInput({ lang: navigator.language || "en-US" });
-  if (voice.supported) {
-    const mic = $("aiVoice");
-    mic.hidden = false;
-    $("aiVoiceNote").hidden = false;
-    mic.addEventListener("click", () => {
-      if (voice.listening) return voice.stop();
-      voice.start(
-        (text) => {
-          $("aiInput").value = text;
-          $("aiForm").requestSubmit();
-        },
-        (state) => {
-          mic.setAttribute("aria-pressed", String(state === "listening"));
-          mic.textContent = state === "listening" ? "Listening…" : "Speak";
-          if (state.startsWith("error:")) $("aiStatus").textContent = state === "error:not-allowed" ? "Microphone blocked: allow it in the browser to speak a request." : "Voice did not catch that. Try again, or type it.";
-        }
-      );
-    });
-  }
+  // until the AI Pilot is in (a moment after the controls open) a send is held, never a page navigation
+  $("aiForm").addEventListener("submit", (e) => !ai && (e.preventDefault(), ($("aiStatus").textContent = "The AI Pilot is loading. Try again in a moment.")));
   $("startTwin").addEventListener("click", () => start(false));
   $("startRobot").addEventListener("click", () => start(true));
   $("linkBtn").addEventListener("click", onConnect);

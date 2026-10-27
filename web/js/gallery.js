@@ -80,10 +80,25 @@ async function load() {
   }
   if (q) ids = ids.filter((i) => i === q);
   if ($("sort").value === "rank" && rarity) ids.sort((a, b) => (rarity.tokens[a - 1]?.rank ?? 1e9) - (rarity.tokens[b - 1]?.rank ?? 1e9));
-  // With filters active, load everything; otherwise paginate
-  if ($("fClass").value || $("fFaction").value) {
-    while (shown < ids.length) await renderNext();
-  } else await renderNext();
+  const fc = $("fClass").value, ff = $("fFaction").value;
+  if (fc || ff) {
+    // The published traits (data/rarity.json, the same file the Market reads) say which agents can match, so only those
+    // are read from the chain, a page at a time; the on-chain traits still decide what is shown (renderNext checks them).
+    // Without that file, or if its seed is not the chain seed, or it does not cover every minted agent, every agent is read, as before.
+    const trusted = rarity?.tokens?.length >= supply && String(await (await agents()).seed().catch(() => "")).toLowerCase() === String(rarity.seed).toLowerCase(); // the file describes this collection
+    if (trusted) ids = ids.filter((i) => { const t = rarity.tokens[i - 1]; return t && (!fc || t.Class === fc) && (!ff || t.Faction === ff); });
+    else {
+      while (shown < ids.length) await renderNext();
+      if (!supply) grid.innerHTML = `<div class="empty">No agents minted yet. Minting happens on OpenSea only.</div>`;
+      return;
+    }
+    if (!ids.length) {
+      grid.innerHTML = `<div class="empty">No agents match the filters.</div>`;
+      more.style.display = "none";
+      return;
+    }
+  }
+  await renderNext();
   if (!supply) grid.innerHTML = `<div class="empty">No agents minted yet. Minting happens on OpenSea only.</div>`;
 }
 

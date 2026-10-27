@@ -16,14 +16,37 @@ function onto(w, h, [p0, p1, p3, p2]) {
   return `matrix3d(${a / w},${d / w},0,${g / w},${b / h},${e / h},0,${k / h},0,0,1,0,${p0.x},${p0.y},0,1)`;
 }
 
-await loadConfig();
-renderChrome("codex");
+// The text page comes first; the nav/footer and the 3D book arrive in the background and attach to it.
+loadConfig()
+  .then(() => renderChrome("codex"))
+  .catch((e) => console.warn("site chrome unavailable", e));
 const $ = (id) => document.getElementById(id);
 
 const page = $("page");
 const phoneQuery = matchMedia("(max-width: 760px)");
 // 400% zoom, tiny or very short screens: a plain readable page instead of the 3D book (WCAG reflow)
 const listMode = matchMedia("(max-width: 340px), (max-height: 480px)").matches;
+
+// ---------------------------------------------------------------- the 3D book (a plain page without WebGL or at high zoom)
+const glOk = (() => {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext(); // only a probe: release it
+    return Boolean(gl);
+  } catch {
+    return false;
+  }
+})();
+// Reserve the page's final box before anything loads, so the text never jumps when the book arrives: phones get the bottom
+// sheet at once; wide screens keep the page hidden (it is printed on the book) until the book has laid it out.
+const wants3D = glOk && !listMode;
+if (wants3D) {
+  if (phoneQuery.matches) page.classList.add("sheet");
+  else {
+    page.style.visibility = "hidden";
+    setTimeout(() => (page.style.visibility = ""), 4000); // never leave the text hidden if the book is slow
+  }
+}
 let view = null, dio = null, index = -1, busy = false, pending = null;
 let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -202,23 +225,34 @@ addEventListener("hashchange", () => {
   if (Number.isInteger(n)) go(n);
 });
 
-// ---------------------------------------------------------------- the 3D book (a plain page without WebGL or at high zoom)
-const glOk = (() => {
-  try {
-    const gl = document.createElement("canvas").getContext("webgl2");
-    gl?.getExtension("WEBGL_lose_context")?.loseContext(); // only a probe: release it
-    return Boolean(gl);
-  } catch {
-    return false;
-  }
-})();
-if (glOk && !listMode) {
+// motion: one constant label, the state is aria-pressed (WCAG 2.2.2); default from the OS setting
+const pauseBtn = $("pauseBtn");
+const applyMotion = () => {
+  view?.setMotion(!paused);
+  pauseBtn.setAttribute("aria-pressed", String(paused));
+  pauseBtn.querySelector("[aria-hidden]").textContent = paused ? "▶" : "❚❚";
+};
+pauseBtn.hidden = true; // shown with the book
+pauseBtn.onclick = () => ((paused = !paused), applyMotion());
+matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", (e) => ((paused = e.matches), applyMotion()));
+applyMotion();
+addEventListener("pageshow", () => view?.resume());
+document.body.classList.toggle("no-gl", !wants3D);
+
+// 1. the text page, now
+const start = Math.min(CHAPTERS.length, Math.max(1, Number(location.hash.slice(1)) || 1)) - 1;
+go(start, { first: true });
+
+// 2. the 3D book, when its modules have arrived: the same page is shown again on it (the text box was reserved above)
+async function attachBook() {
   try {
     const { createCodexView } = await import("./codex/codex-view.js");
+    while (busy) await new Promise((r) => setTimeout(r, 50));
     view = createCodexView($("codexCanvas"), {
       onPick: (a) => act(a),
       // the text sits on the left page (wide screens) or in a bottom sheet (phones, where the camera shows the diorama)
       onLayout: (r) => {
+        page.style.visibility = "";
         if (phoneQuery.matches) {
           page.classList.add("sheet");
           page.classList.remove("on-paper"); // phones: a bottom sheet, the book is too small to print on
@@ -235,24 +269,18 @@ if (glOk && !listMode) {
       },
     });
     phoneQuery.addEventListener("change", (e) => view.setFocusRight(e.matches)); // rotation / resize across 760px
+    pauseBtn.hidden = false;
+    applyMotion();
+    await go(index, { first: true }); // build this chapter's diorama on the book
   } catch (e) {
     console.error(e);
+    view?.dispose?.();
+    view = null;
+    page.style.visibility = "";
+    page.classList.remove("sheet", "on-paper");
+    page.style.cssText = "";
+    document.body.classList.add("no-gl");
+    fitPage();
   }
 }
-document.body.classList.toggle("no-gl", !view);
-
-// motion: one constant label, the state is aria-pressed (WCAG 2.2.2); default from the OS setting
-const pauseBtn = $("pauseBtn");
-const applyMotion = () => {
-  view?.setMotion(!paused);
-  pauseBtn.setAttribute("aria-pressed", String(paused));
-  pauseBtn.querySelector("[aria-hidden]").textContent = paused ? "▶" : "❚❚";
-};
-pauseBtn.hidden = !view;
-pauseBtn.onclick = () => ((paused = !paused), applyMotion());
-matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", (e) => ((paused = e.matches), applyMotion()));
-applyMotion();
-addEventListener("pageshow", () => view?.resume());
-
-const start = Math.min(CHAPTERS.length, Math.max(1, Number(location.hash.slice(1)) || 1)) - 1;
-go(start, { first: true });
+if (wants3D) attachBook();

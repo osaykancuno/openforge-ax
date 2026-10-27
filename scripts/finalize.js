@@ -1,7 +1,9 @@
 // After reveal + art generation + IPFS upload, in two runs:
 //   IMAGES_CID=bafy... npx hardhat run scripts/finalize.js --network mainnet          (sets the base URI; then check OpenSea)
 //   IMAGES_CID=bafy... FREEZE=true npx hardhat run scripts/finalize.js --network ...  (locks the renderer and FREEZES: irreversible)
-// FREEZE refuses to run unless the base URI is already this CID, so nothing is frozen unchecked.
+// FREEZE refuses to run unless the base URI is already this CID, so nothing is frozen unchecked. It also GETs
+// <baseURI>1.png and <baseURI><supply>.png and needs HTTP 200 + PNG magic bytes on both (IPFS URIs are read through
+// IPFS_GATEWAY, default https://gateway.pinata.cloud/ipfs).
 // Without IPFS: BASE_URI=https://<site>/images/ serves the images from the website (npm run post-reveal does this
 // when there is no PINATA_JWT). Freezing an https base URI ties the images to that domain forever, so it also
 // needs FREEZE_HTTPS=yes.
@@ -9,6 +11,18 @@
 const { ethers } = require("hardhat");
 require("./lib/nonce-guard");
 const fs = require("fs");
+
+/** First and last image must be served (HTTP 200) and be real PNGs, or the freeze would lock a broken base URI forever. */
+async function assertImagesServed(uri, supply, fetchImpl = fetch) {
+  if (supply < 1) throw new Error("Nothing minted: there are no images to check");
+  const { fetchPng, gatewayBase } = await import("./lib/art-files.mjs");
+  const base = gatewayBase(uri, process.env.IPFS_GATEWAY);
+  for (const id of [...new Set([1, supply])]) {
+    const r = await fetchPng(`${base}${id}.png`, fetchImpl);
+    if (!r.ok) throw new Error(`Refusing to freeze: ${r.reason}. Publish/pin the images and check them, then run again.`);
+  }
+  console.log(`✔ ${base}1.png and ${base}${supply}.png are served (HTTP 200, PNG).`);
+}
 
 async function main() {
   const { IMAGES_CID, BASE_URI, FREEZE, FREEZE_HTTPS } = process.env;
@@ -33,6 +47,7 @@ async function main() {
     if ((await agents.seed()) === ethers.ZeroHash) throw new Error("Reveal first: freezeMetadata needs the seed");
     if ((await agents.baseURI()) !== uri) throw new Error(`Run without FREEZE first and check OpenSea: the base URI is not ${uri}`);
     if ((await agents.reputation()) === ethers.ZeroAddress) throw new Error("Set the reputation source first: a freeze would disable it forever");
+    await assertImagesServed(uri, Number(await agents.totalSupply()));
     if (needsLock && (!(await renderer.placeholderImage()) || !(await renderer.externalUrl()) || !(await renderer.license()))) {
       throw new Error("Complete AgentRenderer.setPresentation first: it can never change after the lock");
     }
@@ -61,7 +76,7 @@ async function main() {
   }
 }
 
-module.exports = { main };
+module.exports = { main, assertImagesServed };
 
 if (require.main === module) {
   main().catch((e) => {

@@ -6,6 +6,10 @@
 export const ORDER_FULFILLED = "0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31";
 export const ORDER_FULFILLED_ABI =
   "event OrderFulfilled(bytes32 orderHash, address indexed offerer, address indexed zone, address recipient, (uint8 itemType, address token, uint256 identifier, uint256 amount)[] offer, (uint8 itemType, address token, uint256 identifier, uint256 amount, address recipient)[] consideration)";
+/** topic0 of the ERC-721 Transfer(address,address,uint256). */
+export const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+/** The official Seaport 1.5 and 1.6 (lowercase; the same addresses on Ethereum and Sepolia). Anyone can emit an OrderFulfilled-shaped event, so only these count. */
+export const SEAPORT = ["0x00000000000000adc04c56bf30ac9d3c0aaf14dc", "0x0000000000000068f116a894984e2db1123eb395"];
 /** Wrapped ether, counted as ETH in prices (offers on OpenSea are paid in WETH). */
 export const WETH = { 1: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", 11155111: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14" };
 export const ZERO = "0x0000000000000000000000000000000000000000";
@@ -26,6 +30,24 @@ export function salePrice(order, nft, tokenId, weth = "") {
   if (offer.some(isAgent)) return sum(consideration.filter(isMoney));
   if (consideration.some(isAgent)) return sum(offer.filter(isMoney));
   return null;
+}
+
+/** Seaport contracts whose sales are trusted on this chain: the official ones, plus the local demo's stand-in on chain 31337 only. */
+export const seaportAddresses = (chainId, local = "") => [...SEAPORT, ...(Number(chainId) === 31337 && /^0x[0-9a-fA-F]{40}$/.test(local ?? "") ? [local.toLowerCase()] : [])];
+
+/** True when the receipt's logs hold the collection's ERC-721 Transfer of `tokenId`. */
+export function movedToken(logs, nft, tokenId) {
+  return (logs ?? []).some((l) => l?.topics?.length === 4 && l.topics[0] === TRANSFER && same(l.address, nft) && BigInt(l.topics[3]) === BigInt(tokenId));
+}
+
+/**
+ * The OrderFulfilled logs of one receipt that may be priced as a sale of agent `tokenId`: emitted by an allowed Seaport,
+ * in a receipt where that agent really moved. Anything else (a look-alike contract's event) is dropped.
+ */
+export function saleOrderLogs(logs, { chainId, nft, tokenId, localSeaport = "" }) {
+  const allowed = seaportAddresses(chainId, localSeaport);
+  if (!movedToken(logs, nft, tokenId)) return [];
+  return (logs ?? []).filter((l) => l?.topics?.[0] === ORDER_FULFILLED && allowed.includes(String(l.address ?? "").toLowerCase()));
 }
 
 /** "mint", "burn" or "transfer", from a Transfer log's addresses. */

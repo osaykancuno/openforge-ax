@@ -240,4 +240,25 @@ describe("Neo-Forge world", () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(server.stats().players).to.equal(before);
   });
+
+  it("a room broadcast is serialized once, not once per recipient", async () => {
+    const watchers = [await guest(), await guest(), await guest()];
+    await new Promise((r) => setTimeout(r, 100));
+    const real = JSON.stringify;
+    let joins = 0;
+    JSON.stringify = function (v, ...rest) {
+      if (v && v.t === "join") joins++;
+      return real.call(this, v, ...rest);
+    };
+    let newcomer;
+    try {
+      newcomer = await guest(); // the three watchers each get a "join" about it
+      for (const w of watchers) await w.next("join");
+    } finally {
+      JSON.stringify = real;
+    }
+    expect(joins).to.equal(1);
+    for (const w of [...watchers, newcomer]) w.close();
+    await Promise.all([...watchers, newcomer].map((w) => w.closed));
+  });
 });

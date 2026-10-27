@@ -26,3 +26,15 @@ rehearsal-*.txt
 *.key
 *.jks
 .DS_Store
+# safety net: credential and environment files that must never be published
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+secrets/
+.secrets/
+sessions/
+.venv/
+venv/
+__pycache__/
+.vscode/

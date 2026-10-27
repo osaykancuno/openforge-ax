@@ -53,6 +53,32 @@ describe("Self-hosting server hardening", () => {
     it("accepts any Host when unguarded (HOST=0.0.0.0 or a proxy)", async () => {
       expect((await get(null, { host: "192.168.1.20:8080" })).statusCode).to.equal(200);
     });
+    it("applies the deployment.json overrides whatever the spelling of the path (case, trailing dot or space, ./, double slash)", async () => {
+      const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "serve-")) + path.sep;
+      fs.writeFileSync(path.join(dir, "deployment.json"), JSON.stringify({ chainId: 1, provingApi: "http://old" }));
+      const srv2 = http.createServer(serve.createHandler(null, dir, { provingApi: "http://new" }));
+      await new Promise((ok) => srv2.listen(0, "127.0.0.1", ok));
+      const fetchJson = (p) => new Promise((ok, fail) => http.get({ port: srv2.address().port, path: p }, (res) => { let s = ""; res.on("data", (c) => (s += c)); res.on("end", () => ok([res.statusCode, s])); }).on("error", fail));
+      try {
+        for (const p of ["/deployment.json", "/Deployment.json", "/DEPLOYMENT.JSON", "/./deployment.json", "//deployment.json", "/deployment.json."]) {
+          const [code, body] = await fetchJson(p);
+          // a spelling the file system does not resolve is a 404; one that resolves must carry the override
+          if (code === 200) expect(JSON.parse(body).provingApi, p).to.equal("http://new");
+          else expect(code, p).to.equal(404);
+        }
+        expect(JSON.parse((await fetchJson("/deployment.json"))[1])).to.include({ provingApi: "http://new", chainId: 1 });
+      } finally {
+        srv2.close();
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+    it("Permissions-Policy matches web/_headers: microphone only on the Phone Brain page", async () => {
+      const policy = (p) => new Promise((ok, fail) => { const s = http.createServer(serve.createHandler(null)); s.listen(0, "127.0.0.1", () => http.get({ port: s.address().port, path: p }, (res) => { res.resume(); res.on("end", () => s.close(() => ok(res.headers["permissions-policy"]))); }).on("error", fail)); });
+      expect(await policy("/pilot.html")).to.include("microphone=(self)");
+      expect(await policy("/index.html")).to.include("microphone=()");
+      expect(await policy("/robot.html")).to.include("microphone=()");
+    });
     it("sends the hardening headers", async () => {
       const res = await get(null, { host: "localhost" });
       expect(res.headers["x-content-type-options"]).to.equal("nosniff");
@@ -63,20 +89,21 @@ describe("Self-hosting server hardening", () => {
   });
 
   describe("selfhost childEnv", () => {
-    const env = { PATH: "/bin", PRIVATE_KEY: "a", SEPOLIA_PRIVATE_KEY: "b", PINATA_JWT: "c", ETHERSCAN_API_KEY: "d", SIM_ATTESTER_KEY: "e", ADMIN_TOKEN: "f", PROVING_RPC_URL: "http://rpc", HOST: "0.0.0.0" };
+    const env = { PATH: "/bin", OPENSEA_API_KEY: "g", OPENSEA_SLUG: "my-slug", PRIVATE_KEY: "a", SEPOLIA_PRIVATE_KEY: "b", PINATA_JWT: "c", ETHERSCAN_API_KEY: "d", SIM_ATTESTER_KEY: "e", ADMIN_TOKEN: "f", PROVING_RPC_URL: "http://rpc", HOST: "0.0.0.0" };
     it("web and world get no secrets", () => {
       for (const n of ["web", "world"]) {
         const e = selfhost.childEnv(n, env, { X: "1" });
-        expect(Object.keys(e).sort()).to.deep.equal(["HOST", "PATH", "PROVING_RPC_URL", "X"]);
+        expect(Object.keys(e).sort()).to.deep.equal(["HOST", "OPENSEA_SLUG", "PATH", "PROVING_RPC_URL", "X"]); // the slug is public; the OpenSea key stays with the verifier
       }
     });
     it("proving keeps the attester key, admin token and RPC but loses deploy secrets", () => {
       const e = selfhost.childEnv("proving", env);
-      expect(e).to.include({ SIM_ATTESTER_KEY: "e", ADMIN_TOKEN: "f", PROVING_RPC_URL: "http://rpc" });
+      expect(e).to.include({ SIM_ATTESTER_KEY: "e", ADMIN_TOKEN: "f", PROVING_RPC_URL: "http://rpc", OPENSEA_API_KEY: "g" });
       for (const k of ["PRIVATE_KEY", "SEPOLIA_PRIVATE_KEY", "PINATA_JWT", "ETHERSCAN_API_KEY"]) expect(e).to.not.have.property(k);
     });
     it("unknown services get least privilege and the input is not mutated", () => {
       expect(selfhost.childEnv("other", env)).to.not.have.property("SIM_ATTESTER_KEY");
+      expect(selfhost.childEnv("other", env)).to.not.have.property("OPENSEA_API_KEY");
       expect(env.PRIVATE_KEY).to.equal("a");
     });
     it("service-specific values override", () => {

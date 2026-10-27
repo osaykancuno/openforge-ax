@@ -52,16 +52,33 @@ Automated checks:
 
 ## Backlog closed after the audit (2026-10-27)
 
-- `AgentAccount`: a sale lock is bound to the holding period it was set in, so it no longer comes back when the seller buys the agent back (A→B→A).
+- `AgentAccount`: the sale lock now binds the wallet, not the seller (decision of 2026-10-27, see the audit below). The earlier "bound to the holding period" design is superseded.
 - `AgentReputation`: the constructor refuses an `agents` address with no code, and `renounceOwnership` always reverts.
 - `npm run web:build` writes `web/vendor/SHA256SUMS` with the versions and SHA-256 of every vendored file (`sha256sum -c SHA256SUMS` in `web/vendor`).
 - The contracts changed, so the next Sepolia rehearsal (with `REHEARSAL_PIN=yes`) covers them before mainnet.
 
+## Security audit (2026-10-27)
+
+Secrets scan: PASS (repo and every commit clean, no key rotation needed). `npm audit`: 4 moderate in `uuid` through `@openzeppelin/merkle-tree`, scripts only. Fixed, each with a regression test:
+
+- **Sale lock binds the wallet.** Until `lockedUntil` (at most 30 days, extend-only) nobody can move the wallet's contents: not the seller, not a second address of theirs, not the buyer. The buyer gets full control at expiry. A self-transfer no longer bumps `transferNonce`.
+- **Reveal seed without `blockhash`**: `prevrandao` of `revealBlock + 1`, chain id, total supply and the contract address. A proposer who builds their own block can no longer grind it.
+- **Launch scripts**: `deploy.js` also requires a future `PUBLIC_START`, `PUBLIC_END + 3 days` on or before the reveal deadline, `OPENSEA_FEE_BPS` 500–2000, and a `CONFIRM_PRICE` / `CONFIRM_MAX_PER_WALLET` that repeats any price or per-wallet cap other than the decided 0.015 / 3. `generate` and `pin` refuse an image set that is not exactly `1..N.png`; `finalize` with `FREEZE` checks that the first and last image are served as PNGs; `post-reveal` exits with code 2 and "NOT DONE" when the base URI is not on-chain yet.
+- **Market page**: sales are read only from `OrderFulfilled` events of the official Seaport 1.5/1.6 contracts, with the token's `Transfer` in the same receipt.
+- **Agent page**: wallet and proposal data are re-read through the wallet's own provider before signing; Top up shows the recipient, and approvals show the operator and limit.
+- **Verifier and servers**: malformed URLs answer 400 instead of crashing, atomic file writes, coarser rate limits (/48, /24), a fee cap with same-nonce replacement, request timeouts, and RPC URLs redacted in logs.
+- **Site build**: GitHub Actions pinned by commit SHA, vendored files checked with `sha256sum -c`, loopback CSP sources stripped from the published build, `site:check` fails on a loopback CSP or `fromBlock` 0 outside the local chain.
+
 ## Accepted risks (by design, disclosed)
 
 - Royalty info and the contract URI stay changeable by the owner after `freezeMetadata`. Token metadata does not.
-- The reveal seed resists a single block producer, but a validator who proposes both `revealBlock` and `revealBlock + 1` can bias it by skipping. Never call the reveal "provably fair".
-- Lab challenges can be requested with a public owner address, so a stranger can use up that token's hourly bad-signature budget. Lab passes stay safe, because only the holder can sign them.
+- The reveal seed resists a single block producer, but a validator who proposes `revealBlock + 1` can still skip it (one bit of bias) or censor the reveal transaction. Never call the reveal "provably fair".
+- **The traits are computable about one block early.** `prevrandao` of `revealBlock + 1` is known once the beacon block at `revealBlock` is out, so a bot can read every trait about 12 seconds before the reveal lands and buy listed rares in that window. Same class as the residual above; a fix would need VRF or a secret commit.
+- **A seller can lock just before a sale lands.** The lock binds the wallet for every holder, so a seller who sees a purchase coming can lock for up to 30 days first; the buyer then holds a wallet they can't use until expiry (never longer: only the current holder can extend it). Buyers should check the lock on the agent page (`lockedUntil`) before buying; the "sell safely" guide says so.
+- **The sale lock cannot revoke approvals.** Token approvals the wallet gave other apps before the lock still count, and no contract can withdraw them. Every place that describes the lock says so.
+- `AgentAccount.isValidSignature` validates the raw hash it is given. Apps that ask the wallet to sign through Permit2 or other raw-hash schemes rely on the holder reading what they sign; a lock or pause still voids every signature.
+- The site is served from the shared `osaykancuno.github.io` origin until a custom domain is set. Move to a custom domain before launch (storage and service-worker scope are shared with other Pages sites on that origin).
+- Lab challenges can be requested with a public owner address, so a stranger can use up that token's hourly bad-signature budget. Lab passes stay safe, because only the holder can sign them, and since 2026-10-27 a run signed by the holder's own key is still accepted when the budget is spent. A holder whose wallet is a smart contract (ERC-1271) can still be held up for that hour.
 - `img-src https:` and `connect-src https: wss:` stay wide on most pages, so visitors can point the site at their own verifier. Scripts are limited to `'self'` and every untrusted value is escaped.
 
 ## Before launch (you)

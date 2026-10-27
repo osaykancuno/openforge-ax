@@ -187,32 +187,86 @@ describe("AgentAccount - sale scenarios", () => {
     await expect(acct.connect(ctx.operator).execute(ethers.Wallet.createRandom().address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "NotAuthorized");
   });
 
-  it("seller's lock is not inherited by the buyer", async () => {
+  // The lock binds the WALLET, not the seller: every holder is frozen until it expires.
+  async function lockedSale(days = 30) {
     const ctx = await deployAll();
     await ctx.agents.reserveMint(ctx.alice.address, 1);
     const acct = await accountOf(ctx.agents, 1);
     await ctx.owner.sendTransaction({ to: await acct.getAddress(), value: ethers.parseEther("1") });
-    await acct.connect(ctx.alice).lock((await time.latest()) + 30 * DAY);
-    await expect(acct.connect(ctx.alice).execute(ctx.bob.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+    await acct.connect(ctx.alice).lock((await time.latest()) + days * DAY);
+    return { ctx, acct, until: await acct.lockedUntil() };
+  }
+
+  it("lock binds the wallet: after the seller transfers, the buyer cannot execute, sign or approve until expiry, then can", async () => {
+    const { ctx, acct, until } = await lockedSale();
     await ctx.agents.connect(ctx.alice).transferFrom(ctx.alice.address, ctx.bob.address, 1);
-    await expect(acct.connect(ctx.bob).execute(ctx.carol.address, 1, "0x", 0)).to.changeEtherBalance(ctx.carol, 1);
-    // the buyer can set a shorter lock of its own; its own lock is then extend-only
-    await acct.connect(ctx.bob).lock((await time.latest()) + 7 * DAY);
-    await expect(acct.connect(ctx.bob).lock((await time.latest()) + 3 * DAY)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    await expect(acct.connect(ctx.bob).execute(ctx.carol.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+    expect(await acct.isValidSigner(ctx.bob.address, "0x")).to.equal("0x00000000");
+    const hash = ethers.id("order");
+    const wallet = ethers.Wallet.createRandom().connect(ethers.provider);
+    await ctx.owner.sendTransaction({ to: wallet.address, value: ethers.parseEther("1") });
+    await ctx.agents.connect(ctx.bob).transferFrom(ctx.bob.address, wallet.address, 1);
+    expect(await acct.isValidSignature(hash, wallet.signingKey.sign(hash).serialized)).to.equal("0xffffffff");
+    await expect(acct.connect(wallet).approve(0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+    await time.increaseTo(until);
+    expect(await acct.isValidSigner(wallet.address, "0x")).to.equal("0x523e3260");
+    expect(await acct.isValidSignature(hash, wallet.signingKey.sign(hash).serialized)).to.equal("0x1626ba7e");
+    await expect(acct.connect(wallet).execute(ctx.carol.address, 1, "0x", 0)).to.changeEtherBalance(ctx.carol, 1);
   });
 
-  it("a seller's lock does not come back when the seller buys the agent back (A -> B -> A)", async () => {
-    const ctx = await deployAll();
-    await ctx.agents.reserveMint(ctx.alice.address, 1);
-    const acct = await accountOf(ctx.agents, 1);
-    await ctx.owner.sendTransaction({ to: await acct.getAddress(), value: ethers.parseEther("1") });
-    await acct.connect(ctx.alice).lock((await time.latest()) + 30 * DAY);
+  it("lock binds a second address of the seller and the operator's proposals too", async () => {
+    const { ctx, acct } = await lockedSale();
+    await acct.connect(ctx.alice).configure(ctx.operator.address, 1, 0, DAY);
+    await ctx.agents.connect(ctx.alice).transferFrom(ctx.alice.address, ctx.carol.address, 1); // a second address
+    await expect(acct.connect(ctx.carol).execute(ctx.bob.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+    expect(await acct.isValidSigner(ctx.carol.address, "0x")).to.equal("0x00000000");
+    await acct.connect(ctx.carol).configure(ctx.operator.address, 1, 0, DAY);
+    await expect(acct.connect(ctx.operator).propose(ctx.bob.address, 1, "0x")).to.be.revertedWithCustomError(acct, "AccountLocked");
+  });
+
+  it("a self-transfer keeps the lock", async () => {
+    const { ctx, acct, until } = await lockedSale();
+    await ctx.agents.connect(ctx.alice).transferFrom(ctx.alice.address, ctx.alice.address, 1);
+    expect(await acct.lockedUntil()).to.equal(until);
+    await expect(acct.connect(ctx.alice).execute(ctx.carol.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+  });
+
+  it("A -> B -> A keeps the lock until expiry", async () => {
+    const { ctx, acct, until } = await lockedSale();
     await ctx.agents.connect(ctx.alice).transferFrom(ctx.alice.address, ctx.bob.address, 1);
     await ctx.agents.connect(ctx.bob).transferFrom(ctx.bob.address, ctx.alice.address, 1);
-    await expect(acct.connect(ctx.alice).execute(ctx.carol.address, 1, "0x", 0)).to.changeEtherBalance(ctx.carol, 1);
-    // a fresh holding period: a new, shorter lock is accepted and then extend-only again
-    await acct.connect(ctx.alice).lock((await time.latest()) + 3 * DAY);
     await expect(acct.connect(ctx.alice).execute(ctx.carol.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
-    await expect(acct.connect(ctx.alice).lock((await time.latest()) + 2 * DAY)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    await time.increaseTo(until);
+    await expect(acct.connect(ctx.alice).execute(ctx.carol.address, 1, "0x", 0)).to.changeEtherBalance(ctx.carol, 1);
+  });
+
+  it("nobody can shorten or cancel the lock, including a new holder; extending is allowed and recorded", async () => {
+    const { ctx, acct, until } = await lockedSale(10);
+    const now = await time.latest();
+    for (const t of [until - 1n, until, BigInt(now + DAY)]) {
+      await expect(acct.connect(ctx.alice).lock(t)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    }
+    await ctx.agents.connect(ctx.alice).transferFrom(ctx.alice.address, ctx.bob.address, 1);
+    await expect(acct.connect(ctx.bob).lock(until - 1n)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    await expect(acct.connect(ctx.bob).lock(until)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    await expect(acct.connect(ctx.bob).lock(0)).to.be.revertedWithCustomError(acct, "InvalidParams");
+    expect(await acct.lockedUntil()).to.equal(until);
+    expect(await acct.lockOwner()).to.equal(ctx.alice.address);
+    const longer = BigInt((await time.latest()) + 20 * DAY);
+    await expect(acct.connect(ctx.bob).lock(longer)).to.emit(acct, "Locked").withArgs(longer);
+    expect(await acct.lockedUntil()).to.equal(longer);
+    expect(await acct.lockOwner()).to.equal(ctx.bob.address);
+    await time.increaseTo(until + 1n); // the old expiry no longer frees the wallet
+    await expect(acct.connect(ctx.bob).execute(ctx.carol.address, 1, "0x", 0)).to.be.revertedWithCustomError(acct, "AccountLocked");
+    await expect(acct.connect(ctx.bob).lock(longer)).to.be.revertedWithCustomError(acct, "InvalidParams");
+  });
+
+  it("an expired lock can be replaced by a shorter one; the 30-day cap always applies", async () => {
+    const { ctx, acct, until } = await lockedSale(3);
+    await time.increaseTo(until);
+    const next = BigInt((await time.latest()) + DAY);
+    await acct.connect(ctx.alice).lock(next);
+    expect(await acct.lockedUntil()).to.equal(next);
+    await expect(acct.connect(ctx.alice).lock(BigInt((await time.latest()) + 31 * DAY))).to.be.revertedWithCustomError(acct, "InvalidParams");
   });
 });

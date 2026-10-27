@@ -8,6 +8,16 @@ export const el = (tag, cls, text) => {
   return n;
 };
 
+/** WebGL available? (cheap probe, no context kept). Here, not in bench-view.js, so a page can decide before loading three.js. */
+export function hasWebGL() {
+  try {
+    const c = document.createElement("canvas");
+    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
+  } catch {
+    return false;
+  }
+}
+
 /** A status line for screen readers: cleared first, so the same text twice is announced twice. */
 export const createSpeaker = (node) => (text) => {
   node.textContent = "";

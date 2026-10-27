@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { Contract, JsonRpcProvider, getAddress } from "ethers";
 import { ownerVerifier } from "./lib/signatures.mjs";
-import { createWorldServer, hostsOf, isLoopbackHost } from "./world/core.mjs";
+import { createWorldServer, hostsOf, isLoopbackHost, hardenHttpServer, installCrashGuards } from "./world/core.mjs";
 import { PREFIX, SUFFIX, LEGENDARY } from "../art/traits.mjs";
+
+installCrashGuards("world"); // a stray rejected promise is logged, it must not take the world server down
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dep = JSON.parse(readFileSync(join(root, "web/deployment.json"), "utf8"));
@@ -29,12 +31,13 @@ if (dep.chainId !== 31337 && !env.ALLOWED_ORIGINS) throw new Error("ALLOWED_ORIG
 // local demo: loopback only (HOST=0.0.0.0 to open it to the LAN); loopback binds also check the Host header against DNS rebinding
 const host = env.HOST || (dep.chainId === 31337 ? "127.0.0.1" : "");
 const guarded = host && isLoopbackHost(host);
-const httpServer = createServer((_req, res) => res.writeHead(426).end("websocket only"));
+const httpServer = hardenHttpServer(createServer((_req, res) => res.writeHead(426).end("websocket only"))); // timeouts bound the upgrade handshake
 httpServer.listen(Number(env.WORLD_PORT || 8788), ...(host ? [host] : []));
 
 const world = createWorldServer({
   server: httpServer,
   hosts: guarded ? hostsOf([env.PUBLIC_URL, env.SITE, ...(env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(",") : [])]) : null,
+  // no Origin list (null) is accepted only on the local demo: it is bound to 127.0.0.1 behind the Host guard above; every other chain requires ALLOWED_ORIGINS
   origins: env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(",") : null,
   trustProxy: env.TRUST_PROXY === "true",
   deps: {

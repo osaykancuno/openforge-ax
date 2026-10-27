@@ -1,7 +1,7 @@
 // The OpenForge Codex: a pop-up lab notebook on a wooden desk. Each chapter pops a small diorama out of the right page;
 // the left page's text is real HTML laid over it (codex.js). This file renders the book, turns pages and runs dioramas.
 import * as THREE from "three";
-import { PALETTE, makeStage } from "../models/look.js";
+import { PALETTE, makeStage, disposeObject } from "../models/look.js";
 
 export const PAGE_W = 4.2, PAGE_D = 5.9; // one page, in metres (x across, z down the page): A5 proportions, like a real notebook
 const SEG = 28;
@@ -262,6 +262,7 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
     const g = current.group;
     await animate(260, (k) => g.scale.set(1, Math.max(0.001, 1 - k), 1));
     slot.remove(g);
+    disposeObject(g); // free this page's geometries, materials and textures (shared ones stay cached)
     current.dispose?.();
     current = null;
   }
@@ -312,8 +313,11 @@ export function createCodexView(canvas, { onPick = () => {}, onLayout = () => {}
   let raf = 0, last = performance.now();
   let motionT = 0; // the clock idle animations use: it stops while motion is paused or reduced
   let dirty = true; // something changed while paused: render one frame
+  // phones and touch screens draw at most 30 frames a second (battery, heat); desktops draw every refresh
+  const frameGap = small || matchMedia("(pointer: coarse)").matches ? 1000 / 30 - 2 : 0;
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    if (frameGap && now - last < frameGap) return;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = lastFrame = now;
     stepAnims(now); // animations always progress (even at zero size), so awaited page turns and actions can never hang

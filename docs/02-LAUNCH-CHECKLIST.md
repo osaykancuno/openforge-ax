@@ -20,9 +20,12 @@ Four ECC audits ran (contracts and launch scripts, verifier and servers, website
 
 - [x] 🤖 **Provenance**: the art was declared final on 2026-10-27 and `npm run assets` ran then, so `PROVENANCE_HASH` is current. If the art or the traits change again, run it again. `deploy.js` now recomputes the generator hash on mainnet and refuses a stale `PROVENANCE_HASH` (it is locked at the first mint).
 - [ ] 🧑 **Supply values are explicit**: on mainnet `deploy.js` requires `MAX_SUPPLY=1024`, `TEAM_RESERVE=100`, `ROYALTY_BPS` (0-1000), `REVEAL_DEADLINE_DAYS` (7-45), `PUBLIC_PRICE_ETH` and `MAX_PER_WALLET` in `.env`. No silent defaults.
+  - Since the 2026-10-27 audit it also requires `OPENSEA_FEE_BPS` (500–2000, check Studio), a `PUBLIC_START` in the future and a `PUBLIC_END` at least 3 days before the reveal deadline (both unix seconds).
+  - A price other than 0.015 or a cap other than 3 is refused unless `CONFIRM_PRICE` / `CONFIRM_MAX_PER_WALLET` repeat the value.
+- [ ] 🧑 **The contracts changed on 2026-10-27** (wallet-bound sale lock, reveal seed without `blockhash`): run the Sepolia rehearsal again with `REHEARSAL_PIN=yes` before mainnet.
 - [ ] 🧑 **Ownership**: the Safe must call `acceptOwnership` on all three contracts (Ownable2Step) before the drop opens. Keep the deploy key on a minimal balance until then.
 - [ ] 🧑 **Reserve before the end of the public phase** (see §3 step 4): an unminted reserve is lost if anyone commits the reveal at the deadline.
-- [ ] 🤖 **Smoke test**: `npm run site:smoke` must report 78/78 (every page, 3 viewports, both themes: no page errors, no 4xx, no page scroll, no horizontal overflow, no sound before a gesture).
+- [ ] 🤖 **Smoke test**: `npm run site:smoke` must report 140/140 (every page, 3 viewports, both themes: no page errors, no 4xx, no page scroll, no horizontal overflow, no sound before a gesture).
 - [ ] 🧑 **Comprehension test** with 5 people ([16-COMPREHENSION-TEST.md](16-COMPREHENSION-TEST.md)): at least 4 of 5 right on every question.
 - [ ] 🧑 **Site config**: `web/deployment.json` must come from the real deploy (`npm run site:check -- 1` refuses chain 31337, localhost and `#` links). Then `npm run web:build`: the CSP lists loopback hosts only for the local demo.
 - [ ] 🧑 **Headers on the live host**: `curl -I https://<site>/arena.html` must show `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, HSTS and nosniff from `web/_headers`. On a host that ignores `_headers`, the pages hide themselves when framed (fallback in `theme-boot.js`), but set the headers anyway.
@@ -96,6 +99,8 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
    - with `PINATA_JWT` it pins them to IPFS; without it, it copies them to `web/images/` (publish `web/` right after, about 460 MB);
    - it sets the base URI;
    - it copies `rarity.json` to the site.
+   - It refuses an image folder that is not exactly `1.png … N.png`, and after pinning it checks three images by SHA-256 through the gateway.
+   - If the base URI is not on-chain at the end (for example Safe calldata still to execute), it prints **NOT DONE** and exits with code 2. Do not refresh OpenSea or freeze until `baseURI()` shows the new value.
 3. —
 4. If the owner is the Safe, the script prints the calldata to send from the Safe.
 5. 🧑 On OpenSea, spot-check 10 tokens with "Refresh metadata", including the Prime Constructs (`AgentRenderer.legendaryIds()`).
@@ -103,6 +108,7 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
    - With site-hosted images, freezing ties every image to the domain forever, so it also needs `$env:FREEZE_HTTPS="yes"`.
    - Better: move the images to IPFS first (add `PINATA_JWT`, run `npm run post-reveal -- mainnet` again), then freeze. Nothing forces an early freeze.
    - It runs only if step 4 already set this CID, the reputation source is set and the renderer presentation is complete.
+   - It also downloads the first and the last image (`IPFS_GATEWAY`, default Pinata) and refuses to freeze unless both are served as PNGs.
    - It locks the renderer, then calls `freezeMetadata()`. From the Safe, execute the printed calls in order (lock → freezeMetadata), or as one batch.
 7. 🤖 `npm run web:build` copies `rarity.json` to the site (rarity-sortable gallery). Run `npm run site:check` and republish `web/`.
 
@@ -113,7 +119,7 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
 - [ ] 🧑 `AgentReputation.setAttester(oracle)`. Use `scripts/attest.js` to record tasks and data.
 - [ ] 🧑 Set `defaultOperator` in `config.js` once the agent runtime is ready (enables one-click Assisted and Autonomous modes).
 - [ ] 🧑 ERC-8004 registration (files in `art/out/agent-cards/`), after verifying the standard's current status, ABI and addresses.
-- [ ] 🧑 Publish a "sell safely" guide: lock the wallet from the site, cancel old Seaport listings, then list on OpenSea.
+- [ ] 🧑 Publish a "sell safely" guide: lock the wallet from the site, cancel old Seaport listings, then list on OpenSea. For buyers: check the agent page before buying; a wallet locked until a date stays unusable for every holder until then, and approvals it gave other apps earlier still count.
 - [ ] 🧑 **Proving Grounds** (after reveal; Synth Arm agents need their traits):
   1. Create a dedicated hot key with minimal ETH, then call `AgentReputation.setSimAttester(key, true)` from the Safe.
   2. Host `scripts/proving-server.mjs` (Node 24) behind HTTPS with:

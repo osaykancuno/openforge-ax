@@ -8,7 +8,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join, extname, normalize } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { hostAllowed, hostsOf, isLoopbackHost } from "./world/core.mjs";
+import { hostAllowed, hostsOf, isLoopbackHost, hardenHttpServer, installCrashGuards } from "./world/core.mjs";
 
 const root = fileURLToPath(new URL("../web/", import.meta.url));
 const port = Number(process.argv[2] || 8080);
@@ -16,7 +16,7 @@ const chainId = (() => { try { return JSON.parse(readFileSync(join(root, "deploy
 const HOST = process.env.HOST || (chainId === 31337 ? "127.0.0.1" : "");
 const guard = HOST && isLoopbackHost(HOST) ? hostsOf([process.env.PUBLIC_URL, process.env.SITE]) : null;
 const OVERRIDES = process.env.SITE_OVERRIDES ? JSON.parse(process.env.SITE_OVERRIDES) : null;
-const PILOT_POLICY = "bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(), geolocation=(), serial=()";
+const PILOT_POLICY = "bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()";
 const TYPES = {
   ".webmanifest": "application/manifest+json",
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json",
@@ -31,16 +31,25 @@ const SECURITY = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), serial=(), bluetooth=()",
 };
 
-export const createHandler = (guard, rootDir = root) => async (req, res) => {
+/** True for any spelling of web/deployment.json that reaches the same file (case-insensitive volumes, a trailing dot or space, an NTFS stream). */
+const isDeploymentName = (p) => p.toLowerCase().replace(/[. ]+$/, "").split(":")[0] === "deployment.json";
+
+export const createHandler = (guard, rootDir = root, overrides = OVERRIDES) => async (req, res) => {
   if (guard && !hostAllowed(req.headers.host, guard)) return res.writeHead(421, SECURITY).end("misdirected request");
   try {
     const p = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^([/\\])+/, "");
     let file = join(rootDir, p);
     if (!file.startsWith(rootDir)) return res.writeHead(403, SECURITY).end();
-    if ((await stat(file)).isDirectory()) file = join(file, "index.html");
+    const st = await stat(file, { bigint: true });
+    if (st.isDirectory()) file = join(file, "index.html");
     let body = await readFile(file);
-    if (OVERRIDES && p === "deployment.json") body = JSON.stringify({ ...JSON.parse(body), ...OVERRIDES });
-    // Robot Link needs Web Serial and the camera (film mode); Phone Brain needs camera, Bluetooth and motion sensors; other pages keep them off
+    if (overrides) {
+      // the served config carries the overrides whatever the spelling of its name (/Deployment.json is the same file on Windows and macOS)
+      const real = await stat(join(rootDir, "deployment.json"), { bigint: true }).catch(() => null);
+      if (isDeploymentName(p) || (real && st.ino && st.ino === real.ino && st.dev === real.dev)) body = JSON.stringify({ ...JSON.parse(body), ...overrides });
+    }
+    // Robot Link needs Web Serial and the camera (film mode); Phone Brain needs camera, Bluetooth, the microphone and
+    // motion sensors; other pages keep them off
     const camera = p === "robot.html" ? { "Permissions-Policy": SECURITY["Permissions-Policy"].replace("camera=()", "camera=(self)").replace("serial=()", "serial=(self)") }
       : p === "pilot.html" ? { "Permissions-Policy": PILOT_POLICY } : {};
     res.writeHead(200, { ...SECURITY, ...camera, "Content-Type": TYPES[extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
@@ -52,5 +61,6 @@ export const createHandler = (guard, rootDir = root) => async (req, res) => {
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-  createServer(createHandler(guard)).listen(port, ...(HOST ? [HOST] : []), () => console.log(`OpenForge web at http://localhost:${port}${HOST ? ` (bound to ${HOST})` : ""}`));
+  installCrashGuards("web");
+  hardenHttpServer(createServer(createHandler(guard))).listen(port, ...(HOST ? [HOST] : []), () => console.log(`OpenForge web at http://localhost:${port}${HOST ? ` (bound to ${HOST})` : ""}`));
 }

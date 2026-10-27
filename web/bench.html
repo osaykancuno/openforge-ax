@@ -18,8 +18,11 @@
 } }
 </script>
 <!--preload-->
+<link rel="preload" as="fetch" crossorigin href="deployment.json">
 <link rel="modulepreload" href="js/bench/bench.js">
-<link rel="modulepreload" href="js/bench/bench-view.js">
+<link rel="modulepreload" fetchpriority="low" href="js/bench/bench-view.js">
+<link rel="modulepreload" fetchpriority="low" href="js/bench/motions.js">
+<link rel="modulepreload" fetchpriority="low" href="js/bench/test-scenes.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/models/robots.js">
 <link rel="modulepreload" href="js/models/robot-specs.js">
@@ -29,31 +32,30 @@
 <link rel="modulepreload" href="js/bench/shared.js">
 <link rel="modulepreload" href="vendor/three/three.module.min.js">
 <link rel="modulepreload" href="js/models/look.js">
+<link rel="modulepreload" href="js/sim/arm-sim.js">
+<link rel="modulepreload" href="js/bench/missions/biped.js">
+<link rel="modulepreload" href="js/bench/missions/replicant.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-walker.js">
+<link rel="modulepreload" href="js/bench/missions/hound.js">
+<link rel="modulepreload" href="js/bench/missions/ax1-desk.js">
 <link rel="modulepreload" href="js/theme.js">
-<link rel="modulepreload" href="js/ambient.js">
-<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
 <link rel="modulepreload" href="js/bench/missions/so101.js">
 <link rel="modulepreload" href="js/bench/missions/rover.js">
-<link rel="modulepreload" href="js/bench/missions/hound.js">
 <link rel="modulepreload" href="js/bench/missions/hand.js">
 <link rel="modulepreload" href="js/bench/missions/spider.js">
 <link rel="modulepreload" href="js/bench/missions/drone.js">
 <link rel="modulepreload" href="js/bench/missions/fab.js">
-<link rel="modulepreload" href="js/bench/missions/replicant.js">
 <link rel="modulepreload" href="js/bench/missions/ax1-rover.js">
-<link rel="modulepreload" href="js/bench/missions/ax1-desk.js">
-<link rel="modulepreload" href="js/bench/missions/ax1-walker.js">
 <link rel="modulepreload" href="js/bench/missions/common.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
-<link rel="modulepreload" href="js/sim/arm-sim.js">
 <link rel="modulepreload" href="js/bench/missions/drive.js">
-<link rel="modulepreload" href="js/bench/missions/biped.js">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
 <!--/preload-->
 <!--seo-->
 <meta property="og:type" content="website">

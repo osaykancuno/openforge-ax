@@ -5,7 +5,7 @@ import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome, agents, reader, eth, isDeployed, esc, short } from "./chain.js";
 import { TRAITS } from "./traits-data.js";
 import {
-  ORDER_FULFILLED, ORDER_FULFILLED_ABI, WETH, salePrice, kindOf, holdersFrom, holderStats, salesStats, traitRows, rarest, formatEth, ago,
+  ORDER_FULFILLED_ABI, WETH, salePrice, saleOrderLogs, kindOf, holdersFrom, holderStats, salesStats, traitRows, rarest, formatEth, ago,
 } from "./market/market-data.js";
 
 await loadConfig();
@@ -139,13 +139,16 @@ async function loadChain() {
   const candidates = rows.filter((r) => r.kind === "transfer").slice(0, SCAN_MAX);
   const iface = new (await eth()).Interface([ORDER_FULFILLED_ABI]);
   const weth = WETH[CONFIG.chainId] ?? "";
+  // the local demo's Seaport stand-in (deployment.json "mockSeaport", demo chain only); on a real chain only the official Seaports count
+  const localSeaport = CONFIG.chainId === 31337 ? await fetch(new URL("../deployment.json", import.meta.url)).then((r) => r.json()).then((d) => d?.mockSeaport ?? "").catch(() => "") : "";
   const receipts = new Map();
   for (let i = 0; i < candidates.length; i += 10) {
     const hashes = [...new Set(candidates.slice(i, i + 10).map((r) => r.hash))].filter((h) => !receipts.has(h));
     (await Promise.all(hashes.map((h) => p.getTransactionReceipt(h).catch(() => null)))).forEach((rc, k) => receipts.set(hashes[k], rc));
   }
   for (const r of candidates) {
-    const orders = (receipts.get(r.hash)?.logs ?? []).filter((l) => l.topics[0] === ORDER_FULFILLED).map((l) => iface.parseLog(l)?.args).filter(Boolean);
+    // only an official Seaport's event, in a receipt where this agent moved, can price a sale (anyone can emit a fake OrderFulfilled)
+    const orders = saleOrderLogs(receipts.get(r.hash)?.logs, { chainId: CONFIG.chainId, nft: CONFIG.agents, tokenId: r.id, localSeaport }).map((l) => iface.parseLog(l)?.args).filter(Boolean);
     for (const o of orders) {
       const price = salePrice(o, CONFIG.agents, r.id, weth);
       if (price != null) (r.kind = "sale"), (r.price = price);

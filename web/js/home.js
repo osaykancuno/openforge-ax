@@ -84,19 +84,25 @@ for (const s of STATIONS) {
   });
   nav.append(b);
 }
-const label = (id) => nav.querySelector(`[data-id="${id}"]`);
 const labels = [...nav.querySelectorAll(".lab-label")];
-let halfWidths = new Map(); // measured on resize, not per frame
+const byId = new Map(labels.map((b) => [b.dataset.id, b])); // no selector query per label per frame
+const label = (id) => byId.get(id);
+const hudEl = document.querySelector(".lab-hud");
+// One slot per label, reused every frame: nothing is allocated while the ring turns.
+const slots = labels.map((b) => ({ b, id: b.dataset.id, half: 60, x: 0, y: 0, visible: true }));
+const slotById = new Map(slots.map((sl) => [sl.id, sl]));
 let labelH = 30;
 let hudBox = null; // wide screens: the title block on the left, which labels never slide under
+// All the layout reads happen together, and in a ResizeObserver callback (layout is already clean there): reading a
+// width right after the DOM writes above forced a ~160 ms reflow of the whole page.
 const measure = () => {
-  halfWidths = new Map(labels.map((b) => [b.dataset.id, b.offsetWidth / 2]));
+  for (const sl of slots) sl.half = sl.b.offsetWidth / 2;
   labelH = labels[0]?.offsetHeight || 30;
-  hudBox = innerWidth > 760 ? document.querySelector(".lab-hud").getBoundingClientRect() : null;
+  hudBox = innerWidth > 760 ? hudEl.getBoundingClientRect() : null;
 };
-new ResizeObserver(measure).observe(nav);
-new ResizeObserver(measure).observe(document.querySelector(".lab-hud"));
-measure();
+const measurer = new ResizeObserver(measure); // fires once on observe(), after the first layout, then on every size change
+measurer.observe(nav);
+measurer.observe(hudEl);
 
 // ---------------------------------------------------------------- 3D lab (falls back to the list of stations)
 // startLab() runs at the end of this file, once every handler below is attached.
@@ -116,24 +122,28 @@ async function startLab() {
         onSelect: (id) => select(id),
         // the HUD's footprint: the lab is framed in the space it leaves free
         safeArea: () => {
-          const r = document.querySelector(".lab-hud").getBoundingClientRect();
+          const r = hudEl.getBoundingClientRect();
           return { left: r.right, top: r.bottom };
         },
         onFrame: (pts) => {
           const W = innerWidth;
-          const placed = pts.map((p) => {
-            const half = halfWidths.get(p.id) || 60;
-            let x = Math.max(half + 6, Math.min(W - half - 6, p.x)); // labels never leave the screen
-            if (hudBox && p.y > hudBox.top && p.y - labelH < hudBox.bottom) x = Math.max(x, hudBox.right + half + 6); // nor go under the title
-            return { p, half, x, y: p.y };
-          });
+          const placed = slots;
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i], sl = slotById.get(p.id);
+            if (!sl) continue;
+            sl.p = p;
+            let x = Math.max(sl.half + 6, Math.min(W - sl.half - 6, p.x)); // labels never leave the screen
+            if (hudBox && p.y > hudBox.top && p.y - labelH < hudBox.bottom) x = Math.max(x, hudBox.right + sl.half + 6); // nor go under the title
+            sl.x = x;
+            sl.y = p.y;
+          }
           // small screens crowd the ring: labels that would overlap are pushed apart vertically, a few cheap passes
           const gap = labelH + 4;
           for (let pass = 0; pass < 4; pass++) {
             for (let i = 0; i < placed.length; i++) {
               for (let j = i + 1; j < placed.length; j++) {
                 const a = placed[i], c = placed[j];
-                if (!a.p.visible || !c.p.visible || Math.abs(a.x - c.x) >= a.half + c.half + 4) continue;
+                if (!a.p || !c.p || !a.p.visible || !c.p.visible || Math.abs(a.x - c.x) >= a.half + c.half + 4) continue;
                 const dy = c.y - a.y, push = (gap - Math.abs(dy)) / 2;
                 if (push <= 0) continue;
                 const s = dy < 0 ? -1 : 1;
@@ -141,10 +151,11 @@ async function startLab() {
               }
             }
           }
-          for (const { p, x: px, y: py } of placed) {
-            const b = label(p.id);
-            const x = Math.round(px);
-            const y = Math.round(py);
+          for (const sl of placed) {
+            const p = sl.p, b = sl.b;
+            if (!p) continue;
+            const x = Math.round(sl.x);
+            const y = Math.round(sl.y);
             if (b._x !== x || b._y !== y) (b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`), (b._x = x), (b._y = y);
             const v = p.visible ? "" : "hidden";
             if (b.style.visibility !== v) b.style.visibility = v;
@@ -162,7 +173,7 @@ async function startLab() {
   applyMotion();
   // a panel opened from the URL before the scene existed: fly to its station now
   const station = open && STATIONS.find((s) => s.panel === open);
-  if (view && station) view.focus(station.id);
+  if (view && station) (view.focus(station.id), panelCovers() && view.pause());
 }
 
 // ---------------------------------------------------------------- motion: a visible pause (WCAG 2.2.2), default from the OS setting
@@ -210,11 +221,15 @@ function select(id, from = label(id)) {
   setTimeout(() => (location.href = s.href), view && !paused ? 650 : 0);
 }
 let open = null;
+// on a narrow screen the panel covers the whole canvas: nothing to draw, so the render loop stops until it closes
+const panelCovers = () => open && innerWidth <= 560;
+addEventListener("resize", () => open && (panelCovers() ? view?.pause() : view?.resume())); // a rotation across 560 px with the panel open
 function openPanel(name, from = document.activeElement) {
   const station = STATIONS.find((s) => s.panel === name); // the guide panel has no station: it opens from the nav FAQ / "Guide" button
   open = name;
   opener = from instanceof HTMLElement && from !== document.body ? from : station ? label(station.id) : label("codex");
   if (station) view?.focus(station.id);
+  if (panelCovers()) view?.pause();
   $("panelTitle").textContent = PANEL_TITLES[name];
   document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
   labels.forEach((b) => b.hasAttribute("aria-expanded") && b.setAttribute("aria-expanded", String(b.dataset.id === station?.id)));
@@ -238,6 +253,7 @@ function closePanel() {
   document.body.classList.remove("panel-open");
   labels.forEach((b) => b.hasAttribute("aria-expanded") && b.setAttribute("aria-expanded", "false"));
   document.querySelectorAll("[data-open]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  view?.resume();
   view?.reset();
   history.replaceState(null, "", location.pathname + location.search);
   (opener?.isConnected ? opener : label("codex"))?.focus();
@@ -267,7 +283,7 @@ addEventListener("pageshow", () => {
   status("");
   view?.hover(null); // a tap on a phone sends mouseenter but never mouseleave: drop the lifted station
   if (!open) view?.reset(0);
-  view?.resume();
+  if (!panelCovers()) view?.resume();
 });
 
 // ---------------------------------------------------------------- panel content (from the generated trait data)
@@ -300,5 +316,6 @@ async function refresh() {
   }
 }
 startLab(); // every handler is attached: now build the scene
-refresh();
-setInterval(() => !document.hidden && refresh(), 30000);
+// the stats are not what the page is for: the first read waits for an idle moment (the scene builds first), then once a minute
+(window.requestIdleCallback ? requestIdleCallback(refresh, { timeout: 3000 }) : setTimeout(refresh, 1500));
+setInterval(() => !document.hidden && refresh(), 60000);

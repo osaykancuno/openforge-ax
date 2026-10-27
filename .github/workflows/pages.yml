@@ -2,6 +2,7 @@
 # web/ is already built and committed (npm run web:build), so this only copies it. Until the launch the copy is a
 # preview: no local-demo config (visitors' browsers never contact 127.0.0.1) and no search-engine indexing.
 # GitHub Pages ignores web/_headers; the CSP is a <meta> tag in each page and theme-boot.js blocks framing.
+# Actions are pinned to a full commit SHA (the tag is the trailing comment): a moved tag cannot change what runs here.
 name: Pages
 
 on:
@@ -25,19 +26,30 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Prepare the preview copy
         run: |
           cp -r web _site
+          # the vendored libraries must still be the exact files web:build copied from node_modules (before any pruning below)
+          (cd _site/vendor && sha256sum -c SHA256SUMS)
           # the local demo points at 127.0.0.1: the preview gets the public defaults instead (mainnet, no contracts yet,
           # so the blockchain pages say "not published yet" and never contact the visitor's machine)
-          if grep -q '"chainId": *31337' _site/deployment.json 2>/dev/null; then printf '{ "chainId": 1, "chainName": "Ethereum" }\n' > _site/deployment.json; fi
+          if grep -q '"chainId": *31337' _site/deployment.json 2>/dev/null; then
+            printf '{ "chainId": 1, "chainName": "Ethereum" }\n' > _site/deployment.json
+            # and no page may allow loopback hosts in its CSP (the pilot page keeps its own: the visitor's local model server)
+            for f in _site/*.html; do
+              [ "$f" = "_site/pilot.html" ] && continue
+              sed -i -E 's# (http|ws)://(localhost|127\.0\.0\.1):\*##g' "$f"
+            done
+          fi
+          # never referenced by a page: the unminified three.js (art renders only), the demo token images (local demo only), unused showcase previews
+          rm -rf _site/assets/showcase _site/demo-images _site/vendor/three/three.module.js
           rm -f _site/_headers _site/sitemap.xml
           printf 'User-agent: *\nDisallow: /\n' > _site/robots.txt
           touch _site/.nojekyll
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

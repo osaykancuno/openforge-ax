@@ -1,6 +1,5 @@
 import { themeButton } from "./theme.js";
-import { musicButton } from "./ambient.js";
-import { soundsButton } from "./ui-sounds.js";
+import { soundsDom, musicDom, lazyAudio } from "./audio-buttons.js"; // the audio code itself (ui-sounds.js, ambient.js) loads on the first gesture
 import { CONFIG } from "./config.js";
 import { SERVERS_KEY, applyServers, validServerUrl } from "./servers.js";
 
@@ -53,7 +52,8 @@ export const ABI = {
 // ---------------------------------------------------------------- deployment override
 let ready;
 export function loadConfig() {
-  ready ??= fetch(new URL("../deployment.json", import.meta.url))
+  // same URL and credentials as the <link rel="preload" as="fetch" crossorigin href="deployment.json"> that scripts/build-web.mjs puts in each page, so the browser reuses that download
+  ready ??= fetch(new URL("../deployment.json", import.meta.url), { credentials: "same-origin" })
     .then((r) => (r.ok ? r.json() : {}))
     .catch(() => ({}))
     .then((d) => Object.assign(CONFIG, applyServers({ ...CONFIG, ...pickDeployment(d) }, storedServers())));
@@ -182,6 +182,19 @@ export async function autoReconnect() {
   if (accs.length) await connect().catch(() => {});
 }
 
+// Pages where a visitor signs something (the agent pages, the Proving Grounds, Neo-Forge) get their wallet back at
+// load, which means loading ethers (160 KB gz). Every other page only shows the remembered address in the nav, read
+// from the wallet without ethers, and loads ethers when the visitor clicks Connect.
+export const WALLET_PAGES = ["mine", "arena", "world"];
+export const walletByDefault = (active) => WALLET_PAGES.includes(active);
+
+/** The address of a wallet the visitor already connected here, as the nav shows it, or "" (no ethers; not checksummed). */
+export async function rememberedAddress() {
+  if (!window.ethereum || localStorageSafe("get", "ofx-connected") !== "1") return "";
+  const accs = await window.ethereum.request({ method: "eth_accounts" }).catch(() => []);
+  return /^0x[0-9a-fA-F]{40}$/.test(accs?.[0]) ? short(accs[0]) : "";
+}
+
 if (window.ethereum?.on) {
   window.ethereum.on("accountsChanged", () => location.reload());
   window.ethereum.on("chainChanged", () => location.reload()); // a network switch must never leave the page signing for another chain
@@ -296,7 +309,8 @@ export function toast(msg, isErr = false) {
   el._t = setTimeout(() => (el.textContent = ""), isErr ? 9000 : 6000);
 }
 
-export function renderChrome(active) {
+/** `wallet`: restore the connected wallet now (loads ethers). Default: only on the pages that sign (WALLET_PAGES). */
+export function renderChrome(active, { wallet = walletByDefault(active) } = {}) {
   const nav = document.createElement("nav");
   nav.className = "nav";
   nav.innerHTML = `<div class="wrap">
@@ -330,7 +344,9 @@ export function renderChrome(active) {
   // back/forward cache as it left) does not come back to a menu still covering the page
   links.addEventListener("click", (e) => e.target.closest("a") && fold());
   addEventListener("pageshow", fold);
-  nav.querySelector("#mintNav").before(soundsButton(), musicButton(), themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
+  const soundsBtn = soundsDom(), musicBtn = musicDom();
+  nav.querySelector("#mintNav").before(soundsBtn, musicBtn, themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
+  lazyAudio(soundsBtn, musicBtn); // their code loads on the first gesture, not with the page
   const btn = nav.querySelector("#connectBtn");
   btn.onclick = () => connect();
   onWallet((s) => s && ((btn.textContent = short(s.addressChecksum)), btn.removeAttribute("title")));
@@ -346,5 +362,7 @@ export function renderChrome(active) {
   document.body.append(foot);
   let dlg;
   foot.querySelector("#serversLink").onclick = (e) => (e.preventDefault(), (dlg ??= serversDialog()).showModal());
-  autoReconnect();
+  if (wallet) autoReconnect();
+  else
+    rememberedAddress().then((a) => a && !signer && ((btn.textContent = a), btn.removeAttribute("title"))); // a click still goes through connect(), which loads ethers
 }

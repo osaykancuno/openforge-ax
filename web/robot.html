@@ -16,6 +16,7 @@
 } }
 </script>
 <!--preload-->
+<link rel="preload" as="fetch" crossorigin href="deployment.json">
 <link rel="modulepreload" href="js/robot.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/sim/arena-view.js">
@@ -29,8 +30,7 @@
 <link rel="modulepreload" href="js/robot/player.js">
 <link rel="modulepreload" href="js/recorder.js">
 <link rel="modulepreload" href="js/theme.js">
-<link rel="modulepreload" href="js/ambient.js">
-<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
 <link rel="modulepreload" href="vendor/three/three.module.min.js">
@@ -41,7 +41,7 @@
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
 <!--/preload-->
 <!--seo-->
 <meta property="og:type" content="website">

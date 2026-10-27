@@ -1,7 +1,7 @@
 // Proving Grounds lab trials: every Workbench robot, three levels each, in the same 3D lab as the Workbench.
 // A guest run stays in this browser; an agent run gets a server mission (seed), is signed by the holder (EIP-712,
 // free) and replayed by the verifier, which attests passes on-chain (scripts/proving-server.mjs, /lab/*).
-import { keccak256, toUtf8Bytes } from "../../vendor/ethers.min.js";
+import { keccak256, toUtf8Bytes } from "./hash.js";
 import { CONFIG } from "../config.js";
 import { ROBOTS, buildRobot } from "../models/robots.js";
 import { NAMES } from "../traits-data.js";

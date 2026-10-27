@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { LINKS, CELL, DOCK_RADIUS } from "./arm-sim.js";
-import { PALETTE, makeStage, inkOutline, onThemeChange, themed } from "../models/look.js";
+import { PALETTE, makeStage, inkOutline, onThemeChange, themed, disposeObject } from "../models/look.js";
 import { buildRobot } from "../models/robots.js";
 
 const RAD = Math.PI / 180;
@@ -61,7 +61,8 @@ export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) 
   ground.position.y = -TABLE_H - 0.004; // paper floor just under the tabletop
   const paintRoom = () => ground.material.color.setHex(themed(PALETTE.paper)); // paper floor; the lit table stays light
   paintRoom();
-  onThemeChange(paintRoom);
+  let dirty = true; // the scene is drawn only when something changed (state, camera, size, theme, visibility)
+  const offTheme = onThemeChange(() => (paintRoom(), (dirty = true)));
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10);
   camera.position.set(0.32, 0.46, 0.62);
@@ -71,6 +72,7 @@ export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) 
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 0.25;
   controls.maxDistance = 1.4;
+  controls.addEventListener("change", () => (dirty = true));
 
   // table: a round notebook-grid top (z = 0 in the sim) with an ink rim
   const table = new THREE.Mesh(
@@ -114,10 +116,16 @@ export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) 
   scene.add(rig.group);
   const JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"];
 
+  // the size is read when the canvas changes size (ResizeObserver), not on every frame
+  let sizeStale = true;
+  const ro = new ResizeObserver(() => ((sizeStale = true), (dirty = true)));
+  ro.observe(canvas);
   function resize() {
+    if (!sizeStale) return;
+    sizeStale = false;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+    if (w && h && (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio()))) {
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -149,18 +157,37 @@ export function createArenaView(canvas, { preserveDrawingBuffer = false } = {}) 
     cellMat.color.setHex(state.cell.mode === "held" ? PALETTE.accent : PALETTE.sun);
     dock.position.set(state.dock.x, 0.0012, -state.dock.y);
     dockPad.material.opacity = state.success ? 0.55 : 0.18;
+    dirty = true;
   }
 
   let raf;
   let paused = false; // hidden (the Proving Grounds lab trials are shown): no GPU work
+  const onVis = () => (dirty = true); // a tab coming back redraws once
+  document.addEventListener("visibilitychange", onVis);
   (function loop() {
     if (!paused && !document.hidden) { // a hidden tab draws nothing
       resize();
-      controls.update();
-      renderer.render(scene, camera);
+      if (controls.update()) dirty = true; // damping keeps moving the camera for a moment after a drag
+      if (dirty) {
+        dirty = false;
+        renderer.render(scene, camera);
+      }
     }
     raf = requestAnimationFrame(loop);
   })();
 
-  return { update, setPaused: (p) => (paused = !!p), dispose: () => cancelAnimationFrame(raf) };
+  return {
+    update,
+    setPaused: (p) => ((paused = !!p), p || (dirty = true)),
+    dispose() {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      document.removeEventListener("visibilitychange", onVis);
+      offTheme();
+      controls.dispose();
+      disposeObject(scene); // every geometry, material and texture the view made
+      scene.clear();
+      renderer.dispose();
+    },
+  };
 }

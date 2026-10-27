@@ -307,6 +307,13 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   const look = new THREE.Vector2();
   let raf = 0, last = performance.now(), clock = 0;
   const minDt = maxFps ? 1000 / maxFps - 2 : 0; // 2 ms of slack: display frames come in whole multiples of 16.7 ms
+  // the GPU is the bottleneck: a quarter of the shadow-map pixels (the map is rebuilt at the new size on the next frame)
+  const cheaperShadows = () => {
+    const sh = stage.key.shadow;
+    sh.mapSize.set(512, 512);
+    sh.map?.dispose();
+    sh.map = null;
+  };
   let seen = 0, prevRaf = 0, sum = 0, n = 0; // frame-time probe for adaptiveDpr: rAF to rAF, first 30 frames after a short warm-up
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   function frame(now) {
@@ -314,7 +321,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     if (adaptiveDpr && n < 30) {
       if (prevRaf && ++seen > 2) {
         sum += now - prevRaf;
-        if (++n === 30 && sum / n > 24 && renderer.getPixelRatio() > 1) (renderer.setPixelRatio(1), resize());
+        if (++n === 30 && sum / n > 24 && renderer.getPixelRatio() > 1) (renderer.setPixelRatio(1), cheaperShadows(), resize());
       }
       prevRaf = now;
     }
@@ -366,20 +373,27 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
     }
     renderer.render(scene, camera);
 
-    items.forEach((it, i) => {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], a = anchors[i];
       tmp.copy(it.group.position).setY(it.top + 0.45 + it.lift * 0.18).project(camera);
-      Object.assign(anchors[i], { x: ((tmp.x + 1) / 2) * rect.width, y: ((1 - tmp.y) / 2) * rect.height, visible: it.ready && tmp.z < 1 });
-    });
+      a.x = ((tmp.x + 1) / 2) * rect.width; // anchors are reused: nothing is allocated per frame
+      a.y = ((1 - tmp.y) / 2) * rect.height;
+      a.visible = it.ready && tmp.z < 1;
+    }
     onFrame(anchors);
   }
   const stop = () => (cancelAnimationFrame(raf), (raf = 0));
   const start = () => !raf && !document.hidden && ((last = performance.now()), (prevRaf = 0), wake(), (raf = requestAnimationFrame(frame)));
-  const onVisibility = () => (document.hidden ? stop() : start());
+  let held = false; // paused by the page (a panel covers the canvas): a tab coming back must not restart it
+  const onVisibility = () => (document.hidden ? stop() : held || start());
   document.addEventListener("visibilitychange", onVisibility);
   start();
 
   return {
-    focus, reset, hover: setHover, resume: start,
+    focus, reset, hover: setHover,
+    resume: () => ((held = false), start()),
+    /** stops drawing until resume() (a panel covers the canvas); a hidden page stops and restarts on its own */
+    pause: () => ((held = true), stop()),
     /** false freezes every automatic motion (drift, robots, waves); hover, clicks and AX-1's gaze still work */
     setMotion: (on) => ((reduced = !on), wake()),
     dispose: () => {

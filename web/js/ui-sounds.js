@@ -5,8 +5,9 @@
 //     tab, a stage, a page or a book page changes; slide: a tiny detent while a slider moves;
 //   * quiet and warm like the music: everything under a 2.4 kHz low-pass, peaks far below full scale, nothing bright;
 //   * browsers allow sound only after a gesture: the first click, tap or key wakes the audio, and nothing plays before;
-//   * the speaker button turns them off, and "off" is remembered in this browser (key ofx-sounds).
-const KEY = "ofx-sounds";
+//   * the speaker button turns them off, and "off" is remembered in this browser (key ofx-sounds);
+//   * loaded by chain.js on the first pointer or key event (audio-buttons.js), not with the page.
+import { SOUNDS_KEY as KEY, soundsDom } from "./audio-buttons.js";
 const LEVEL = 0.5;
 
 const CONTROL = 'a[href], button, summary, select, [role="tab"], [role="button"], label.btn, input[type="checkbox"], input[type="radio"]';
@@ -139,28 +140,27 @@ if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => (document.hidden ? sounds?.ctx.suspend() : on && sounds?.ctx.resume().catch(() => {})));
 }
 
-const SPEAKER = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z"/><path class="snd-wave" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4"/><path class="snd-off" d="M11 6l3.5 4M14.5 6L11 10"/></svg>';
+/** Turns the sounds on or off (the speaker button), remembered in this browser. */
+export function toggleSounds() {
+  on = !on;
+  try {
+    if (on) localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, "off");
+  } catch {} // storage blocked: the choice lasts for this page
+  sync();
+  if (on) playSoon((s) => s.press());
+}
 
-/** The interface-sounds toggle (aria-pressed = sounds on). `className` styles it for the page it sits in. */
-export function soundsButton(className = "btn sm ghost sound-btn") {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = `${className}${className.includes("sound-btn") ? "" : " sound-btn"}`;
-  b.innerHTML = `${SPEAKER}<span class="nav-txt">Sounds</span>`;
-  b.title = "Interface sounds (turn off if you use a screen reader)";
-  b.setAttribute("aria-label", "Interface sounds");
-  b.dataset.sound = "none"; // it plays its own sound, after turning on
-  b.onclick = () => {
-    on = !on;
-    try {
-      if (on) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, "off");
-    } catch {} // storage blocked: the choice lasts for this page
-    sync();
-    if (on) playSoon((s) => s.press());
-  };
+/** Wires a button built by audio-buttons.js (aria-pressed = sounds on): chain.js loads this module on the first gesture. */
+export function adoptSoundsButton(b) {
+  b.onclick = toggleSounds;
   buttons.add(b);
   sync();
-  if (!(window.AudioContext || window.webkitAudioContext)) b.hidden = true; // no Web Audio: nothing to offer
+}
+
+/** The interface-sounds toggle, built and wired in one go. `className` styles it for the page it sits in. */
+export function soundsButton(className) {
+  const b = soundsDom(className);
+  adoptSoundsButton(b);
   return b;
 }

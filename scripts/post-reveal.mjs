@@ -22,7 +22,7 @@ if (!net) throw new Error("Usage: npm run post-reveal -- sepolia|mainnet");
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dep = JSON.parse(readFileSync(join(root, `deployments-${net.chainId}.json`), "utf8"));
-const agents = new Contract(dep.agents, ["function seed() view returns (bytes32)", "function totalSupply() view returns (uint256)"], new JsonRpcProvider(net.rpc, net.chainId, { staticNetwork: true }));
+const agents = new Contract(dep.agents, ["function seed() view returns (bytes32)", "function totalSupply() view returns (uint256)", "function baseURI() view returns (string)"], new JsonRpcProvider(net.rpc, net.chainId, { staticNetwork: true }));
 const [seed, supply] = await Promise.all([agents.seed(), agents.totalSupply()]);
 if (seed === ZeroHash) throw new Error(`Not revealed yet: run npm run reveal:${name} first`);
 
@@ -31,7 +31,7 @@ run(process.execPath, ["art/generate.mjs", "--seed", seed, "--supply", String(su
 
 let target;
 if (process.env.PINATA_JWT) {
-  const cid = await pinFolder(join(root, "art/out/images"), `openforge-images-${name}`);
+  const cid = await pinFolder(join(root, "art/out/images"), `openforge-images-${name}`, { supply: Number(supply) });
   setEnv({ IMAGES_CID: cid, BASE_URI: "" });
   target = { IMAGES_CID: cid, BASE_URI: "" };
   console.log(`✔ Images pinned: ipfs://${cid}/ (IMAGES_CID saved in .env)`);
@@ -47,6 +47,14 @@ if (process.env.PINATA_JWT) {
 }
 run("npx", ["hardhat", "run", "scripts/finalize.js", "--network", name], { ...target, FREEZE: "" });
 run(process.execPath, ["scripts/build-web.mjs"]);
+// finalize.js only prints Safe calldata when the owner is a Safe: do not announce "Next" unless the base URI is really set
+const wanted = target.BASE_URI || `ipfs://${target.IMAGES_CID}/`;
+const onChain = await agents.baseURI().catch(() => "");
+if (onChain !== wanted) {
+  console.log(`\nNOT DONE: the on-chain base URI is "${onChain}", not "${wanted}".`);
+  console.log("If finalize printed Safe calldata above, execute it from the Safe, then check baseURI() again. Do not refresh OpenSea or freeze before that.");
+  process.exit(2);
+}
 console.log(`\nNext: ${target.BASE_URI ? "publish web/ (it now contains the images), then " : ""}on OpenSea "Refresh metadata" on ~10 agents (Prime Constructs included).`);
 console.log(target.BASE_URI
   ? `Freeze only if you will keep the domain forever: $env:FREEZE="true"; $env:FREEZE_HTTPS="yes"; npm run finalize:${name}  (or keep it unfrozen and move to IPFS later)`

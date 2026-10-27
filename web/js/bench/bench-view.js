@@ -19,15 +19,7 @@ const cssColor = (name, fallback) => {
   }
 };
 
-/** WebGL available? (cheap probe, no context kept) */
-export function hasWebGL() {
-  try {
-    const c = document.createElement("canvas");
-    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
-  } catch {
-    return false;
-  }
-}
+export { hasWebGL } from "./shared.js";
 
 export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
   const small = matchMedia("(max-width: 760px)").matches;
@@ -44,6 +36,7 @@ export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
   // ---------------------------------------------------------------- camera: az/el/size/target, tweened
   const cam = { az: 35, el: 28, size: 0.4, tx: 0, ty: 0.12, tz: 0 };
   let aspect = 1;
+  let viewW = 0, viewH = 0; // the canvas's size, read once per resize (not per frame)
   function placeCamera() {
     const d = 12;
     const az = cam.az * RAD, el = cam.el * RAD;
@@ -70,9 +63,12 @@ export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
   }
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
+    viewW = w;
+    viewH = h;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     aspect = w / h;
+    sizesStale(); // a new plate size can reflow the labels (media queries, wrapping)
     // a framed scene keeps filling the plate when the plate changes shape (unless the visitor moved the camera)
     if (home.box && resetBtn.hidden) cam.size = home.size = fitSize(home.box, cam.az, cam.el, home.pad);
     placeCamera();
@@ -405,56 +401,84 @@ export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
       svg.append(line, dot);
       const tmp = new THREE.Vector3();
       const anchor = s.anchor || (s.node ? () => s.node.getWorldPosition(tmp) : () => tmp.copy(s.point));
-      labels.push({ el: li, line, dot, anchor, text: typeof s.text === "function" ? s.text : null, last: txt, side: s.side });
+      labels.push({ el: li, line, dot, anchor, text: typeof s.text === "function" ? s.text : null, last: txt, side: s.side, w: 0, h: 22 });
     }
     invalidate();
   }
+  // Layout runs on every live frame, so it reads and writes in separate passes (no layout thrash), keeps each label's
+  // size until its text or the plate changes, writes only what moved, and allocates nothing.
+  const labelV = new THREE.Vector3();
+  const slots = [], colRight = [], colLeft = [];
+  const byY = (a, b) => a.ly - b.ly;
+  const sizesStale = () => {
+    for (const l of labels) l.w = 0;
+  };
   function layoutLabels() {
     if (!labels.length) return;
-    const W = canvas.clientWidth, H = canvas.clientHeight;
-    const v = new THREE.Vector3();
-    const placed = [];
+    const W = viewW, H = viewH;
+    // 1. writes that change a label's size: dynamic text
     for (const l of labels) {
-      if (l.text) {
-        const t = l.text();
-        if (t !== l.last) (l.el.textContent = t), (l.last = t);
-      }
+      if (!l.text) continue;
+      const t = l.text();
+      if (t !== l.last) (l.el.textContent = t), (l.last = t), (l.w = 0);
+    }
+    // 2. reads: the size of every label that has none yet (one layout for all of them)
+    for (const l of labels) if (!l.w) (l.w = l.el.offsetWidth || 120), (l.h = l.el.offsetHeight || 22);
+    // 3. pure maths: projection, then keep labels on each side from overlapping (sort by height, push each below the one
+    // above; real heights, a long label wraps to two lines)
+    colRight.length = colLeft.length = 0;
+    let n = 0;
+    for (const l of labels) {
       const p = l.anchor();
       if (!p) {
-        l.el.style.visibility = "hidden";
+        l.show = false;
         continue;
       }
-      v.copy(p).project(camera);
-      const x = ((v.x + 1) / 2) * W, y = ((1 - v.y) / 2) * H;
+      labelV.copy(p).project(camera);
+      const x = ((labelV.x + 1) / 2) * W, y = ((1 - labelV.y) / 2) * H;
       const right = l.side ? l.side > 0 : x >= W / 2;
-      placed.push({ l, x, y, right, ly: y - 26, h: l.el.offsetHeight || 22 });
+      const q = (slots[n++] ??= {});
+      q.l = l;
+      q.x = x;
+      q.y = y;
+      q.ly = y - 26;
+      l.show = true;
+      (right ? colRight : colLeft).push(q);
+      q.right = right;
     }
-    // keep labels on each side from overlapping: sort by height, push each below the one above (real heights: a
-    // long label wraps to two lines)
-    for (const side of [true, false]) {
-      const col = placed.filter((p) => p.right === side).sort((a, b) => a.ly - b.ly);
+    for (const col of [colRight, colLeft]) {
+      col.sort(byY);
       let next = 6, last = 0;
-      for (const p of col) {
-        p.ly = Math.max(p.ly, next);
-        next = p.ly + p.h + 4;
-        last = p.ly + p.h;
+      for (const q of col) {
+        q.ly = Math.max(q.ly, next);
+        next = q.ly + q.l.h + 4;
+        last = q.ly + q.l.h;
       }
       const over = last - (H - 6);
-      if (over > 0) col.forEach((p) => (p.ly -= over));
+      if (over > 0) for (const q of col) q.ly -= over;
     }
-    for (const p of placed) {
-      const { l } = p;
-      const w = l.el.offsetWidth || 120;
-      const lx = p.right ? Math.min(W - w - 6, Math.max(p.x + 34, W * 0.62)) : Math.max(6, Math.min(p.x - 34 - w, W * 0.38 - w));
-      l.el.style.visibility = "visible";
-      l.el.style.transform = `translate(${Math.round(lx)}px, ${Math.round(p.ly)}px)`;
-      const ex = p.right ? lx - 4 : lx + w + 4, ey = p.ly + 11;
-      l.line.setAttribute("x1", p.x.toFixed(1));
-      l.line.setAttribute("y1", p.y.toFixed(1));
-      l.line.setAttribute("x2", ex.toFixed(1));
-      l.line.setAttribute("y2", ey.toFixed(1));
-      l.dot.setAttribute("cx", p.x.toFixed(1));
-      l.dot.setAttribute("cy", p.y.toFixed(1));
+    // 4. writes: only what changed since the last frame
+    for (const l of labels) if (!l.show && l.vis !== false) (l.el.style.visibility = "hidden"), (l.vis = false);
+    for (let i = 0; i < n; i++) {
+      const q = slots[i], l = q.l, w = l.w;
+      const lx = q.right ? Math.min(W - w - 6, Math.max(q.x + 34, W * 0.62)) : Math.max(6, Math.min(q.x - 34 - w, W * 0.38 - w));
+      if (l.vis !== true) (l.el.style.visibility = "visible"), (l.vis = true);
+      const tx = Math.round(lx), ty = Math.round(q.ly);
+      if (tx !== l.tx || ty !== l.ty) (l.el.style.transform = `translate(${tx}px, ${ty}px)`), (l.tx = tx), (l.ty = ty);
+      const x1 = Math.round(q.x * 10) / 10, y1 = Math.round(q.y * 10) / 10;
+      const x2 = Math.round((q.right ? lx - 4 : lx + w + 4) * 10) / 10, y2 = Math.round((q.ly + 11) * 10) / 10;
+      if (x1 !== l.x1 || y1 !== l.y1) {
+        l.line.setAttribute("x1", x1);
+        l.line.setAttribute("y1", y1);
+        l.dot.setAttribute("cx", x1);
+        l.dot.setAttribute("cy", y1);
+        (l.x1 = x1), (l.y1 = y1);
+      }
+      if (x2 !== l.x2 || y2 !== l.y2) {
+        l.line.setAttribute("x2", x2);
+        l.line.setAttribute("y2", y2);
+        (l.x2 = x2), (l.y2 = y2);
+      }
     }
   }
 
@@ -495,8 +519,8 @@ export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
     if (onTick) onTick(reduced ? 0 : dt, t);
     if (rig) rig.update(live && !reduced ? dt : 0, t);
     placeSignal(t);
-    if (canvas.clientWidth) {
-      renderer.setViewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+    if (viewW) {
+      renderer.setViewport(0, 0, viewW, viewH);
       renderer.setScissorTest(false);
       renderer.render(scene, camera);
       if (phoneCam && phoneRect && !phoneRect.hidden) {
@@ -530,6 +554,7 @@ export function createBenchView(canvas, labelLayer, { reduced = false } = {}) {
     invalidate();
   }
 
+  document.fonts?.ready.then(() => (sizesStale(), invalidate())); // label sizes change when the web fonts land
   onThemeChange(applyTheme);
   applyTheme();
   resize();

@@ -11,9 +11,10 @@ import "dotenv/config";
 // Children get only what they need. Secrets are an explicit denylist (the .env is loaded for all of them).
 const CHAIN_SECRETS = ["PRIVATE_KEY", "SEPOLIA_PRIVATE_KEY", "PINATA_JWT", "ETHERSCAN_API_KEY"]; // deploy-time only, no service uses them
 const ATTEST_SECRETS = ["SIM_ATTESTER_KEY", "ADMIN_TOKEN"]; // the verifier only
-const DENY = { web: [...CHAIN_SECRETS, ...ATTEST_SECRETS], world: [...CHAIN_SECRETS, ...ATTEST_SECRETS], proving: CHAIN_SECRETS };
+const MARKET_SECRETS = ["OPENSEA_API_KEY"]; // the verifier only (its GET /market relay); the site and the world server never call OpenSea
+const DENY = { web: [...CHAIN_SECRETS, ...ATTEST_SECRETS, ...MARKET_SECRETS], world: [...CHAIN_SECRETS, ...ATTEST_SECRETS, ...MARKET_SECRETS], proving: CHAIN_SECRETS };
 export function childEnv(name, env, extra = {}) {
-  const deny = new Set(DENY[name] || [...CHAIN_SECRETS, ...ATTEST_SECRETS]); // unknown service: least privilege
+  const deny = new Set(DENY[name] || [...CHAIN_SECRETS, ...ATTEST_SECRETS, ...MARKET_SECRETS]); // unknown service: least privilege
   return { ...Object.fromEntries(Object.entries(env).filter(([k]) => !deny.has(k))), ...extra };
 }
 

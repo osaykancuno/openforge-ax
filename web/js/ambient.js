@@ -8,7 +8,7 @@
 //     ui-sounds.js; the ♪ button turns the music on, and "on" is remembered in this browser, so the next pages continue
 //     it (at once if the browser allows sound there, otherwise at the visitor's first click, tap or key);
 //   * quiet and soft: nothing bright or sharp (everything under a 2.4 kHz low-pass), silent while the page is hidden.
-const KEY = "ofx-music";
+import { MUSIC_KEY as KEY, musicDom } from "./audio-buttons.js";
 const VOLUME = 0.42; // low on purpose: background, never in the way (about -36 dBFS RMS)
 
 // ---------------------------------------------------------------- composition (pure: no audio, testable)
@@ -372,17 +372,19 @@ if (typeof document !== "undefined") {
   }
 }
 
-/** The ♪ toggle (aria-pressed = music on). `className` styles it for the page it sits in. */
-export function musicButton(className = "btn sm ghost music-btn") {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = `${className}${className.includes("music-btn") ? "" : " music-btn"}`;
-  b.innerHTML = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12V3.5l7-1.5v8.5"/><circle cx="4.3" cy="12" r="1.8"/><circle cx="11.3" cy="10.5" r="1.8"/><path class="mus-off" d="M2 2l12 12"/></svg><span class="nav-txt">Music</span>';
-  b.title = "Background music";
-  b.setAttribute("aria-label", "Background music");
-  b.onclick = () => setMusic(!on);
+/** Turns the music on or off (the ♪ button); "on" is remembered, so the next pages continue it. */
+export const toggleMusic = () => setMusic(!on);
+
+/** Wires a button built by audio-buttons.js (aria-pressed = music on): chain.js loads this module on its first click, or at once when the music was left on. */
+export function adoptMusicButton(b) {
+  b.onclick = toggleMusic;
   buttons.add(b);
   sync();
-  if (!(window.AudioContext || window.webkitAudioContext)) b.hidden = true; // no Web Audio: nothing to offer
+}
+
+/** The ♪ toggle, built and wired in one go. `className` styles it for the page it sits in. */
+export function musicButton(className) {
+  const b = musicDom(className);
+  adoptMusicButton(b);
   return b;
 }

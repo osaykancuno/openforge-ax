@@ -97,7 +97,7 @@ async function main() {
 
   fs.writeFileSync(
     path.join(root, "web/deployment.json"),
-    JSON.stringify({ chainId: 31337, chainName: "Hardhat Local", rpcUrl: "http://127.0.0.1:8545", provingApi: process.env.PROVING_API || "http://localhost:8787", worldWs: process.env.WORLD_WS || "ws://localhost:8788", explorer: "#", openseaDropUrl: "#demo-opensea", seaDrop: sd, agents: await agents.getAddress(), renderer: await renderer.getAddress(), reputation: await rep.getAddress(), fromBlock }, null, 2)
+    JSON.stringify({ chainId: 31337, chainName: "Hardhat Local", rpcUrl: "http://127.0.0.1:8545", provingApi: process.env.PROVING_API || "http://localhost:8787", worldWs: process.env.WORLD_WS || "ws://localhost:8788", explorer: "#", openseaDropUrl: "#demo-opensea", seaDrop: sd, mockSeaport: await seaport.getAddress(), agents: await agents.getAddress(), renderer: await renderer.getAddress(), reputation: await rep.getAddress(), fromBlock }, null, 2)
   );
   await run([path.join(root, "scripts/build-web.mjs")]);
   console.log("\nDemo ready: npm run serve  ->  http://localhost:8080");

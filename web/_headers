@@ -4,6 +4,7 @@
 /*
   X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'
+  Cross-Origin-Opener-Policy: same-origin
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
@@ -13,13 +14,14 @@
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
 /pilot.html
   ! Permissions-Policy
-  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(), geolocation=(), serial=()
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()
 /pilot
   ! Permissions-Policy
-  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(), geolocation=(), serial=()
+  Permissions-Policy: bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=()
 /robot
   ! Permissions-Policy
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=()
+# voice input (SpeechRecognition) needs the microphone: only on the Phone Brain page
 # the free *.pages.dev address is a preview: never indexed by search engines (the custom domain is not affected)
 https://:project.pages.dev/*
   X-Robots-Tag: noindex

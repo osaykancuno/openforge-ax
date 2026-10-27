@@ -26,14 +26,20 @@ interface INonceSource {
 ///      you trust like yourself. The holder keeps an emergency pause and can revoke at any time.
 ///
 /// Guarantees (all levels):
-///   - The holder (NFT owner) can always execute, except during a sale lock.
+///   - The holder (NFT owner) can always execute, except during a sale lock (it binds the WALLET, whoever holds it).
 ///   - The operator can never call the common asset-moving functions directly (see _isAssetMove, a denylist:
 ///     defence in depth, not a security boundary for L3), never call this account, and never control another
 ///     agent account owned by this one (nested ERC-6551 accounts).
 ///   - Each policy is bound to the holder who set it: on NFT transfer the previous policy
 ///     (operator, whitelist, proposals) lapses automatically (epoch).
-///   - lock(): the seller freezes execution, proposals and signatures for up to 30 days. It does NOT revoke
-///     approvals the account granted earlier: a seller must revoke them before listing.
+///   - lock(): the holder freezes the WALLET (execution, proposals, approvals and signatures) for up to 30 days. The
+///     lock follows the wallet, not the person: after a transfer it still binds every holder (the seller, a second
+///     address, the buyer) until it expires. Nobody can shorten or cancel it; any holder may extend it. It does NOT
+///     revoke approvals the account granted earlier: a seller must revoke them before listing.
+///   - isValidSignature validates the raw hash against the holder's key without binding it to this account (same
+///     as the ERC-6551 reference). A signature the holder's EOA made for another purpose (e.g. a Permit2-style
+///     message whose "owner" field is checked against ecrecover) can be replayed with owner = this account if the
+///     account approved that protocol. Do not approve Permit2-like spenders from the account unless you accept it.
 ///   - CALL only, no delegatecall. No ownership cycles (the account cannot own its own NFT).
 contract AgentAccount is
     IERC6551Account,
@@ -54,8 +60,7 @@ contract AgentAccount is
     address public operator;
     address public configuredFor; // holder the policy is valid for
     uint256 public configuredNonce; // NFT transferNonce at configuration time
-    address public lockOwner; // who set the lock (void if the NFT changes holder)
-    uint256 public lockNonce; // NFT transferNonce when the lock was set (A -> B -> A does not revive it)
+    address public lockOwner; // who last set or extended the lock (informational: the lock binds the wallet)
     uint8 private _level; // 1..3 (0 = never configured -> L1)
     bool public paused; // emergency pause
     uint64 public lockedUntil;
@@ -135,6 +140,8 @@ contract AgentAccount is
         return _isValidSigner(signer) ? IERC6551Account.isValidSigner.selector : bytes4(0);
     }
 
+    /// @dev Raw-hash check against the holder's key, as in the ERC-6551 reference: the hash is not bound to this
+    ///      account. See the class note on replay of signatures the holder's EOA made elsewhere.
     function isValidSignature(bytes32 hash, bytes memory signature) external view returns (bytes4) {
         // Only the holder signs off-chain (Seaport, permit...). The operator must NOT sign arbitrary hashes:
         // a signature would bypass the whitelist and spend cap.
@@ -185,15 +192,15 @@ contract AgentAccount is
         emit Paused(p);
     }
 
-    /// @notice Sale lock: freezes the account (execution and signatures) until `until` (max 30 days). Extend-only for
-    ///         the holder who set it; a previous holder's lock no longer applies, so a new holder starts fresh.
+    /// @notice Sale lock: freezes the WALLET (execution, proposals, approvals and signatures) until `until` (max 30
+    ///         days from now). It binds every holder until it expires, the seller after a transfer, a second address
+    ///         and the buyer alike. Extend-only: while locked, `until` must be later than the current `lockedUntil`,
+    ///         so nobody (including a new holder) can shorten or cancel it; a new holder may extend it.
     function lock(uint64 until) external onlyOwner {
         if (until <= block.timestamp || until > block.timestamp + MAX_LOCK) revert InvalidParams();
-        uint256 n = _transferNonce();
-        if (lockOwner == msg.sender && lockNonce == n && until <= lockedUntil) revert InvalidParams();
+        if (block.timestamp < lockedUntil && until <= lockedUntil) revert InvalidParams();
         lockedUntil = until;
         lockOwner = msg.sender;
-        lockNonce = n;
         _bump();
         emit Locked(until);
     }
@@ -227,10 +234,10 @@ contract AgentAccount is
         return INonceSource(tokenContract).transferNonce(tokenId);
     }
 
-    /// @dev the lock binds the seller who set it, for the holding period it was set in: a buyer does not inherit it,
-    ///      and it does not come back if the seller buys the agent back (A -> B -> A).
+    /// @dev the lock binds the wallet, not a person: it holds for every holder (seller, second address, buyer, and
+    ///      A -> B -> A) until `lockedUntil`. The buyer of a locked agent waits for expiry (30 days at most).
     function _isLocked() internal view returns (bool) {
-        return block.timestamp < lockedUntil && lockOwner == owner() && lockNonce == _transferNonce();
+        return block.timestamp < lockedUntil;
     }
 
     /// @dev selectors that move or grant assets directly (ERC20/721/1155, permits, Permit2, ERC-777/1363, ownership,

@@ -1,12 +1,13 @@
 // Builds the site's static assets from art/ (single source of truth for traits).
 //   node scripts/build-web.mjs  -> web/js/traits-data.js, web/assets/*, web/data/rarity.json (if art/out exists)
-import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, cpSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, readdirSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { WEIGHTS, NAMES } from "../art/traits.mjs";
 import { markSVG } from "../art/brand/src/mark.mjs";
+import { preloadLinks, addonImports, addonClosure } from "./lib/preload-plan.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const web = join(root, "web");
@@ -66,8 +67,23 @@ mkdirSync(join(web, "vendor/three/addons"), { recursive: true });
 copyFileSync(join(nm, "ethers/dist/ethers.min.js"), join(web, "vendor/ethers.min.js"));
 copyFileSync(join(nm, "three/build/three.module.js"), join(web, "vendor/three/three.module.js")); // the art renders load this one
 copyFileSync(join(nm, "three/build/three.module.min.js"), join(web, "vendor/three/three.module.min.js")); // the pages: same exports, half the size
-for (const dir of ["controls", "postprocessing", "shaders", "geometries", "environments"]) {
-  cpSync(join(nm, "three/examples/jsm", dir), join(web, "vendor/three/addons", dir), { recursive: true });
+// Only the addons something imports (the site's modules and pages, the art renders) and the addons those import in turn,
+// not the whole examples folder: the vendor copy shrinks from ~880 KB to what the pages can load.
+const jsm = join(nm, "three/examples/jsm");
+const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : /\.(?:m?js|html)$/.test(e.name) ? [join(dir, e.name)] : []));
+const addonUsers = [...walk(join(web, "js")), ...readdirSync(web).filter((f) => f.endsWith(".html")).map((f) => join(web, f)), ...["art/brand/src", "art/marketing/src", "art/token"].filter((d) => existsSync(join(root, d))).flatMap((d) => walk(join(root, d)))];
+const ADDONS = addonClosure([...new Set(addonUsers.flatMap((f) => addonImports(readFileSync(f, "utf8"))))], (p) => readFileSync(join(jsm, p), "utf8"));
+rmSync(join(web, "vendor/three/addons"), { recursive: true, force: true }); // drop what an earlier build copied and nothing imports now
+for (const p of ADDONS) {
+  mkdirSync(dirname(join(web, "vendor/three/addons", p)), { recursive: true });
+  copyFileSync(join(jsm, p), join(web, "vendor/three/addons", p));
+}
+// keccak for the arena and lab trials without loading ethers on first paint: the four ESM files it needs, with the
+// source-map comments dropped and the one bare import made relative (browsers have no import map for it)
+mkdirSync(join(web, "vendor/noble"), { recursive: true });
+for (const f of ["sha3.js", "_u64.js", "utils.js", "crypto.js"]) {
+  const src = readFileSync(join(nm, "@noble/hashes/esm", f), "utf8").replace(/^\/\/# sourceMappingURL=.*\r?\n?/gm, "");
+  writeFileSync(join(web, "vendor/noble", f), src.replace(/(["'])@noble\/hashes\/crypto\1/g, "$1./crypto.js$1"));
 }
 // Checksums of every vendored file, so a reviewer can compare them with the upstream packages (`sha256sum -c`).
 const vendorFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? vendorFiles(join(dir, e.name)) : e.name === "SHA256SUMS" ? [] : [join(dir, e.name)]));
@@ -75,7 +91,7 @@ const vendorDir = join(web, "vendor");
 const versionOf = (pkg) => JSON.parse(readFileSync(join(nm, pkg, "package.json"), "utf8")).version;
 writeFileSync(
   join(vendorDir, "SHA256SUMS"),
-  `# ethers ${versionOf("ethers")}, three ${versionOf("three")} (copied from node_modules by scripts/build-web.mjs)\n` +
+  `# ethers ${versionOf("ethers")}, three ${versionOf("three")}, @noble/hashes ${versionOf("@noble/hashes")} (noble/utils.js imports ./crypto.js instead of @noble/hashes/crypto; copied from node_modules by scripts/build-web.mjs)\n` +
     vendorFiles(vendorDir)
       .map((f) => [f.slice(vendorDir.length + 1).replace(/\\/g, "/"), f])
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -98,7 +114,9 @@ let LOCAL_DEMO = true;
 try {
   LOCAL_DEMO = JSON.parse(readFileSync(join(web, "deployment.json"), "utf8")).chainId === 31337;
 } catch {} // no deployment yet: the demo setup
-const NARROW = { "pilot.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self' http://localhost:* http://127.0.0.1:*" /* Chrome rejects http://[::1]:* as a CSP source */ } };
+const NARROW = {
+  "pilot.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self' http://localhost:* http://127.0.0.1:*" /* Chrome rejects http://[::1]:* as a CSP source */ },
+};
 // Search and link previews: every page gets Open Graph / Twitter tags from its own <title> and description; the
 // absolute ones (canonical, og:url, og:image, sitemap) only when the site's address is known (SITE_URL, else
 // EXTERNAL_URL in .env), so a local or preview build never carries a wrong domain. Private or retired pages: noindex.
@@ -136,31 +154,6 @@ function seoBlock(name, html) {
 // Preloads: each page announces its module graph (so the browser fetches all of it in parallel instead of
 // discovering it one import at a time) and the normal-style fonts that css/style.css declares. Rewritten between
 // <!--preload--> markers on every build, so running the build again never duplicates a tag.
-const STATIC_IMPORT = /(?:^|[\s;}])(?:import|export)\s*(?:[^'"()]*?\bfrom\s*)?["']([^"']+)["']/g; // import/export ... from "x" and import "x"; never import("x")
-// comments out, string and template literals kept as they are (a "/*" inside a // comment or a "//" inside a URL string are not comment starts)
-const stripComments = (src) => src.replace(/("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m, str) => str ?? "");
-function moduleGraph(entries, importmap) {
-  const seen = new Set();
-  const queue = [...entries];
-  const resolveBare = (spec) => {
-    if (importmap[spec]) return importmap[spec];
-    const prefix = Object.keys(importmap).filter((k) => k.endsWith("/") && spec.startsWith(k)).sort((a, b) => b.length - a.length)[0];
-    return prefix ? importmap[prefix] + spec.slice(prefix.length) : null;
-  };
-  while (queue.length) {
-    const file = queue.shift();
-    if (seen.has(file)) continue;
-    if (!existsSync(file)) throw new Error(`module graph: ${file} does not exist`);
-    seen.add(file);
-    for (const m of stripComments(readFileSync(file, "utf8")).matchAll(STATIC_IMPORT)) {
-      const spec = m[1];
-      const target = /^\.{0,2}\//.test(spec) ? join(dirname(file), spec) : /^[a-z@][^:]*$/i.test(spec) ? (resolveBare(spec) ? join(web, resolveBare(spec)) : null) : null;
-      if (!target) throw new Error(`module graph: cannot resolve "${spec}" imported by ${file}`);
-      queue.push(target);
-    }
-  }
-  return [...seen];
-}
 // the @font-face rules of css/style.css with font-style: normal (the italic one is rare and is not preloaded)
 const css = readFileSync(join(web, "css/style.css"), "utf8");
 const FONTS = [...css.matchAll(/@font-face\s*{[^}]*}/g)]
@@ -170,13 +163,16 @@ const FONTS = [...css.matchAll(/@font-face\s*{[^}]*}/g)]
   .filter(Boolean);
 if (FONTS.length !== 3) throw new Error(`expected 3 normal fonts in css/style.css, found ${FONTS.length}`);
 // modules a page imports dynamically but always, right at start (the preload scan only follows static imports)
-const EAGER = { "index.html": ["js/lab/lab-view.js"], "bench.html": ["js/bench/bench-view.js"] };
+// (they are announced at low priority: the first paint and the page script come first)
+const EAGER = {
+  "index.html": ["js/lab/lab-view.js"],
+  "bench.html": ["js/bench/bench-view.js", "js/bench/motions.js", "js/bench/test-scenes.js"],
+  "codex.html": ["js/codex/codex-view.js"], // the book attaches after the text page paints
+  "pilot.html": ["js/pilot/ai/ai-pilot.js", "js/pilot/ai/ai-panel.js", "js/pilot/ai/voice.js"], // the AI Pilot panel loads when the controls open
+};
 function preloadBlock(html, page) {
-  const importmap = JSON.parse((html.match(/<script type="importmap">([\s\S]*?)<\/script>/) || [, '{"imports":{}}'])[1]).imports;
-  const entries = [...html.matchAll(/<script[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/g)].map((m) => join(web, m[1]));
-  entries.push(...(EAGER[page] || []).map((f) => join(web, f)));
-  const links = moduleGraph(entries, importmap).map((f) => `<link rel="modulepreload" href="${f.slice(web.length + 1).replace(/\\/g, "/")}">`);
-  if (/<link rel="stylesheet" href="css\/style\.css">/.test(html)) links.push(...FONTS.map((f) => `<link rel="preload" as="font" type="font/woff2" crossorigin href="${f}">`));
+  const fonts = /<link rel="stylesheet" href="css\/style\.css">/.test(html) ? FONTS : [];
+  const links = preloadLinks({ html, page, web, eager: EAGER, fonts });
   return links.length ? `<!--preload-->\n${links.join("\n")}\n<!--/preload-->` : "";
 }
 
@@ -191,7 +187,7 @@ for (const page of readdirSync(web).filter((f) => f.endsWith(".html"))) {
   const local = LOCAL_DEMO ? "http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*" : ""; // loopback only for the local demo
   const narrow = NARROW[page] || {};
   const csp = [
-    "default-src 'self'", `script-src 'self' ${hashes.join(" ")}`.trim(), "style-src 'self' 'unsafe-inline'",
+    "default-src 'self'", `script-src 'self' ${[narrow.script, ...hashes].filter(Boolean).join(" ")}`.trim(), "style-src 'self' 'unsafe-inline'",
     "font-src 'self'", narrow.img || "img-src 'self' data: blob: https:", "media-src 'self' blob: mediastream:", narrow.connect || `connect-src 'self' https: wss: ${local}`.trim(),
     "object-src 'none'", "base-uri 'none'", "form-action 'none'",
   ].join("; ");

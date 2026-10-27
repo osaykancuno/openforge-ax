@@ -1,11 +1,15 @@
 /* Workbench: a lab-notebook plate (docs/12-OPENFORGE-LAB.md §3–4). Tokens come from css/style.css. */
 
 .bench { background: var(--paper); }
+/* The nav and footer are added by chain.js renderChrome after the page's own text is on screen. Their rows are kept
+   (the nav is 60px + 1px border, the app footer about 33px) until they exist, so the plate never jumps. */
+body.bench.app:not(:has(> .nav))::before { content: ""; display: block; flex: none; height: 61px; }
+body.bench.app:not(:has(> footer))::after { content: ""; display: block; flex: none; height: 33px; }
 .bn { max-width: 1360px; margin: 0 auto; padding: 12px 20px 40px; }
 
 /* ---------- shelf of robots */
 .bn-shelf { margin: 4px 0 14px; }
-.bn-shelf ul { display: flex; gap: 6px; list-style: none; margin: 0; padding: 4px 2px 8px; overflow-x: auto; scrollbar-width: thin; }
+.bn-shelf ul { min-height: 52px; /* tab 40px + padding, before the tabs are drawn */ display: flex; gap: 6px; list-style: none; margin: 0; padding: 4px 2px 8px; overflow-x: auto; scrollbar-width: thin; }
 .bn-tab {
   display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; min-height: 40px; padding: 9px 14px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);

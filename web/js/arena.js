@@ -1,4 +1,4 @@
-import { keccak256, toUtf8Bytes, hexlify, randomBytes, ZeroHash } from "../vendor/ethers.min.js";
+import { keccak256, toUtf8Bytes, hexlify, randomBytes, ZeroHash } from "./proving/hash.js";
 import { CONFIG } from "./config.js";
 import { loadConfig, renderChrome, onWallet, ownedBy, tokenMeta, attr, toast, friendlyError, isDeployed, short } from "./chain.js";
 import { initialState, step, replay, score, fk, ik, limitStep, REST, LIMITS, DT, MAX_TICKS, FPS } from "./sim/arm-sim.js";

@@ -70,9 +70,9 @@ const { timestamp } = await provider.getBlock(blockTag);
 
 let configured = 0, locked = 0, tasks = 0, failures = 0, simRuns = 0, agentsWithRecord = 0;
 ids.forEach((_, i) => {
-  const [op, until, lockOwner] = [acct[i * 3]?.[0], acct[i * 3 + 1]?.[0], acct[i * 3 + 2]?.[0]];
+  const [op, until] = [acct[i * 3]?.[0], acct[i * 3 + 1]?.[0]];
   if (op && op !== ZeroAddress) configured++;
-  if (until && Number(until) > timestamp && lockOwner === owners[i]?.[0]) locked++;
+  if (until && Number(until) > timestamp) locked++; // the sale lock binds the wallet for every holder until it expires
   const st = rep[i * 2];
   const sim = rep[i * 2 + 1];
   if (st) [tasks, failures] = [tasks + Number(st[0]), failures + Number(st[2])];

@@ -20,7 +20,11 @@
 } }
 </script>
 <!--preload-->
+<link rel="preload" as="fetch" crossorigin href="deployment.json">
 <link rel="modulepreload" href="js/pilot/pilot.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/ai-pilot.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/ai-panel.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/voice.js">
 <link rel="modulepreload" href="vendor/three/three.module.min.js">
 <link rel="modulepreload" href="js/models/look.js">
 <link rel="modulepreload" href="js/models/robots.js">
@@ -31,28 +35,24 @@
 <link rel="modulepreload" href="js/pilot/sensors.js">
 <link rel="modulepreload" href="js/pilot/ui.js">
 <link rel="modulepreload" href="js/pilot/motions.js">
-<link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
 <link rel="modulepreload" href="js/chain.js">
-<link rel="modulepreload" href="js/pilot/ai/ai-panel.js">
-<link rel="modulepreload" href="js/pilot/ai/voice.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/tools.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/grammar.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/prompt.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/executor.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/settings.js">
+<link rel="modulepreload" fetchpriority="low" href="js/pilot/ai/model-client.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
 <link rel="modulepreload" href="js/pilot/bridge-sim.js">
-<link rel="modulepreload" href="js/pilot/ai/tools.js">
-<link rel="modulepreload" href="js/pilot/ai/grammar.js">
-<link rel="modulepreload" href="js/pilot/ai/prompt.js">
-<link rel="modulepreload" href="js/pilot/ai/executor.js">
 <link rel="modulepreload" href="js/theme.js">
-<link rel="modulepreload" href="js/ambient.js">
-<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
-<link rel="modulepreload" href="js/pilot/ai/settings.js">
-<link rel="modulepreload" href="js/pilot/ai/model-client.js">
 <link rel="modulepreload" href="js/robot/sts-bus.js">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
 <!--/preload-->
 <!--seo-->
 <meta property="og:type" content="website">

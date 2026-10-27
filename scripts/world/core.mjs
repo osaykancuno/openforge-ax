@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { isIPv6 } from "node:net";
 import { PROTOCOL, EMOTES, ROOM_CAP, GUEST_CAP, RESUME_SECONDS, joinTypedData, qPos, qYaw } from "../../web/js/world/protocol.js";
 import { DISTRICT, SIZE, SPAWN, MAX_SPEED, buildDistrict } from "../../web/js/world/district.js";
+import { redactSecrets } from "../lib/signatures.mjs";
 
 const hex = (n) => "0x" + randomBytes(n).toString("hex");
 
@@ -43,6 +44,30 @@ export function hostsOf(list) {
 export const isLoopbackHost = (h) => h === "localhost" || h === "::1" || /^127\./.test(h);
 
 /**
+ * Timeouts and a connection ceiling for a public http.Server (Node's defaults leave a slow-header client open for
+ * minutes), and a malformed request line is answered 400 and closed instead of surfacing as an error.
+ * For the world server these only bound the HTTP upgrade handshake: an upgraded socket is no longer the server's.
+ */
+export function hardenHttpServer(server, { maxConnections = 1000, headersTimeout = 10_000, requestTimeout = 15_000 } = {}) {
+  server.headersTimeout = headersTimeout;
+  server.requestTimeout = requestTimeout;
+  server.maxConnections = maxConnections;
+  server.on("clientError", (e, sock) => {
+    // a socket that never sent a byte (a browser's spare preconnect) is closed silently: a reply written into it would
+    // be read by the browser as the answer to the request it sends there later (pages turned 400 after ~20 s idle)
+    if (!sock.writable || e.code === "ECONNRESET" || sock.bytesRead === 0) return void sock.destroy();
+    const status = e.code === "ERR_HTTP_REQUEST_TIMEOUT" || e.code === "ERR_HTTP_HEADERS_TIMEOUT" ? "408 Request Timeout" : "400 Bad Request";
+    sock.end(`HTTP/1.1 ${status}\r\nconnection: close\r\ncontent-length: 0\r\n\r\n`);
+  });
+  return server;
+}
+
+/** Last-resort net for the server entry points: a stray rejected promise is logged (redacted), never fatal. */
+export function installCrashGuards(label, { proc = process, log = console.error } = {}) {
+  proc.on("unhandledRejection", (reason) => log(`${label}: unhandled rejection:`, redactSecrets(reason)));
+}
+
+/**
  * deps: { chainId, verifyingContract, ownerOf(tokenId) -> address, agentInfo(tokenId) -> {name, traits},
  *         verifySignature(owner, typedData, signature) -> bool }
  */
@@ -72,7 +97,8 @@ export function createWorldServer({ port = 8788, server, deps, origins = null, t
   const pruneRates = () => {
     for (const [k, ts] of ipRate) if (!ts.some((t) => t > now() - 60_000)) ipRate.delete(k);
   };
-  const send = (ws, msg) => ws.readyState === 1 && ws.bufferedAmount < 64_000 && ws.send(JSON.stringify(msg));
+  const sendText = (ws, text) => ws.readyState === 1 && ws.bufferedAmount < 64_000 && ws.send(text);
+  const send = (ws, msg) => sendText(ws, JSON.stringify(msg));
   const pub = (p) => ({ id: p.id, kind: p.kind, tokenId: p.tokenId, name: p.name, traits: p.traits, x: qPos(p.x), z: qPos(p.z), yaw: qYaw(p.yaw) });
 
   function roomFor(kind) {
@@ -87,7 +113,8 @@ export function createWorldServer({ port = 8788, server, deps, origins = null, t
     }
   }
   const broadcast = (room, msg, except) => {
-    for (const id of rooms.get(room) || []) if (id !== except) send(players.get(id).ws, msg);
+    const text = JSON.stringify(msg); // once for the room, not once per recipient
+    for (const id of rooms.get(room) || []) if (id !== except) sendText(players.get(id).ws, text);
   };
 
   function enter(ws, p) {

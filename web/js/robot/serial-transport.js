@@ -5,9 +5,9 @@ export const BAUD = 1_000_000;
 
 export const serialSupported = () => typeof navigator !== "undefined" && "serial" in navigator;
 
-/** A port this site was already allowed to use (no picker), if any. */
+/** A port this site was already allowed to use (no picker), if any: only from a known USB bridge (FILTERS), never an arbitrary device. */
 export async function rememberedPort() {
-  const ports = await navigator.serial.getPorts();
+  const ports = (await navigator.serial.getPorts()).filter((p) => FILTERS.some((f) => f.usbVendorId === p.getInfo?.().usbVendorId));
   return ports.length === 1 ? ports[0] : null;
 }
 

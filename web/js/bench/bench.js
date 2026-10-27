@@ -6,14 +6,13 @@ import { ROBOT_SPECS, TO_VERIFY, RESEARCH_DATE } from "../models/robot-specs.js"
 import { ORDER, stagesFor, robotText } from "./content.js";
 import { MISSIONS } from "./missions/index.js";
 import { createMissionRunner, createProgressStore } from "./mission-runner.js";
-import { KIND_ORDER, createSpeaker, el, overviewLabels as overviewOf, resetRig as resetRigOf, staticLabelList } from "./shared.js";
+import { KIND_ORDER, createSpeaker, el, hasWebGL, overviewLabels as overviewOf, resetRig as resetRigOf, staticLabelList } from "./shared.js";
 
-try {
-  await loadConfig();
-  renderChrome("bench");
-} catch (e) {
-  console.warn("site chrome unavailable", e);
-}
+// The page chrome (nav, footer) and the 3D view load in the background: the text UI renders first, in its final place
+// (bench.css reserves the nav and footer rows until renderChrome fills them), and the 3D attaches when it arrives.
+loadConfig()
+  .then(() => renderChrome("bench"))
+  .catch((e) => console.warn("site chrome unavailable", e));
 
 const $ = (id) => document.getElementById(id);
 let reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -22,21 +21,14 @@ let reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const store = createProgressStore();
 const levelRec = store.rec;
 
-// ---------------------------------------------------------------- 3D view (optional)
-let view = null, viewMod = null, motionsMod = null, scenesMod = null;
-try {
-  viewMod = await import("./bench-view.js");
-  if (viewMod.hasWebGL() && !new URLSearchParams(location.search).has("nogl")) {
-    [motionsMod, scenesMod] = await Promise.all([import("./motions.js"), import("./test-scenes.js")]);
-    view = viewMod.createBenchView($("plate"), $("labels"), { reduced });
-  }
-} catch (e) {
-  console.warn("3D view unavailable", e);
-  view = null;
-}
-document.body.classList.toggle("no-gl", !view);
-$("noGL").hidden = !!view;
-$("motionBtn").hidden = !view;
+// ---------------------------------------------------------------- 3D view (optional, attached when its modules arrive)
+let view = null, motionsMod = null, scenesMod = null;
+const wantGL = hasWebGL() && !new URLSearchParams(location.search).has("nogl");
+let glPending = wantGL; // the 3D is on its way: no text-only rig or static labels in the meantime
+const viewModsP = wantGL ? Promise.all([import("./bench-view.js"), import("./motions.js"), import("./test-scenes.js")]) : null;
+document.body.classList.toggle("no-gl", !wantGL);
+$("noGL").hidden = wantGL;
+$("motionBtn").hidden = true; // shown with the 3D view
 
 const speak = createSpeaker($("status"));
 
@@ -102,7 +94,7 @@ function selectRobot(id, stageId) {
   $("idea").textContent = t.bigIdea;
   document.title = `${ROBOTS[id].name} · Workbench · OpenForge Lab`;
   if (view) rig = view.setRobot(id);
-  else rig = buildRobot(id); // labels still come from the model, as text
+  else rig = glPending ? null : buildRobot(id); // no WebGL: labels still come from the model, as text; the 3D builds its own
   prevChips = [];
   renderStageList();
   refreshShelf();
@@ -195,7 +187,7 @@ async function goStage(i, { first = false } = {}) {
   if (location.hash !== want && !(i === 0 && location.hash === `#${robotId}`)) history.replaceState(null, "", want);
   renderPanel(s.id);
   if (!first) speak(`Stage ${i + 1} of ${stages.length}: ${s.title}`);
-  if (!view) return renderStaticLabels(s.id);
+  if (!view) return glPending ? undefined : renderStaticLabels(s.id);
   resetRig();
   view.setLabels([]);
   const camTo = (v) => view.moveCamera(view.view(v), first ? 0 : 900);
@@ -405,3 +397,29 @@ window.addEventListener("hashchange", () => {
 });
 const h0 = parseHash();
 selectRobot(h0.id, h0.stage);
+
+// ---------------------------------------------------------------- the 3D arrives (or fails): same page, same stage
+function attach3D(mods) {
+  if (runner?.running) return void setTimeout(() => attach3D(mods), 400); // a text-only run in progress finishes first
+  let viewMod;
+  try {
+    [viewMod, motionsMod, scenesMod] = mods;
+    view = viewMod.createBenchView($("plate"), $("labels"), { reduced });
+  } catch (e) {
+    return fail3D(e);
+  }
+  glPending = false;
+  $("motionBtn").hidden = false;
+  rig = view.setRobot(robotId);
+  goStage(stageIdx, { first: true });
+}
+function fail3D(e) {
+  console.warn("3D view unavailable", e);
+  view = null;
+  glPending = false;
+  document.body.classList.add("no-gl");
+  $("noGL").hidden = false;
+  rig = buildRobot(robotId);
+  goStage(stageIdx, { first: true });
+}
+viewModsP?.then(attach3D, fail3D);

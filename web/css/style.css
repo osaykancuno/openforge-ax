@@ -464,6 +464,19 @@ body.lab:not(.lab-list) .lab-hud { padding: 14px 18px 16px; margin-left: -18px; 
 body.lab:not(.lab-list) .lab-hint { padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(6px); color: var(--ink-2); }
 body.lab:not(.lab-list) footer { padding: 7px 0; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-top: 1px solid var(--line); color: var(--ink-2); }
 body.lab:not(.lab-list) footer a { color: var(--ink); }
+/* touch and small screens: no blur over the moving canvas (it re-blurs every frame, which phones cannot afford); the backing
+   is a nearly solid paper instead, from the themed --paper, so the text stays readable in light and in dark */
+@media (hover: none), (max-width: 760px) {
+  .nav, .overlay, body.lab:not(.lab-list) .lab-hud, body.lab:not(.lab-list) .lab-hint, body.lab:not(.lab-list) footer { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .overlay { background: color-mix(in srgb, var(--paper) 92%, transparent); }
+  body.lab:not(.lab-list) .lab-hud, body.lab:not(.lab-list) .lab-hint { background: color-mix(in srgb, var(--paper) 94%, transparent); }
+  body.lab:not(.lab-list) footer { background: color-mix(in srgb, var(--paper) 96%, transparent); }
+}
+/* the home nav floats over the canvas: its links get the same soft paper backing (no blur), in both themes */
+body.lab:not(.lab-list) .nav { background: color-mix(in srgb, var(--paper) 86%, transparent); }
+@media (hover: none), (max-width: 760px) {
+  .nav, body.lab:not(.lab-list) .nav { background: color-mix(in srgb, var(--paper) 96%, transparent); }
+}
 /* desktop: the hint sits bottom right, above "Pause animation", clear of the title block on the left */
 @media (min-width: 761px) { .lab-hint { left: auto; right: 16px; bottom: 96px; transform: none; } }
 

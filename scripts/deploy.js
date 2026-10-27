@@ -23,8 +23,17 @@ async function generatorHash() {
 }
 const intIn = (v, lo, hi) => /^\d+$/.test(v || "") && Number(v) >= lo && Number(v) <= hi;
 
-/** On mainnet nothing may fall back to a default: these values are public at once and some are locked forever. */
-async function mainnetGuard(env, deployer) {
+// decided launch values: anything else needs an explicit CONFIRM_* that repeats it
+const DECIDED_PRICE_ETH = "0.015";
+const DECIDED_MAX_PER_WALLET = "3";
+const OPENSEA_FEE_BPS_RANGE = [500, 2000]; // OpenSea's primary fee is 1000 (10%): 5-20% catches typos, not policy
+const REVEAL_MARGIN = 3 * 86400; // the public phase must end this long before the reveal deadline
+
+/**
+ * On mainnet nothing may fall back to a default: these values are public at once and some are locked forever.
+ * `nowSec` is injectable for tests.
+ */
+async function mainnetGuard(env, deployer, nowSec = Math.floor(Date.now() / 1000)) {
   const problems = [];
   for (const k of ["OWNER", "TREASURY"]) {
     if (!ethers.isAddress(env[k] || "")) problems.push(`${k} must be an address (the Safe)`);
@@ -43,8 +52,30 @@ async function mainnetGuard(env, deployer) {
   if (env.TEAM_RESERVE !== "100") problems.push("TEAM_RESERVE must be exactly 100");
   if (!intIn(env.ROYALTY_BPS, 0, 1000)) problems.push("ROYALTY_BPS must be set, 0-1000");
   if (!intIn(env.REVEAL_DEADLINE_DAYS, 7, 45)) problems.push("REVEAL_DEADLINE_DAYS must be set, 7-45 (it can only be moved later)");
-  if (!/^0\.0\d{1,3}$/.test(env.PUBLIC_PRICE_ETH || "")) problems.push("PUBLIC_PRICE_ETH must be set explicitly (decided: 0.015)");
-  if (!intIn(env.MAX_PER_WALLET, 1, 10)) problems.push("MAX_PER_WALLET must be set explicitly (decided: 3)");
+  if (!/^0\.0\d{1,3}$/.test(env.PUBLIC_PRICE_ETH || "") || !(Number(env.PUBLIC_PRICE_ETH) > 0)) problems.push(`PUBLIC_PRICE_ETH must be set explicitly (decided: ${DECIDED_PRICE_ETH})`);
+  else if (env.PUBLIC_PRICE_ETH !== DECIDED_PRICE_ETH && env.CONFIRM_PRICE !== env.PUBLIC_PRICE_ETH) {
+    problems.push(`PUBLIC_PRICE_ETH=${env.PUBLIC_PRICE_ETH} is not the decided ${DECIDED_PRICE_ETH}: set CONFIRM_PRICE=${env.PUBLIC_PRICE_ETH} to confirm it`);
+  }
+  if (!intIn(env.MAX_PER_WALLET, 1, 10)) problems.push(`MAX_PER_WALLET must be set explicitly (decided: ${DECIDED_MAX_PER_WALLET})`);
+  else if (env.MAX_PER_WALLET !== DECIDED_MAX_PER_WALLET && env.CONFIRM_MAX_PER_WALLET !== env.MAX_PER_WALLET) {
+    problems.push(`MAX_PER_WALLET=${env.MAX_PER_WALLET} is not the decided ${DECIDED_MAX_PER_WALLET}: set CONFIRM_MAX_PER_WALLET=${env.MAX_PER_WALLET} to confirm it`);
+  }
+  if (!intIn(env.OPENSEA_FEE_BPS, OPENSEA_FEE_BPS_RANGE[0], OPENSEA_FEE_BPS_RANGE[1])) {
+    problems.push(`OPENSEA_FEE_BPS must be set explicitly, ${OPENSEA_FEE_BPS_RANGE.join("-")} (check the current primary fee in OpenSea Studio; it was 1000)`);
+  }
+  // the public phase: explicit, not live before the Safe accepts ownership and the reserve is minted, and over
+  // well before the reveal deadline (a reveal commit closes minting)
+  if (!intIn(env.PUBLIC_START, 1, 4_102_444_800) || !intIn(env.PUBLIC_END, 1, 4_102_444_800)) {
+    problems.push("PUBLIC_START and PUBLIC_END must both be set (unix seconds)");
+  } else {
+    const start = Number(env.PUBLIC_START);
+    const end = Number(env.PUBLIC_END);
+    if (start <= nowSec) problems.push("PUBLIC_START must be in the future: the drop must not be live before the Safe accepts ownership and the reserve is minted");
+    if (end <= start) problems.push("PUBLIC_END must be after PUBLIC_START");
+    if (intIn(env.REVEAL_DEADLINE_DAYS, 7, 45) && end + REVEAL_MARGIN > nowSec + Number(env.REVEAL_DEADLINE_DAYS) * 86400) {
+      problems.push("PUBLIC_END + 3 days must be on or before the reveal deadline (REVEAL_DEADLINE_DAYS from now); raise REVEAL_DEADLINE_DAYS or shorten the phase");
+    }
+  }
   for (const k of ["PLACEHOLDER_IMAGE", "COLLECTION_IMAGE", "COLLECTION_BANNER"]) {
     if (!imageUri(env[k], env.EXTERNAL_URL)) problems.push(`${k} must be ipfs://<CID>/… or a file on EXTERNAL_URL (npm run assets writes it)`);
   }
@@ -53,6 +84,8 @@ async function mainnetGuard(env, deployer) {
 }
 
 async function main() {
+  // reserveMint (Safe, after acceptOwnership) must run in batches of about 25 (~145k gas each; 100 in one tx would
+  // not fit a block comfortably) and before the public phase ends: a reveal commit closes minting for the reserve too.
   const [deployer] = await ethers.getSigners();
   const net = await ethers.provider.getNetwork();
   const env = process.env;
@@ -143,6 +176,7 @@ async function main() {
   }
   console.log(JSON.stringify(out, null, 2));
   console.log(`Reveal deadline: ${new Date(deadline * 1000).toISOString()} (the OpenSea public phase must end before it; extendRevealDeadline can add up to 90 days).`);
+  console.log("Next, from the Safe after acceptOwnership(): reserveMint(address, n) in batches of about 25 (gas), before the public phase ends.");
 
   // Etherscan: all four contracts, from inside the script (no shell quoting of constructor arguments)
   if (hre.network.name !== "hardhat" && env.ETHERSCAN_API_KEY) {
@@ -165,7 +199,7 @@ async function main() {
   return { out, agents, renderer, rep, impl, deadline };
 }
 
-module.exports = { main };
+module.exports = { main, mainnetGuard, generatorHash };
 
 if (require.main === module) {
   main().catch((e) => {

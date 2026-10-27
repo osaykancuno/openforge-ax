@@ -116,6 +116,47 @@ describe("Market (market-data.js, market-proxy.mjs, MockSeaport)", () => {
       const cold = P.createMarketProxy({ apiKey: "k", slug: "s", fetchImpl: async () => ({ ok: false, status: 500 }) });
       expect((await cold.get()).status).to.equal(502);
     });
+    it("never follows a redirect with the key: fetch is told to error out", async () => {
+      let seen = null;
+      const px = P.createMarketProxy({ apiKey: "secret", slug: "s", fetchImpl: async (_u, opts) => ((seen = opts), { ok: true, json: async () => upstream }) });
+      await px.get();
+      expect(seen.redirect).to.equal("error");
+    });
+    it("remembers an upstream failure for a minute: no new upstream call, stale figures or 502 meanwhile, then it retries", async () => {
+      let calls = 0, ok = true, t = 0;
+      const fetchImpl = async () => (calls++, ok ? { ok: true, json: async () => upstream } : { ok: false, status: 429 });
+      const px = P.createMarketProxy({ apiKey: "k", slug: "s", fetchImpl, now: () => t, ttlMs: 10 });
+      await px.get(); // good figures cached
+      ok = false;
+      t = 100;
+      expect((await px.get()).body.stale).to.equal(true); // the failing call
+      expect(calls).to.equal(2);
+      t = 20_000;
+      expect((await px.get()).body.stale).to.equal(true); // inside the negative window: served without calling OpenSea
+      expect(calls).to.equal(2);
+      t = 100 + 61_000;
+      await px.get();
+      expect(calls).to.equal(3); // window over: asked again
+      const cold = P.createMarketProxy({ apiKey: "k", slug: "s", now: () => t, fetchImpl: async () => (calls++, { ok: false, status: 500 }) });
+      const before = calls;
+      expect((await cold.get()).status).to.equal(502);
+      t += 5000;
+      expect((await cold.get()).status).to.equal(502);
+      expect(calls).to.equal(before + 1); // the second 502 cost no upstream call
+    });
+    it("does not put the key or a URL in its log line", async () => {
+      const lines = [];
+      const orig = console.error;
+      console.error = (...a) => lines.push(a.join(" "));
+      try {
+        await P.createMarketProxy({ apiKey: "topsecretkey", slug: "s", fetchImpl: async () => { throw new Error("connect failed https://api.opensea.io/api/v2/x with topsecretkey"); } }).get();
+      } finally {
+        console.error = orig;
+      }
+      const logged = lines.join(" | ");
+      expect(logged).to.not.match(/topsecretkey|api[.]opensea/);
+      expect(logged).to.match(/connect failed/);
+    });
   });
 
   it("MockSeaport sells an agent; the page's code reads the full price back from the receipt", async () => {

@@ -217,4 +217,51 @@ describe("OpenForgeAgents - SeaDrop mint (OpenSea)", () => {
     await agents.connect(alice).transferFrom(alice.address, await agents.accountOf(2), 1);
     await expect(agents.connect(alice).transferFrom(alice.address, await agents.accountOf(1), 2)).to.be.revertedWithCustomError(agents, "OwnershipCycle");
   });
+
+  it("a self-transfer is not a change of holder: transferNonce and the operator policy survive", async () => {
+    const { agents, alice, bob, operator, mint } = ctx;
+    await mint(alice, 1);
+    const acct = await ethers.getContractAt("AgentAccount", await agents.accountOf(1));
+    await acct.connect(alice).configure(operator.address, 3, ethers.parseEther("1"), 86400);
+    await agents.connect(alice).transferFrom(alice.address, alice.address, 1);
+    expect(await agents.transferNonce(1)).to.equal(0);
+    expect(await acct.autonomyLevel()).to.equal(3);
+    await agents.connect(alice).transferFrom(alice.address, bob.address, 1);
+    expect(await agents.transferNonce(1)).to.equal(1);
+    expect(await acct.autonomyLevel()).to.equal(1);
+  });
+
+  it("mint cycle: agent N cannot be minted to the wallet of M while M is owned by the wallet of N", async () => {
+    const { agents, alice } = ctx;
+    await agents.reserveMint(alice.address, 1); // id 1
+    await agents.connect(alice).transferFrom(alice.address, await agents.accountOf(2), 1); // agent 1 -> wallet of (future) agent 2
+    // minting agent 2 to the wallet of agent 1 would close the loop wallet1 owns 2, wallet2 owns 1
+    await expect(agents.reserveMint(await agents.accountOf(1), 1)).to.be.revertedWithCustomError(agents, "OwnershipCycle");
+    expect(await agents.totalSupply()).to.equal(1);
+    await agents.reserveMint(alice.address, 1); // a normal mint of agent 2 still works
+    expect(await agents.ownerOf(2)).to.equal(alice.address);
+  });
+
+  it("reveal seed does not depend on blockhash: it is keccak(prevrandao, chainid, supply, collection)", async () => {
+    const { agents, alice, mint } = ctx;
+    await mint(alice, 3);
+    await time.increase(8 * 86400);
+    await agents.commitReveal();
+    await mine(5);
+    const rcpt = await (await agents.revealSeed()).wait();
+    const block = await ethers.provider.send("eth_getBlockByNumber", [ethers.toQuantity(rcpt.blockNumber), false]);
+    block.prevRandao = block.mixHash; // post-merge, the header's mixHash carries prevrandao
+    expect(Number(block.number)).to.equal(Number(await agents.revealBlock()) + 1);
+    const chainId = (await ethers.provider.getNetwork()).chainId;
+    const expected = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(["uint256", "uint256", "uint256", "address"], [block.prevRandao, chainId, 3n, await agents.getAddress()])
+    );
+    expect(await agents.seed()).to.equal(expected);
+    // the old formula (with blockhash(revealBlock)) must not match
+    const prev = (await ethers.provider.getBlock(Number(await agents.revealBlock()))).hash;
+    const old = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256", "uint256", "uint256", "address"], [prev, block.prevRandao, chainId, 3n, await agents.getAddress()])
+    );
+    expect(await agents.seed()).to.not.equal(old);
+  });
 });

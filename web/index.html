@@ -17,23 +17,23 @@
 } }
 </script>
 <!--preload-->
+<link rel="preload" as="fetch" crossorigin href="deployment.json">
 <link rel="modulepreload" href="js/home.js">
-<link rel="modulepreload" href="js/lab/lab-view.js">
+<link rel="modulepreload" fetchpriority="low" href="js/lab/lab-view.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/traits-data.js">
-<link rel="modulepreload" href="vendor/three/three.module.min.js">
-<link rel="modulepreload" href="js/models/look.js">
-<link rel="modulepreload" href="js/models/robots.js">
+<link rel="modulepreload" fetchpriority="low" href="vendor/three/three.module.min.js">
+<link rel="modulepreload" fetchpriority="low" href="js/models/look.js">
+<link rel="modulepreload" fetchpriority="low" href="js/models/robots.js">
 <link rel="modulepreload" href="js/theme.js">
-<link rel="modulepreload" href="js/ambient.js">
-<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
-<link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
-<link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
+<link rel="modulepreload" fetchpriority="low" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
+<link rel="modulepreload" fetchpriority="low" href="vendor/three/addons/environments/RoomEnvironment.js">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/inter-tight-latin-wght-normal.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="assets/fonts/jetbrains-mono-latin-wght-normal.woff2">
 <!--/preload-->
 <!--seo-->
 <meta property="og:type" content="website">
@@ -140,7 +140,7 @@
           <li><b>11 classes.</b> AX-1 Rover, Desk and Walker (31% of the collection), plus 8 inspired by open platforms. In the gallery they appear as Synth Arm (SO-101 arm), Street Rover (OpenBot rover), Cyber Hound (quadruped), Ghost Hand (hand), Spider Mech (hexapod), Sky Drone (drone), Fab Rig (3D printer) and Replicant (humanoid).</li>
           <li><b>Missions with a record.</b> In the <a href="arena.html">Proving Grounds</a> your agent flies its own robot and the three AX-1 bodies. Each passed run is replayed by a verifier and written to the blockchain, so nobody can self-report a score. It is lab-simulation data, not proof of a real robot.</li>
           <li><b>Its own wallet.</b> Every agent has an Ethereum wallet of its own (a standard called ERC-6551), created at mint. Whoever holds the agent controls it. Sell the agent and the wallet goes with it.</li>
-          <li><b>Autonomy you set.</b> It starts in Manual: it proposes, you approve. Assisted and Autonomous will act only within a daily limit you choose; the agent software for them isn't out yet. An emergency pause is one click away, and you can lock the wallet for up to 30 days before selling so a buyer knows it can't be emptied. It can never move your other tokens.</li>
+          <li><b>Autonomy you set.</b> It starts in Manual: it proposes, you approve. Assisted and Autonomous will act only within a daily limit you choose; the agent software for them isn't out yet. An emergency pause is one click away, and before selling you can lock the wallet for up to 30 days: until then nobody, you included, can make it send anything, so a buyer knows it can't be emptied through it (they get full control when the lock ends; approvals it gave other apps earlier still count, so check them before buying). It can never move your other tokens.</li>
           <li><b>Real robots next.</b> <a href="robot.html">Robot Link</a> replays a run on a real SO-101 arm; the <a href="pilot.html">Phone Brain</a> is built to drive a real AX-1, but the firmware is untested on hardware until our first build. No real-robot records or wallet history exist yet.</li>
           <li><b>Dormant, then revealed.</b> At mint you get a dormant agent. After the sale ends, a public random draw assigns traits, so nobody can pick the rare ones early. The art is drawn from the lab's 3D models and is CC0: anyone may use it.</li>
         </ul>

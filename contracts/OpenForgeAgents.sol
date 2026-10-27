@@ -33,7 +33,7 @@ interface IAgentAccountToken {
 /// @notice ERC-721 collection where each token is an embodied agent with an ERC-6551 agent wallet.
 ///  - Minted on OpenSea via SeaDrop (pricing, stages and allowlists are managed in OpenSea Studio).
 ///  - The agent wallet is created at mint time, with no extra step for the user.
-///  - Traits are derived on-chain from a future blockhash and RANDAO (commit -> reveal) after the sale.
+///  - Traits are derived on-chain from a future block's RANDAO (commit -> reveal) after the sale.
 ///  - Dynamic metadata comes from an on-chain renderer that can be swapped until freeze.
 contract OpenForgeAgents is ERC721, Ownable2Step, ReentrancyGuard, INonFungibleSeaDropToken {
     // ---------------------------------------------------------------- immutables
@@ -152,6 +152,7 @@ contract OpenForgeAgents is ERC721, Ownable2Step, ReentrancyGuard, INonFungibleS
             if (to == accountOf(id + 1)) revert OwnershipCycle(); // an NFT owned by its own wallet is lost forever
             _mint(to, ++id);
             registry.createAccount(accountImplementation, ACCOUNT_SALT, block.chainid, address(this), id);
+            _checkNoCycle(to, id); // agent `id` must not end up owned (through nested wallets) by its own wallet
         }
         totalSupply = id;
     }
@@ -179,7 +180,8 @@ contract OpenForgeAgents is ERC721, Ownable2Step, ReentrancyGuard, INonFungibleS
     function _update(address to, uint256 tokenId, address auth) internal override returns (address from) {
         from = super._update(to, tokenId, auth);
         if (from != address(0)) {
-            transferNonce[tokenId]++;
+            // a self-transfer is not a change of holder: it must not reset the operator policy
+            if (from != to) transferNonce[tokenId]++;
             if (to == accountOf(tokenId)) revert OwnershipCycle();
             _checkNoCycle(to, tokenId);
         }
@@ -220,16 +222,18 @@ contract OpenForgeAgents is ERC721, Ownable2Step, ReentrancyGuard, INonFungibleS
         emit RevealDeadlineExtended(newDeadline);
     }
 
-    /// @notice Step 2 (anyone), only in block revealBlock + 1: seed from blockhash(revealBlock) AND that block's
-    ///         RANDAO. One fixed block means the caller cannot pick among outcomes by timing; the builder of
-    ///         revealBlock can grind its hash but cannot know the next RANDAO. What remains is excluding the call
-    ///         (censorship) to force a re-commit, so reveal with a high priority fee. For full unbiasability use VRF.
+    /// @notice Step 2 (anyone), only in block revealBlock + 1: seed from that block's RANDAO (prevrandao), the
+    ///         chain, the supply and this contract. blockhash(revealBlock) is NOT used: a proposer that builds its
+    ///         own block could grind it through extraData. One fixed block means the caller cannot pick among
+    ///         outcomes by timing. The bias that remains: the proposer of revealBlock can propose or skip it (1 bit),
+    ///         and the proposer of revealBlock + 1 can censor the call (forcing a re-commit), so reveal with a high
+    ///         priority fee. This is NOT provably fair; for full unbiasability use VRF.
     function revealSeed() external {
         if (seed != bytes32(0)) revert AlreadyRevealed();
         uint256 rb = revealBlock;
         if (rb == 0 || block.number <= rb) revert NotRevealable();
         if (block.number > rb + 1) revert RevealExpired();
-        seed = keccak256(abi.encode(blockhash(rb), block.prevrandao, block.chainid, totalSupply, address(this)));
+        seed = keccak256(abi.encode(block.prevrandao, block.chainid, totalSupply, address(this)));
         emit SeedRevealed(seed);
         if (totalSupply > 0) emit BatchMetadataUpdate(1, totalSupply);
     }
