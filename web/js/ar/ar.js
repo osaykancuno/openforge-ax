@@ -32,6 +32,7 @@ const BANNER_CAMERA = "Camera view: the robot is not anchored to your floor (you
 const NEEDS_AR = "Obstacle sensing needs Android Chrome AR";
 const body = document.body;
 
+const DEBUG = new URLSearchParams(location.search).has("debug"); // ar.html?debug: the AR session's facts on screen
 const caps = await probeAr({ nav: navigator, win: window });
 const canRun = caps.mode === "xr" || caps.mode === "camera";
 
@@ -41,7 +42,7 @@ let view = null;
 let viewError = "";
 if (canRun) {
   try {
-    view = createArView({ canvas: $("arCanvas"), video: $("arVideo"), overlay: $("arOverlay") });
+    view = createArView({ canvas: $("arCanvas"), video: $("arVideo"), overlay: $("arOverlay"), debug: DEBUG });
   } catch {
     viewError = "3D drawing is not available on this device.";
   }
@@ -643,3 +644,12 @@ if (view && controller) {
 
 showCard();
 render();
+
+if (DEBUG && view) {
+  // inside the overlay: in AR it is the only part of the page on screen
+  const pre = el("pre", { class: "ar-debug", "aria-hidden": "true" });
+  $("arOverlay").append(pre);
+  setInterval(() => {
+    pre.textContent = `${view.diagnostics()}\nstate ${stateName()} · link ${model.link ?? "-"}`;
+  }, 500);
+}

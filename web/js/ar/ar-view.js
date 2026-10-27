@@ -33,8 +33,9 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  *   visibility(state)                       XR session visibility: "visible" | "visible-blurred" | "hidden"
  *   ended(reason)                           the session or the camera view is over
  *   hint(text | null)                       what to tell the person while they look for a floor
+ * debug: true adds a magenta test cube 60 cm in front of where AR started and fills view.diagnostics() (ar.html?debug).
  */
-export function createArView({ canvas, video, overlay, handlers = {} }) {
+export function createArView({ canvas, video, overlay, handlers = {}, debug = false }) {
   const renderer = makeRenderer(canvas, { alpha: true });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 1.5));
@@ -94,6 +95,10 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
   scene.add(labelGroup);
   const labels = new Map(); // id -> { sprite, text }
 
+  // ar.html?debug: what the AR session really does on a phone (nothing of this runs otherwise)
+  const dbg = { frames: 0, hitResults: 0, upHits: 0, calls: 0, tris: 0, glErr: 0, ndc: null, cube: null };
+  const dbgV = new THREE.Vector3();
+
   const tracker = createObstacleTracker();
   const view = {
     handlers,
@@ -119,6 +124,7 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
     },
     setLabels,
     placeHere,
+    diagnostics,
     startXr,
     startCamera,
     exit,
@@ -296,6 +302,12 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
     }
     view.mode = "xr";
     video.hidden = true;
+    if (debug && !dbg.cube) {
+      // unlit, bright, 10 cm: if even this does not show, nothing from WebGL reaches the screen
+      dbg.cube = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0xff00ff }));
+      dbg.cube.position.set(0, 0, -0.6);
+      scene.add(dbg.cube);
+    }
     unplace();
     placeRoot.visible = true; // drawn at a tiny size: shaders compile now, not when the Rover is placed
     placeRoot.scale.setScalar(WARM_SCALE);
@@ -360,10 +372,13 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
   function updateHit(frame, t) {
     let shown = false;
     const results = hitSource ? frame.getHitTestResults(hitSource) : [];
+    if (debug) dbg.hitResults = results.length;
     const pose = results.length ? results[0].getPose(refSpace) : null;
     if (pose) {
       const m = pose.transform.matrix;
+      if (debug) dbg.upY = Math.round(m[5] * 100) / 100;
       if (m[5] > 0.8) {
+        if (debug) dbg.upHits++;
         // only floors and tables: the plane's up axis points up
         reticle.matrix.fromArray(m);
         reticle.matrixWorldNeedsUpdate = true;
@@ -472,7 +487,37 @@ export function createArView({ canvas, video, overlay, handlers = {} }) {
     updateRig(dt, t);
     if (view.placed) sense(frame, vp, t);
     renderer.render(scene, camera);
+    if (debug) {
+      dbg.frames++;
+      dbg.calls = renderer.info.render.calls;
+      dbg.tris = renderer.info.render.triangles;
+      const e = renderer.getContext().getError();
+      if (e) dbg.glErr = e;
+      const xc = renderer.xr.getCamera();
+      const c0 = xc && xc.cameras && xc.cameras[0];
+      dbg.ndc = c0 ? rig.group.getWorldPosition(dbgV).project(c0).toArray().map((n) => Math.round(n * 100) / 100) : null;
+    }
     afterRender(t, { frame, session, gl: renderer.getContext(), pose: vp, floorY: placeRoot.position.y, space: refSpace });
+  }
+
+  /** ar.html?debug: one line per fact, plain text. */
+  function diagnostics() {
+    const s = session;
+    const rs = s && s.renderState;
+    const base = rs && rs.baseLayer;
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const w = view.placed || placeRoot.visible ? view.worldPose() : null;
+    const size = renderer.getSize(dbgV.set(0, 0, 0));
+    return [
+      `three r${THREE.REVISION} · mode ${view.mode} · presenting ${renderer.xr.isPresenting} · blend ${s ? s.environmentBlendMode : "-"}`,
+      `layer ${base ? `base ${base.framebufferWidth}x${base.framebufferHeight}` : rs && rs.layers ? `layers(${rs.layers.length})` : "none"} · canvas ${size.x}x${size.y} · ctx lost ${renderer.getContext().isContextLost()}`,
+      `features ${s && s.enabledFeatures ? s.enabledFeatures.join(",") : "?"} · depth ${s ? s.depthUsage || "-" : "-"}`,
+      `frames ${dbg.frames} · draw calls ${dbg.calls} · triangles ${dbg.tris} · gl error ${dbg.glErr}`,
+      `hit results ${dbg.hitResults} · floor hits ${dbg.upHits} · up ${dbg.upY ?? "-"} · reticle ${reticle.visible}`,
+      `placed ${view.placed} · root visible ${placeRoot.visible} scale ${r2(placeRoot.scale.x)} · rover ${w ? [w.x, w.y, w.z].map(r2).join(", ") : "-"}`,
+      `camera ${[cam.x, cam.y, cam.z].map(r2).join(", ")} · distance ${w ? r2(Math.hypot(w.x - cam.x, w.y - cam.y, w.z - cam.z)) : "-"} m · rover on screen ${dbg.ndc ? dbg.ndc.join(", ") : "-"}`,
+      `test cube ${dbg.cube ? "magenta, 60 cm ahead of the start" : "off"}`,
+    ].join("\n");
   }
 
   // ---------------------------------------------------------------- obstacle sensing (depth, or a hit-test ray)
