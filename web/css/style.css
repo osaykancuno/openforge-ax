@@ -425,22 +425,29 @@ body.still .lab-label, body.still .lab-label span, body.still .lab-fade { transi
 .lab-panel-body:focus-visible { outline-offset: -2px; }
 .lab-panel-body h4 { font: 700 14px var(--display); margin: 6px 0 8px; }
 @media (max-width: 760px) {
-  .lab-hud { top: 70px; left: 16px; width: calc(100vw - 32px); }
-  .lab-hud h1 { font-size: 30px; margin: 4px 0 8px; }
+  /* a compact HUD (about a third of the screen) leaves the ring the room it needs; home.js falls back to the list
+     when large text still leaves too little */
+  .lab-hud { top: 64px; left: 16px; width: calc(100vw - 32px); }
+  body.lab:not(.lab-list) .lab-hud { padding: 10px 12px 12px; margin-left: 0; }
+  .lab-hud h1 { font-size: clamp(22px, 7.2vw, 30px); line-height: 1.08; margin: 0 0 6px; }
   .lab-hud .lead { display: none; }
   .lab-hud .kicker { display: none; }
+  .lab-hud .bar { display: none; }
   .lab-steps { grid-template-columns: repeat(4, auto); gap: 2px 10px; }
   .lab-steps li { font-size: 10.5px; }
   .lab-stats { display: none; }
-  .lab-hud .cta { margin-top: 12px; gap: 8px; flex-wrap: wrap; }
-  .lab-hud .cta .btn { white-space: nowrap; }
-  .lab-hud .cta .btn { padding: 8px 12px; font-size: 12.5px; min-height: 40px; }
+  .lab-hud .cta { margin: 10px 0 0; gap: 6px; flex-wrap: wrap; }
+  .lab-hud .cta .btn { white-space: nowrap; padding: 6px 10px; font-size: 12.5px; min-height: 38px; }
+  .lab-hud .cta .btn:not(.ghost) { flex: 1 1 auto; }
+  .lab-hud .cta .btn.ghost { min-height: 32px; padding: 4px 8px; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
   .lab-label { padding: 6px 9px; max-width: 132px; min-height: 30px; }
   .lab-label b { font-size: 12px; }
   .lab-label i, .lab-label span { display: none; }
-  .lab-hint { bottom: 38px; font-size: 10.5px; }
+  .lab-hint { bottom: 44px; left: 16px; transform: none; font-size: 10px; }
   .lab-panel { top: 60px; width: 100vw; border-left: 0; }
-  .lab-pause { bottom: 66px; right: 10px; }
+  /* the pause control shrinks to an icon in the hint's row, clear of the ring */
+  .btn.lab-pause { bottom: 40px; right: 12px; width: 40px; min-height: 40px; padding: 0; justify-content: center; font-size: 0; }
+  .lab-pause [aria-hidden] { font-size: 13px; }
   body.lab footer > .wrap > div:first-child { display: none; }
   body.lab footer .wrap { justify-content: center; }
 }
@@ -565,6 +572,17 @@ html:has(body.app) { scroll-padding-top: 0; } /* the nav no longer sticks over t
   body.app .arena .stage { height: auto; min-height: 240px; }
   body.app .app-scroll, body.app .agent-art { overflow: visible !important; max-height: none; }
   body.app .agent-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* phones held upright: the page scrolls, but the 3D view stays pinned at the top, so the robot is always in sight while
+   the controls scroll under it */
+@media (orientation: portrait) and (max-width: 480px) and (max-height: 700px) {
+  body.app .arena { grid-template-rows: auto auto; }
+  body.app .arena .stage { position: sticky; top: 0; z-index: 6; height: clamp(190px, 40dvh, 320px); min-height: 0; box-shadow: 0 12px 20px -16px rgba(35, 33, 30, .55); }
+}
+/* phones on their side: the desktop layout, the robot on the left and the controls scrolling beside it */
+@media (orientation: landscape) and (max-height: 560px) and (min-width: 560px) {
+  body.app .arena { grid-template-columns: minmax(0, 1.15fr) minmax(260px, 1fr); grid-template-rows: auto; align-items: start; }
+  body.app .arena .stage { position: sticky; top: 0; z-index: 6; height: calc(100dvh - 16px); min-height: 0; }
 }
 /* Proving Grounds / Robot Link: a compact title row leaves the height to the stage and the controls */
 @media (min-width: 861px) and (min-height: 561px) {

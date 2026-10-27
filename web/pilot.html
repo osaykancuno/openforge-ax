@@ -32,9 +32,7 @@
 <link rel="modulepreload" href="js/pilot/ui.js">
 <link rel="modulepreload" href="js/pilot/motions.js">
 <link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
-<link rel="modulepreload" href="js/theme.js">
-<link rel="modulepreload" href="js/ambient.js">
-<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/pilot/ai/ai-panel.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
 <link rel="modulepreload" href="vendor/three/addons/environments/RoomEnvironment.js">
@@ -43,6 +41,11 @@
 <link rel="modulepreload" href="js/pilot/ai/grammar.js">
 <link rel="modulepreload" href="js/pilot/ai/prompt.js">
 <link rel="modulepreload" href="js/pilot/ai/executor.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/ambient.js">
+<link rel="modulepreload" href="js/ui-sounds.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/servers.js">
 <link rel="modulepreload" href="js/pilot/ai/settings.js">
 <link rel="modulepreload" href="js/pilot/ai/model-client.js">
 <link rel="modulepreload" href="js/robot/sts-bus.js">
@@ -61,8 +64,7 @@
 <body class="pilot">
 <div class="pl-app">
   <header class="pl-top">
-    <a class="pl-back" href="index.html">← Lab</a>
-    <p class="pl-fig">FIG. 01 · PHONE BRAIN</p>
+    <p class="pl-fig">FIG. 01 · <b>Phone Brain</b></p>
     <span class="pl-chip" id="linkChip">Twin · offline</span>
   </header>
 
@@ -112,7 +114,7 @@
             </select>
           </label>
           <div class="pl-row">
-            <button class="pl-btn" id="connectBtn" type="button">Connect</button>
+            <button class="pl-btn" id="linkBtn" type="button">Connect</button>
             <button class="pl-btn pl-primary pl-arm" id="armBtn" type="button" disabled>ARM</button>
           </div>
           <p class="pl-msg" id="linkMsg" role="status" aria-live="polite"></p>

@@ -12,9 +12,7 @@ import { capabilities, createWakeLock, startCamera, startTilt } from "./sensors.
 import { $, chip, dpad, el, joystick, renderCaps, slider } from "./ui.js";
 import { GESTURES, POSES } from "./motions.js";
 import { createAiPilot } from "./ai/ai-pilot.js";
-import { themeButton } from "../theme.js";
-import { musicButton } from "../ambient.js";
-import { soundsButton } from "../ui-sounds.js";
+import { loadConfig, renderChrome } from "../chain.js";
 import { mountAiPanel } from "./ai/ai-panel.js";
 
 const caps = capabilities();
@@ -35,7 +33,8 @@ let ai = null; // AI Pilot: plans text requests and runs them through this same 
 let aiPanel = null;
 let aiClient = null; // the user's own model server, or null for the built-in parser
 const human = () => ai && ai.takeover(); // the human touched a control: the AI lets go
-document.querySelector(".pl-top").append(soundsButton("pl-btn sm theme-btn sound-btn"), musicButton("pl-btn sm theme-btn music-btn"), themeButton("pl-btn sm theme-btn")); // interface sounds on; music and dark off by default
+await loadConfig();
+renderChrome("pilot"); // the same nav (sounds, music, dark, menu) and footer as every other page
 
 // ================================================================ capability panel
 
@@ -234,8 +233,8 @@ function render(s) {
   $("bodyChip").classList.add("plain");
 
   const connected = s.link !== LINK.DISCONNECTED && s.link !== LINK.CONNECTING;
-  $("connectBtn").textContent = connected || s.reconnecting ? "Disconnect" : "Connect";
-  $("connectBtn").disabled = s.link === LINK.CONNECTING;
+  $("linkBtn").textContent = connected || s.reconnecting ? "Disconnect" : "Connect";
+  $("linkBtn").disabled = s.link === LINK.CONNECTING;
   $("armBtn").disabled = !(s.link === LINK.LATCHED && s.compatible);
   $("bodySel").disabled = connected || mode === "ble";
   for (const r of document.querySelectorAll('input[name="mode"]')) r.disabled = connected || s.reconnecting;
@@ -538,7 +537,7 @@ function init() {
   aiPanel = mountAiPanel({ ai, storage: safeStorage(), setModel: (client) => (aiClient = client), origin: location.origin });
   $("startTwin").addEventListener("click", () => start(false));
   $("startRobot").addEventListener("click", () => start(true));
-  $("connectBtn").addEventListener("click", onConnect);
+  $("linkBtn").addEventListener("click", onConnect);
   $("armBtn").addEventListener("click", () => loop && loop.arm());
   $("bodySel").addEventListener("change", (e) => {
     bodyKey = e.target.value;

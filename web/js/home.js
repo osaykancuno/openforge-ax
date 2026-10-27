@@ -6,7 +6,19 @@ import { TRAITS, FACTIONS } from "./traits-data.js";
 // page set-up below; nothing waits for it: the panels, FAQ, pause button and hash links work before the scene exists.
 const reducedPref = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // 400% zoom, tiny or very short screens: a plain scrolling list instead of the 3D lab (WCAG reflow)
-const listMode = matchMedia("(max-width: 340px), (max-height: 480px)").matches;
+const reflow = () => matchMedia("(max-width: 340px), (max-height: 480px)").matches;
+// phones with large text: when the HUD leaves the ring less room than this, the list is clearer than a crowded ring
+const RING_MIN = 200;
+const tooTight = () => {
+  if (innerWidth > 760) return false;
+  // the HUD is measured as it sits over the ring (64 px from the top); the hint, pause and footer take 96 px below
+  const list = document.body.classList.contains("lab-list");
+  if (list) document.body.classList.remove("lab-list");
+  const h = document.querySelector(".lab-hud").offsetHeight;
+  if (list) document.body.classList.add("lab-list");
+  return innerHeight - (64 + h) - 96 < RING_MIN;
+};
+let listMode = reflow() || tooTight();
 const glOk = (() => {
   try {
     return Boolean(document.createElement("canvas").getContext("webgl2"));
@@ -14,7 +26,7 @@ const glOk = (() => {
     return false;
   }
 })();
-const labModule = glOk && !listMode ? import("./lab/lab-view.js") : null;
+let labModule = glOk && !listMode ? import("./lab/lab-view.js") : null;
 labModule?.catch(() => {}); // the real handler is in startLab(); this only keeps a slow config fetch from reporting it as unhandled
 
 await loadConfig();
@@ -76,14 +88,25 @@ for (const s of STATIONS) {
 const label = (id) => nav.querySelector(`[data-id="${id}"]`);
 const labels = [...nav.querySelectorAll(".lab-label")];
 let halfWidths = new Map(); // measured on resize, not per frame
-const measure = () => (halfWidths = new Map(labels.map((b) => [b.dataset.id, b.offsetWidth / 2])));
+let labelH = 30;
+let hudBox = null; // wide screens: the title block on the left, which labels never slide under
+const measure = () => {
+  halfWidths = new Map(labels.map((b) => [b.dataset.id, b.offsetWidth / 2]));
+  labelH = labels[0]?.offsetHeight || 30;
+  hudBox = innerWidth > 760 ? document.querySelector(".lab-hud").getBoundingClientRect() : null;
+};
 new ResizeObserver(measure).observe(nav);
+new ResizeObserver(measure).observe(document.querySelector(".lab-hud"));
 measure();
 
 // ---------------------------------------------------------------- 3D lab (falls back to the list of stations)
 // startLab() runs at the end of this file, once every handler below is attached.
 async function startLab() {
-  if (labModule) {
+  // web fonts change the HUD's height: measure again once they are in (never wait long for them)
+  await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 400))]);
+  listMode = reflow() || tooTight();
+  if (!listMode && glOk) labModule ??= import("./lab/lab-view.js");
+  if (labModule && !listMode && !view) {
     try {
       const { createLabView } = await labModule;
       const small = matchMedia("(max-width: 760px)").matches;
@@ -99,11 +122,30 @@ async function startLab() {
         },
         onFrame: (pts) => {
           const W = innerWidth;
-          for (const p of pts) {
-            const b = label(p.id);
+          const placed = pts.map((p) => {
             const half = halfWidths.get(p.id) || 60;
-            const x = Math.round(Math.max(half + 6, Math.min(W - half - 6, p.x))); // labels never leave the screen
-            const y = Math.round(p.y);
+            let x = Math.max(half + 6, Math.min(W - half - 6, p.x)); // labels never leave the screen
+            if (hudBox && p.y > hudBox.top && p.y - labelH < hudBox.bottom) x = Math.max(x, hudBox.right + half + 6); // nor go under the title
+            return { p, half, x, y: p.y };
+          });
+          // small screens crowd the ring: labels that would overlap are pushed apart vertically, a few cheap passes
+          const gap = labelH + 4;
+          for (let pass = 0; pass < 4; pass++) {
+            for (let i = 0; i < placed.length; i++) {
+              for (let j = i + 1; j < placed.length; j++) {
+                const a = placed[i], c = placed[j];
+                if (!a.p.visible || !c.p.visible || Math.abs(a.x - c.x) >= a.half + c.half + 4) continue;
+                const dy = c.y - a.y, push = (gap - Math.abs(dy)) / 2;
+                if (push <= 0) continue;
+                const s = dy < 0 ? -1 : 1;
+                (a.y -= s * push), (c.y += s * push);
+              }
+            }
+          }
+          for (const { p, x: px, y: py } of placed) {
+            const b = label(p.id);
+            const x = Math.round(px);
+            const y = Math.round(py);
             if (b._x !== x || b._y !== y) (b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`), (b._x = x), (b._y = y);
             const v = p.visible ? "" : "hidden";
             if (b.style.visibility !== v) b.style.visibility = v;
@@ -117,7 +159,7 @@ async function startLab() {
   }
   document.body.classList.toggle("no-gl", !view);
   document.body.classList.toggle("lab-list", listMode || !view); // no 3D lab: the scrolling list never overlaps the HUD
-  pauseBtn.hidden = !view;
+  pauseBtn.hidden = !view || listMode;
   applyMotion();
   // a panel opened from the URL before the scene existed: fly to its station now
   const station = open && STATIONS.find((s) => s.panel === open);
@@ -128,7 +170,7 @@ async function startLab() {
 const pauseBtn = $("pauseBtn");
 let paused = reducedPref;
 const applyMotion = () => {
-  view?.setMotion(!paused);
+  view?.setMotion(!paused && !listMode);
   pauseBtn.setAttribute("aria-pressed", String(paused));
   pauseBtn.querySelector("[aria-hidden]").textContent = paused ? "▶" : "❚❚"; // constant label, state in aria-pressed
   document.body.classList.toggle("still", paused);
@@ -136,6 +178,24 @@ const applyMotion = () => {
 pauseBtn.hidden = !view;
 pauseBtn.onclick = () => ((paused = !paused), applyMotion());
 applyMotion();
+// turning the phone (or resizing the window) can switch between the ring and the list; a height-only change is the
+// mobile address bar sliding while the list scrolls, and must not flip the layout under the reader's finger
+let lastW = innerWidth, lastH = innerHeight;
+addEventListener("resize", () => {
+  const dw = innerWidth - lastW, dh = innerHeight - lastH;
+  if (!dw && Math.abs(dh) < 150) return;
+  (lastW = innerWidth), (lastH = innerHeight);
+  const next = reflow() || tooTight();
+  if (next === listMode) return;
+  listMode = next;
+  if (!listMode && !view && glOk) {
+    labModule ??= import("./lab/lab-view.js");
+    return startLab();
+  }
+  document.body.classList.toggle("lab-list", listMode || !view);
+  pauseBtn.hidden = !view || listMode;
+  applyMotion();
+});
 
 // ---------------------------------------------------------------- navigation inside the one-screen app
 const status = (text) => ($("labStatus").textContent = text);

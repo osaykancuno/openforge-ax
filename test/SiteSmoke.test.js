@@ -47,6 +47,12 @@ describe("Site smoke helpers", () => {
       expect(smoke.layoutProblems({ ...m, scrollHeight: 824 })).to.deep.equal([]); // 1px tolerance
       expect(smoke.layoutProblems({ ...m, app: false })).to.deep.equal([]); // marketing pages may scroll
       expect(smoke.layoutProblems({ ...m, innerHeight: 560 })).to.deep.equal([]); // short-screen breakpoint scrolls by design
+      expect(smoke.layoutProblems({ ...m, innerWidth: 345, scrollWidth: 345, innerHeight: 600, scrollHeight: 1100 })).to.deep.equal([]); // phones with large text scroll
+      expect(smoke.layoutProblems({ ...m, innerWidth: 345, scrollWidth: 345, innerHeight: 812, scrollHeight: 1100 })).to.deep.equal(["document scrolls (1100 > 812)"]);
+    });
+    it("flags a 3D canvas that escaped its box (the Workbench phone bug)", () => {
+      const m = { app: true, innerHeight: 600, scrollHeight: 600, innerWidth: 345, scrollWidth: 345, escaped: ["plate"] };
+      expect(smoke.layoutProblems(m)).to.deep.equal(["canvas #plate is larger than its box"]);
     });
     it("flags horizontal overflow on every page", () => {
       const m = { app: false, innerHeight: 812, scrollHeight: 2000, innerWidth: 375, scrollWidth: 420 };
@@ -54,11 +60,11 @@ describe("Site smoke helpers", () => {
     });
   });
 
-  it("covers every page of the site at three viewports and both themes", () => {
+  it("covers every page of the site at five viewports and both themes", () => {
     const names = smoke.PAGES.map((p) => p.path);
     for (const p of ["index.html", "bench.html", "bench.html#so101/test", "bench.html#ax1-desk/test", "pilot.html", "arena.html", "robot.html",
       "codex.html#1", "codex.html#8", "gallery.html", "agent.html?id=1", "agents.html", "license.html"]) expect(names, p).to.include(p);
-    expect(smoke.VIEWPORTS.map((v) => `${v.width}x${v.height}`)).to.deep.equal(["1800x823", "1366x768", "375x812"]);
+    expect(smoke.VIEWPORTS.map((v) => `${v.width}x${v.height}`)).to.deep.equal(["1800x823", "1366x768", "375x812", "345x600", "780x360"]);
     expect(smoke.THEMES).to.deep.equal(["light", "dark"]);
     expect(smoke.VIEWPORTS[2].mobile).to.equal(true);
   });

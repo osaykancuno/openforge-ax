@@ -274,7 +274,7 @@ export function createLabView(canvas, stations, { onHover = () => {}, onSelect =
   function fit(w, h) {
     const { left, top } = safeArea(w, h);
     const portrait = w < 900;
-    const free = portrait ? { x0: 40, y0: top + 52, x1: w - 40, y1: h - 60 } : { x0: left + 60, y0: 60 + 56, x1: w - 60, y1: h - 52 };
+    const free = portrait ? { x0: 40, y0: top + 52, x1: w - 40, y1: h - 96 } : { x0: left + 60, y0: 60 + 56, x1: w - 60, y1: h - 52 };
     camera.aspect = w / h;
     camera.zoom = 1;
     camera.clearViewOffset();

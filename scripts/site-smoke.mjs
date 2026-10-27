@@ -5,7 +5,8 @@
 // The full run takes about 6 minutes: software-rendered WebGL (SwiftShader) is CPU-bound, more tabs barely help.
 // Serves web/ with scripts/serve.mjs's own handler, bound to 127.0.0.1 on a free port (loopback Host guard on).
 // Fails on: uncaught page errors, console.error, same-origin HTTP 4xx/5xx or failed requests, a page without <h1>,
-// document scroll on body.app pages (height >= 561, the one-screen layout), horizontal overflow, music playing before
+// document scroll on body.app pages (height >= 561, the one-screen layout; phones up to 480 x 700 scroll by design),
+// horizontal overflow, a 3D canvas larger than its own box (it then covers the page), music playing before
 // any gesture, missing .sound-btn / .music-btn, .music-btn not aria-pressed="false" by default.
 // Expected and ignored: the chain, proving and world servers (127.0.0.1/localhost :8545, :8787, :8788) are offline here;
 // requests to them are aborted, so the result does not depend on a local chain that happens to be running.
@@ -35,6 +36,8 @@ export const VIEWPORTS = [
   { width: 1800, height: 823 },
   { width: 1366, height: 768 },
   { width: 375, height: 812, mobile: true },
+  { width: 345, height: 600, mobile: true }, // a phone with large text (Android font scaling) under the address bar
+  { width: 780, height: 360, mobile: true }, // a phone on its side
 ];
 export const THEMES = ["light", "dark"];
 const MOBILE_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
@@ -47,8 +50,10 @@ export const isExpectedNetworkError = (text, url = "") => OFFLINE.test(`${text ?
 /** Layout problems out of the page metrics { app, innerHeight, scrollHeight, innerWidth, scrollWidth }. */
 export function layoutProblems(m) {
   const out = [];
-  if (m.app && m.innerHeight >= SHORT_SCREEN && m.scrollHeight > m.innerHeight + 1) out.push(`document scrolls (${m.scrollHeight} > ${m.innerHeight})`);
+  const scrollsByDesign = m.innerHeight < SHORT_SCREEN || (m.innerWidth <= 480 && m.innerHeight <= 700); // same breakpoints as the CSS
+  if (m.app && !scrollsByDesign && m.scrollHeight > m.innerHeight + 1) out.push(`document scrolls (${m.scrollHeight} > ${m.innerHeight})`);
   if (m.scrollWidth > m.innerWidth + 1) out.push(`horizontal overflow (${m.scrollWidth} > ${m.innerWidth})`);
+  for (const c of m.escaped ?? []) out.push(`canvas #${c} is larger than its box`);
   return out;
 }
 
@@ -64,6 +69,11 @@ const inspect = () => {
     sound: !!document.querySelector(".sound-btn"),
     musicBtn: !!music,
     musicPressed: music ? music.getAttribute("aria-pressed") : null,
+    // a canvas absolutely placed in a box that lost its positioning grows to the whole page and swallows every touch
+    escaped: [...document.querySelectorAll("canvas")].filter((c) => {
+      const r = c.getBoundingClientRect(), p = c.parentElement?.getBoundingClientRect();
+      return r.width && p && !document.body.classList.contains("lab") && (r.height > p.height + 2 || r.width > p.width + 2);
+    }).map((c) => c.id || c.className || "canvas"),
   };
 };
 
