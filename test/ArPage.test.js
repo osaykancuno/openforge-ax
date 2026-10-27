@@ -176,6 +176,21 @@ describe("AR page: css/ar.css", () => {
     expect(arJs).to.match(/MIC_OFF_NOTE = "Voice needs the microphone, and the browser cannot ask for it inside AR\. Tap Exit, then Enable microphone\."/);
   });
 
+  it("a refused microphone says why and where to fix it (Android, the site, another app), and only a blocked SITE reads 'blocked'", () => {
+    const fn = arJs.slice(arJs.indexOf("export function micFailText"), arJs.indexOf("function showMic()"));
+    // eslint-disable-next-line no-new-func -- the page module awaits the network at load; test the pure function alone
+    const micFailText = new Function(`${fn.replace("export ", "")}; return micFailText;`)();
+    expect(micFailText("NotAllowedError", "prompt")).to.match(/On Android: Settings, Apps, Chrome, Permissions, Microphone: Allow/);
+    expect(micFailText("NotAllowedError", "prompt")).to.match(/Reset permissions/);
+    expect(micFailText("NotAllowedError", "denied")).to.match(/blocked for this site.*Permissions, then Microphone: Allow/);
+    expect(micFailText("NotReadableError", "prompt")).to.match(/Another app is using the microphone/);
+    expect(micFailText("NotFoundError")).to.match(/No microphone/);
+    expect(micFailText("WeirdError")).to.match(/\(WeirdError\)/);
+    // the button state follows the site permission, not the error
+    expect(arJs).to.match(/if \(site === "denied" \|\| site === "prompt" \|\| site === "granted"\) micState = site;/);
+    expect(arJs).to.not.match(/micState = "denied";/);
+  });
+
   it("direction chips: a tap is the short move, a hold drives until the finger lifts, a long press opens no menu", () => {
     expect(arJs).to.match(/HOLDABLE = new Set\(\["forward", "back", "left", "right"\]\)/);
     expect(arJs).to.match(/held = controller\.press\(c\.id\)/);

@@ -66,6 +66,9 @@ body.pilot h1 { font: 800 clamp(1.6rem, 6vw, 2.4rem)/1.1 var(--display); letter-
   border: 1px solid var(--ink); border-radius: 12px; padding: 0 16px; min-height: 48px; cursor: pointer;
   touch-action: manipulation;
 }
+/* a link that looks like a button (e.g. "See it in your room"): the button's colour and centring, not the link's */
+a.pl-btn, body.pilot .pl-app a.pl-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--ink); }
+a.pl-btn.pl-primary, body.pilot .pl-app a.pl-btn.pl-primary { color: #fff; }
 .pl-btn:hover { background: var(--paper-2); }
 .pl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .pl-btn[aria-pressed="true"]:not(.sound-btn):not(.music-btn) { background: var(--ink); color: var(--paper); } /* sounds and music look the same as on every page */

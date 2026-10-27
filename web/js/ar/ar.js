@@ -432,6 +432,28 @@ function showMicPermission() {
 }
 const micMissing = () => micState === "prompt" || micState === "denied";
 
+/**
+ * Why getUserMedia gave no microphone, and where to fix it. On Android a refusal without any question on screen means
+ * Android has not given the microphone to Chrome, or Chrome stopped asking after earlier refusals: the site's own
+ * permissions do not even list the microphone then (seen on a Galaxy S24).
+ */
+export function micFailText(name, siteState) {
+  switch (name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      if (siteState === "denied") return "The microphone is blocked for this site. Tap the icon left of the address, then Permissions, then Microphone: Allow. Then tap Enable microphone again.";
+      return "Chrome did not get the microphone, and no question appeared. On Android: Settings, Apps, Chrome, Permissions, Microphone: Allow. If it still fails: tap the icon left of the address, then Reset permissions, and tap Enable microphone again.";
+    case "NotReadableError":
+    case "AbortError":
+      return "Another app is using the microphone. Close it, then tap Enable microphone again.";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "No microphone was found on this device.";
+    default:
+      return `The microphone did not start${name ? ` (${String(name).slice(0, 40)})` : ""}. Tap Enable microphone to try again.`;
+  }
+}
+
 function showMic() {
   const listening = Boolean(model.listening ?? mic.listening);
   const mb = $("arMic");
@@ -635,9 +657,14 @@ if (view && controller) {
       micNote = "";
       $("arStartMsg").textContent = "Microphone on. Voice is ready.";
       $("arStartMsg").dataset.tone = "";
-    } catch {
-      micState = "denied";
-      $("arStartMsg").textContent = "The microphone was not allowed. In Chrome: tap the icon left of the address, then Permissions, then Microphone. The buttons work without it.";
+    } catch (e) {
+      // ask the browser where the permission really stands: "denied" only when the SITE is blocked
+      let site = "unknown";
+      try {
+        site = (await navigator.permissions.query({ name: "microphone" })).state;
+      } catch {}
+      if (site === "denied" || site === "prompt" || site === "granted") micState = site;
+      $("arStartMsg").textContent = `${micFailText(e && e.name, site)} The buttons work without it.`;
       $("arStartMsg").dataset.tone = "bad";
     }
     showMicPermission();
