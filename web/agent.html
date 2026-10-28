@@ -38,17 +38,14 @@
       <img class="agent-img" id="img" src="assets/placeholder.png" alt="">
       <div class="row">
         <a class="btn sm magenta" id="osLink" target="_blank" rel="noopener">View on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
-        <a class="btn sm" id="scanLink" target="_blank" rel="noopener">Wallet on Etherscan<span class="sr-only"> (opens in a new tab)</span></a>
         <a class="btn sm yellow" id="arenaLink" href="arena.html" hidden>Test in the Proving Grounds</a>
-        <a class="btn sm" id="robotLink" href="robot.html" hidden>Connect a real arm</a>
-        <a class="btn sm" href="bench.html">Open the Workbench</a>
       </div>
     </div>
     <div class="app-scroll agent-info">
       <div class="kicker" id="kicker">FIG. 12 · Agent</div>
       <h1 class="pg-title" id="name">Loading…</h1>
       <p class="muted" id="desc"></p>
-      <p class="agent-what">This agent can fly lab missions in the <a href="arena.html">Proving Grounds</a>. Passed runs are verified and added to its on-chain record. No real-robot records yet. <a href="index.html#lore">What is an agent? →</a></p>
+      <p class="agent-what">Passed lab missions are verified and added to this agent's on-chain record. No real-robot records yet.</p>
       <div id="badges" class="row"></div>
       <div class="kv" id="traits"></div>
 
@@ -58,7 +55,7 @@
         <p class="mono" id="acct">—</p>
         <div class="kv">
           <div><small>Balance</small><b id="bal">—</b></div>
-          <div><small>Mode</small><b id="lvl">—</b></div>
+          <div id="modeCell"><small>Mode</small><b id="lvl">—</b></div>
           <div><small>Reputation (from verified runs)</small><b id="rep">—</b></div>
           <div><small>Verified tasks / data points</small><b id="tasks">—</b></div>
           <div><small>Lab missions passed / tried</small><b id="sim">—</b></div>

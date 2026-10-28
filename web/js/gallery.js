@@ -103,7 +103,7 @@ async function load() {
 }
 
 if (!isDeployed()) {
-  grid.innerHTML = `<div class="empty">Agents appear here as they are minted, on OpenSea.</div>`;
+  grid.innerHTML = `<div class="empty">No agents minted yet. Minting happens on OpenSea only.</div>`;
   more.style.display = "none";
 } else {
   rarity = await fetch("data/rarity.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);

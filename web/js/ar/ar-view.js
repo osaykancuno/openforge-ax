@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { XREstimatedLight } from "three/addons/webxr/XREstimatedLight.js";
 import { makeRenderer, makeStage, disposeObject, PALETTE } from "../models/look.js";
-import { buildRobot } from "../models/robots.js";
+import { buildRobot, bounds } from "../models/robots.js";
 import { composePose, faceToward } from "../pilot/twin-pose.js";
 import { corridorSamples, createObstacleTracker, evaluateDepth, evaluateRays } from "./obstacle.js";
 import { orientationQuat, relativeQuat } from "./orientation.js";
@@ -18,6 +18,13 @@ const RAY_MS = 200; // hit-test ray fallback: 5 Hz
 const RAY_MOVE = 0.05; // m: the ray source is created again after the Rover moved this far...
 const RAY_TURN = (10 * Math.PI) / 180; // ...or turned this much
 const CAMERA_CB_MS = 100; // object finding looks at 10 Hz at most (the detector slows itself down further)
+// Per body: shadow box half-size and key-light target height (m), whether it senses obstacles, its footprint on the reticle.
+const BODY_LOOK = Object.freeze({
+  rover: { name: "Rover", shadow: 0.4, target: 0.1, senses: true, foot: [[-0.113, -0.085], [0.113, -0.085], [0.113, 0.075], [-0.113, 0.075]] },
+  desk: { name: "Desk", shadow: 0.4, target: 0.15, senses: false, foot: Array.from({ length: 24 }, (_, i) => [Math.cos((i / 24) * Math.PI * 2) * 0.11, Math.sin((i / 24) * Math.PI * 2) * 0.11]) },
+  walker: { name: "Walker", shadow: 0.5, target: 0.25, senses: false, foot: [[-0.075, -0.05], [0.075, -0.05], [0.075, 0.05], [-0.075, 0.05]] },
+});
+const footGeometry = (key) => new THREE.BufferGeometry().setFromPoints(BODY_LOOK[key].foot.map(([x, z]) => new THREE.Vector3(x, 0.002, z)));
 const WARM_SCALE = 1e-4; // the Rover is drawn this small before it is placed, so its shaders are compiled before the drive loop runs
 const HIT_FRESH_MS = 400; // a tap places the Rover only if the floor was seen this recently
 const HIT_TILT_DEG = 7; // the floor ring sits about 10% of the screen above the middle, clear of the controls
@@ -71,8 +78,11 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
   const placeRoot = new THREE.Group();
   placeRoot.visible = false;
   scene.add(placeRoot);
-  const rig = buildRobot("ax1-rover");
+  let bodyKey = "rover"; // setBody() changes it, only between sessions
+  let rig = buildRobot("ax1-rover");
   placeRoot.add(rig.group);
+  let groundY = 0; // the Desk and Walker are put on the floor through bounds() (their models' origin is not at their soles)
+  let groundTick = 0;
 
   // a shadow catcher on the real floor: only the shadow is drawn, the camera picture shows through
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -87,10 +97,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
   reticle.visible = false;
   const ringMat = new THREE.MeshBasicMaterial({ color: PALETTE.accent, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.09, 0.105, 40).rotateX(-Math.PI / 2), ringMat);
-  const foot = new THREE.LineLoop(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.113, 0.002, -0.085), new THREE.Vector3(0.113, 0.002, -0.085), new THREE.Vector3(0.113, 0.002, 0.075), new THREE.Vector3(-0.113, 0.002, 0.075)]),
-    new THREE.LineBasicMaterial({ color: PALETTE.ink, transparent: true, opacity: 0.8 }),
-  );
+  const foot = new THREE.LineLoop(footGeometry("rover"), new THREE.LineBasicMaterial({ color: PALETTE.ink, transparent: true, opacity: 0.8 }));
   reticle.add(ring, foot);
   scene.add(reticle);
 
@@ -114,7 +121,13 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     renderer,
     scene,
     camera,
-    rig,
+    get rig() {
+      return rig;
+    },
+    get bodyKey() {
+      return bodyKey;
+    },
+    setBody,
     mode: null, // null | "xr" | "camera"
     placed: false,
     cameraAccess: false, // camera-access granted (object finding inside AR)
@@ -196,19 +209,50 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     return dt;
   }
 
+  /**
+   * The twin to draw: "rover" | "desk" | "walker". Only before a session starts (it throws while AR or the camera view
+   * runs), so the warm-up compile at the start covers the right model and no shader compiles mid-session.
+   */
+  function setBody(key) {
+    if (!Object.hasOwn(BODY_LOOK, key)) throw new Error(`Unknown body: ${key}`);
+    if (view.mode) throw new Error("Pick the body before AR or the camera view starts");
+    if (key === bodyKey) return;
+    placeRoot.remove(rig.group);
+    disposeObject(rig.group);
+    rig = buildRobot(`ax1-${key}`);
+    placeRoot.add(rig.group);
+    bodyKey = key;
+    groundY = 0;
+    foot.geometry.dispose();
+    foot.geometry = footGeometry(key);
+    const half = BODY_LOOK[key].shadow;
+    sc.left = sc.bottom = -half;
+    sc.right = sc.top = half;
+    sc.updateProjectionMatrix();
+  }
+
   function updateRig(dt, t) {
     const p = view.handlers.frame?.(dt, rig);
     if (p) {
       local = p;
-      rig.group.position.set(p.x, 0, p.z);
+      rig.group.position.set(p.x, groundY, p.z);
       rig.group.rotation.y = p.yaw;
     }
     rig.update?.(dt, t / 1000);
+    // the Desk and the Walker: keep the lowest point on the floor (their models sit 9-11 mm below their origin, and the
+    // Walker's legs bend); every few frames, only at full size. The Rover sits on its wheels already.
+    if (bodyKey !== "rover" && placeRoot.scale.x === 1 && ++groundTick % 6 === 0) {
+      const low = bounds(rig).min.y - placeRoot.position.y;
+      if (Number.isFinite(low) && Math.abs(low) > 0.001) {
+        groundY -= low;
+        rig.group.position.y = groundY;
+      }
+    }
     // the key light, its shadow box and the shadow catcher follow the Rover
     const w = placeRoot.visible ? view.worldPose() : null;
     if (w) {
       shadow.position.set(w.x, w.y + 0.001, w.z);
-      key.target.position.set(w.x, w.y + 0.1, w.z);
+      key.target.position.set(w.x, w.y + BODY_LOOK[bodyKey].target, w.z);
       key.position.set(w.x + keyDir.x * 1.2, w.y + keyDir.y * 1.2, w.z + keyDir.z * 1.2);
       key.target.updateMatrixWorld();
     }
@@ -406,7 +450,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     reticle.visible = shown;
     if (!view.placed && !pending) {
       if (shown) {
-        say("Tap to put the Rover here.");
+        say(`Tap to put the ${BODY_LOOK[bodyKey].name} here.`);
         // keep the warm-up Rover next to the reticle (it is invisible at this size)
         placeRoot.position.set(hit.x, hit.y, hit.z);
       } else say(lowLight ? "It's dark here: turn on a light, then move your phone slowly to find the floor." : "Move your phone slowly to find the floor.");
@@ -515,7 +559,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     updateAnchor(frame);
     updateLight();
     updateRig(dt, t);
-    if (view.placed) sense(frame, vp, t);
+    if (view.placed && BODY_LOOK[bodyKey].senses) sense(frame, vp, t); // obstacles: the wheeled Rover only
     renderer.render(scene, camera);
     if (debug) {
       dbg.frames++;
@@ -706,7 +750,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     document.addEventListener("visibilitychange", pageUp);
     lastT = 0;
     renderer.setAnimationLoop(onCameraFrame);
-    say("Tap anywhere to put the Rover down.");
+    say(`Tap anywhere to put the ${BODY_LOOK[bodyKey].name} down.`);
     return { orientation: view.orientationOn };
   }
 

@@ -352,7 +352,7 @@ export const CHAPTERS = [
   },
   {
     number: "07", kicker: "On-chain", title: "Agents on-chain",
-    body: `<p><b>1,024 NFT agents</b> are the heart of the lab: your membership and your logbook. Each has a robot class, <b>its own wallet</b> (a standard called ERC-6551) and a <b>record</b> of verified lab missions, failures included. Records from real robots come later.</p><p>New agents start in <b>Manual</b>: the agent proposes, you approve. In no mode can it move your NFTs. It is a collectible with tools, not an investment: <b>no returns promised</b>, and the price can fall.</p>`,
+    body: `<p>An <b>agent (NFT)</b> is a collectible robot with its own wallet and a record of verified lab missions, failures included.</p>`,
     actions: [{ id: "wallet", label: "Show its wallet" }, { id: "record", label: "Log a mission" }, { id: "manual", label: "Manual mode" }],
     build({ animate }) {
       const group = new THREE.Group();
@@ -378,12 +378,12 @@ export const CHAPTERS = [
               wallet.scale.setScalar(0.001);
               await animate(380, (k) => wallet.scale.setScalar(Math.max(0.001, k)));
             }
-            return "Its wallet: an Ethereum address that belongs to the agent, not to a person. Whoever holds the agent controls it. Sell the agent and the wallet goes with it, funds included; the old owner's settings reset.";
+            return "Its wallet: an Ethereum address that belongs to the agent, not to a person.";
           }
           if (id === "manual") {
             bubble.visible = true;
             await animate(300, (k) => (bubble.position.y = 1.45 + k * 0.1));
-            return "Manual: the agent only proposes (the bubble). Nothing happens until you approve it on the agent page.";
+            return "Manual: the agent only proposes (the bubble); nothing happens until you approve.";
           }
           if (stack.length >= 10) stack.splice(0).forEach((b) => group.remove(b));
           const ok = runs % 3 !== 2;
@@ -398,53 +398,6 @@ export const CHAPTERS = [
         },
         update: (dt, t) => rig.update(dt, t),
         dispose: () => disposeFace(rig),
-      };
-    },
-  },
-  {
-    number: "08", kicker: "Next", title: "Your first steps",
-    body: `<p>Three stations, in this order:</p><ul><li><a href="bench.html"><b>Workbench</b></a>: take a robot apart stage by stage, then play its missions.</li><li><a href="pilot.html"><b>Phone Brain</b></a>: open it on your phone and drive the 3D twin (or a real AX-1).</li><li><a href="arena.html"><b>Proving Grounds</b></a>: pilot the SO-101 twin in a verified mission.</li></ul><p>No wallet needed for any of them. Open means you can check.</p>`,
-    actions: [{ id: "bench", label: "Workbench" }, { id: "pilot", label: "Phone Brain" }, { id: "arena", label: "Proving Grounds" }],
-    build({ animate }) {
-      const group = new THREE.Group();
-      const arm = model("so101", 3.6);
-      const bench = new THREE.Group();
-      bench.add(at(rbox(0.9, 0.08, 0.6, "paper2", 0.02), 0, 0.04, 0), at(arm.group, 0, 0.08, 0));
-      const face = phoneFace({ w: 256, h: 512 });
-      const ph = phone({ face: face.texture });
-      ph.scale.setScalar(7);
-      const pilot = new THREE.Group();
-      pilot.add(at(rbox(0.6, 0.08, 0.6, "paper2", 0.02), 0, 0.04, 0), at(ph, 0, 0.62, 0));
-      ph.rotation.x = -0.25;
-      const arena = new THREE.Group();
-      const ring = at(torus(0.22, 0.02, "sage"), 0.1, 0.1, 0.05);
-      ring.rotation.x = Math.PI / 2;
-      arena.add(at(cyl(0.42, 0.42, 0.08, "paper2", 48), 0, 0.04, 0), ring, at(rbox(0.16, 0.16, 0.16, "sun", 0.02), -0.18, 0.16, -0.08));
-      const stations = { bench: at(bench, -1.25, 0, 0.1), pilot: at(pilot, 0, 0, -0.5), arena: at(arena, 1.25, 0, 0.1) };
-      for (const [k, s] of Object.entries(stations)) group.add(pick(s, k));
-      let up = null;
-      const INFO = {
-        bench: "Workbench (bench.html): Unfold, Take it apart, Sensors, Brain, Move, Test, Build it. Start with AX-1 or the SO-101.",
-        pilot: "Phone Brain (pilot.html): camera, IMU and touch drive the twin. With an AX-1 bridge it drives the real robot over Bluetooth from Android Chrome; iPhone Safari can't, so iPhones use the twin.",
-        arena: "Proving Grounds (arena.html): move the cell into the dock in 60 seconds. Guests can play. Any wallet can enter the pilot ranking; only agent holders get a record under an agent.",
-      };
-      return {
-        group, pickables: Object.values(stations),
-        async act(id) {
-          const s = stations[id];
-          if (up && up !== s) {
-            const u = up;
-            animate(250, (k) => (u.position.y = 0.3 * (1 - k)));
-          }
-          up = s;
-          await animate(300, (k) => (s.position.y = 0.3 * k));
-          return INFO[id];
-        },
-        update: (dt, t) => {
-          face.tick(t);
-          if (dt) arm.set("shoulder_pan", Math.sin(t * 0.6) * 40);
-        },
-        dispose: () => face.texture.dispose(),
       };
     },
   },

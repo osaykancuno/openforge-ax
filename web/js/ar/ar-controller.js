@@ -6,6 +6,7 @@
 //   armed --obstacle ahead | edge of the play area | AR blurred--> armed (hold: the plan is interrupted, wheels 0)
 //   latched --ARM button--> armed;   any --AR ended--> ready
 //
+// One body per session (start(mode, key)): the Rover, or the Desk / Walker, which move joints only.
 // The rules of the AI Pilot hold unchanged. Nothing here arms except place() (a tap on the floor) and arm() (the ARM
 // button): voice, chips, the model and the AI never reach them. Every motion goes plan -> executor -> guarded drive loop ->
 // twin transport -> bridge state machine -> AX_STATE; the guard only REFUSES forward drives that would hit something. The
@@ -16,7 +17,7 @@ import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
 import { createAiPilot } from "../pilot/ai/ai-pilot.js";
 import { cleanSay } from "../pilot/ai/tools.js";
 import { VMAX, stepPose, wheelsFromState } from "../pilot/twin-pose.js";
-import { CHIPS, chipText } from "./chips.js";
+import { chipText, chipsFor } from "./chips.js";
 import { createArParser } from "./ar-parse.js";
 import { edgeAhead, isBackStep, isBackWheels, isForwardStep, isForwardWheels } from "./obstacle.js";
 
@@ -40,7 +41,10 @@ const HOLD_STICK = { forward: [0, 1], back: [0, -1], left: [-0.6, 0], right: [0.
 const STOP_WORDS = /\b(stop|halt|freeze|brake|abort)\b/i; // anywhere in the sentence: "ok stop" stops at once
 const BLUR_MESSAGE = "AR is paused (something is on top of the camera view), so I stopped moving.";
 const EMPTY_AI = Object.freeze({ state: "idle", running: false, busy: false, messages: [], plan: null, progress: null });
-const ROVER = P.bodyByKey("rover");
+// The bodies the page offers: the Rover drives (odometry, obstacles, hold-to-drive); the Desk and the Walker move joints
+// only (no wheels: no odometry, no obstacle sensing, no hold). The Walker holds poses: it does not walk.
+export const BODY_NAMES = Object.freeze({ rover: "Rover", desk: "Desk", walker: "Walker" });
+const STILL_TEXT = { desk: "Stays where you put it", walker: "Poses only · it does not walk" };
 
 const VOICE_ERRORS = {
   "not-allowed": "The microphone is not allowed for this page. Allow it in your browser's site settings, or use the buttons.",
@@ -58,7 +62,7 @@ const voiceErrorText = (state) => {
 /**
  * createArController({ clock, makeTransport, voice, wake, parse, extensions, onChange, createAi, radius })
  *   clock          { now, setInterval, ... } (twin-transport realTimers by default; tests pass a fake)
- *   makeTransport  () => twin transport (default: the Rover twin with 15 ms of simulated BLE latency)
+ *   makeTransport  (body) => twin transport for that body (default: the twin with 15 ms of simulated BLE latency)
  *   voice          createVoiceInput() result or null;  wake  createWakeLock() result or null
  *   parse          (text, bodyKey, opts) => result; default = createArParser({ obstacle filter, extensions })
  *   extensions     ar-parse extensions (object intents), used by the default parser
@@ -68,6 +72,10 @@ const voiceErrorText = (state) => {
 export function createArController({ clock = realTimers, makeTransport = null, voice = null, wake = null, parse = null, extensions = [], onChange = () => {}, createAi = createAiPilot, radius = 3 } = {}) {
   let state = STATES.READY;
   let mode = null; // "xr" | "camera"
+  let bodyKey = "rover"; // fixed for a session: chosen before start(), changed only between sessions
+  let body = P.bodyByKey("rover");
+  let drives = true; // a wheeled body: odometry, obstacle sensing, hold-to-drive
+  const name = () => BODY_NAMES[bodyKey];
   let loop = null; // the REAL drive loop
   let guarded = null; // what the AI gets: the same loop, with holdFor guarded
   let ai = null;
@@ -106,7 +114,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
    */
   const obstacleAhead = (side = "front") => {
     const o = side === "back" ? obstBack : obst;
-    if (mode !== "xr" || !o || o.state !== "blocked") return Infinity;
+    if (!drives || mode !== "xr" || !o || o.state !== "blocked") return Infinity;
     const p = (side === "back" ? obstBackPose : obstPose) || pose;
     const driven = (pose.x - p.x) * Math.sin(p.yaw) + (pose.z - p.z) * Math.cos(p.yaw); // forward along the heading
     return o.nearM - (side === "back" ? -driven : driven);
@@ -114,13 +122,14 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   /** Blocked = too close to drive toward that side at speed v (m/s): the stop would end nearer than STOP_GAP_M. */
   const isBlocked = (v = 0, side = "front") => obstacleAhead(side) <= stopAt(v);
   const forwardSpeed = () => {
-    if (!snap || snap.body !== ROVER) return 0;
-    const [l, r] = wheelsFromState(snap.state, ROVER);
+    if (!drives || !snap || snap.body !== body) return 0;
+    const [l, r] = wheelsFromState(snap.state, body);
     return ((l + r) / 2000) * VMAX;
   };
   const edgeText = () => `I'm at the edge of my ${+playRadius.toFixed(2)} m play area.`;
 
   function sensing() {
+    if (!drives) return { level: "none", text: STILL_TEXT[bodyKey] || "" };
     if (mode === "camera") return { level: "off", text: CAMERA_SENSING };
     if (isBlocked(VMAX, "back") && !isBlocked(VMAX)) return { level: "blocked", text: STOP_BACK_TEXT }; // backed up to something
     if (!obst) return { level: "off", text: "" };
@@ -131,11 +140,11 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   function hint() {
     switch (state) {
       case STATES.PLACING:
-        return mode === "camera" ? "Tap the screen to wake the Rover." : "Aim at the floor and tap to put the Rover there.";
+        return mode === "camera" ? `Tap the screen to wake the ${name()}.` : bodyKey === "desk" ? "Aim at a table or the floor and tap to put the Desk there." : `Aim at the floor and tap to put the ${name()} there.`;
       case STATES.ARMED:
-        return "The Rover is awake. Say or tap what it should do. STOP stops it.";
+        return `The ${name()} is awake. Tap what it should do. STOP stops it.`;
       case STATES.LATCHED:
-        return "The Rover is stopped. Press ARM to let it move again.";
+        return `The ${name()} is stopped. Press ARM to let it move again.`;
       default:
         return "";
     }
@@ -197,7 +206,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     const active = s.link === LINK.ARMED || s.link === LINK.DRIVING;
     if (state === STATES.ARMED && !active) {
       state = STATES.LATCHED; // the bridge latched, the loop stalled or the link dropped: nothing resumes
-      message = s.message || "The Rover is stopped.";
+      message = s.message || `The ${name()} is stopped.`;
     }
     const sig = `${s.link}|${s.message}|${state}`;
     if (sig !== loopSig) {
@@ -209,6 +218,13 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   const api = {
     get state() {
       return state;
+    },
+    /** The body of this session: its ax-proto number (for applyTwinState) and its key. */
+    get body() {
+      return body;
+    },
+    get bodyKey() {
+      return bodyKey;
     },
     /** Local odometry { x, z, yaw } under the placement. Live object: do not keep it, read it. */
     get pose() {
@@ -250,15 +266,25 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         voiceNote,
         sensing: sensing(),
         radius: playRadius,
-        chips: CHIPS,
+        body: bodyKey,
+        name: name(),
+        drives,
+        chips: chipsFor(bodyKey),
         odometry: { x: pose.x, z: pose.z, yaw: pose.yaw },
         ai: aiView,
       };
     },
 
-    /** The view has entered XR / the camera view. Connects the twin (LATCHED) and waits for the tap that places it. */
-    async start(m) {
+    /**
+     * The view has entered XR / the camera view. Connects the twin of body `key` ("rover" | "desk" | "walker", LATCHED) and
+     * waits for the tap that places it. An unknown body starts nothing.
+     */
+    async start(m, key = "rover") {
       if (state !== STATES.READY) return false;
+      if (typeof key !== "string" || !Object.hasOwn(BODY_NAMES, key)) return false;
+      bodyKey = key;
+      body = P.bodyByKey(key);
+      drives = Boolean(P.BODIES[body] && P.BODIES[body].drive);
       state = STATES.STARTING;
       mode = m === "camera" ? "camera" : "xr";
       playRadius = mode === "camera" ? Math.min(radius, 1.5) : radius;
@@ -270,7 +296,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       notice = "";
       heard = "";
       loopSig = "";
-      const transport = (makeTransport || (() => createTwinTransport({ body: ROVER, clock, latencyMs: 15 })))();
+      const transport = (makeTransport || ((b) => createTwinTransport({ body: b, clock, latencyMs: 15 })))(body);
       const mine = createDriveLoop({ transport, clock, onChange: onLoop });
       loop = mine;
       guarded = guard(mine);
@@ -282,7 +308,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
           getMode: () => mode,
           extensions,
         });
-      ai = createAi({ getLoop: () => guarded, getBodyKey: () => "rover", getMode: () => "twin", getModel: () => null, parse: arParse, clock, onChange: () => emit() });
+      ai = createAi({ getLoop: () => guarded, getBodyKey: () => bodyKey, getMode: () => "twin", getModel: () => null, parse: arParse, clock, onChange: () => emit() });
       emit();
       await mine.connect();
       if (loop !== mine) return false; // ended meanwhile
@@ -331,7 +357,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         message = "";
       } else {
         state = STATES.LATCHED;
-        message = (loop && loop.snapshot.message) || "The Rover could not be armed.";
+        message = (loop && loop.snapshot.message) || `The ${name()} could not be armed.`;
       }
       emit();
       return ok;
@@ -348,7 +374,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         message = "";
         notice = "";
       } else {
-        message = (loop && loop.snapshot.message) || "The Rover could not be armed.";
+        message = (loop && loop.snapshot.message) || `The ${name()} could not be armed.`;
       }
       emit();
       return ok;
@@ -371,7 +397,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     },
 
     chip(id) {
-      const t = chipText(id);
+      const t = chipText(id, bodyKey);
       return t ? api.say(t, { source: "chip" }) : Promise.resolve(null);
     },
 
@@ -401,7 +427,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     press(dir) {
       releaseHold();
       const xy = typeof dir === "string" && Object.hasOwn(HOLD_STICK, dir) ? HOLD_STICK[dir] : null;
-      if (!xy || !guarded || state !== STATES.ARMED) return false;
+      if (!xy || !drives || !guarded || state !== STATES.ARMED) return false;
       if (ai && ai.running) ai.takeover("You took the controls.");
       if (seek && typeof seek.cancel === "function") {
         try {
@@ -465,7 +491,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
      * camera view has no sensing.
      */
     obstacle(update) {
-      if (mode !== "xr") return;
+      if (mode !== "xr" || !drives) return; // the camera view and the bodies without wheels have no sensing
       if (update && typeof update === "object") {
         const near = Number.isFinite(update.nearM) ? update.nearM : Number.isFinite(update.distanceM) ? update.distanceM : 0;
         const o = { state: update.state, distanceM: update.distanceM ?? null, nearM: near, message: String(update.message || "") };
@@ -485,8 +511,8 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     /** Call every render frame with the seconds since the last. Advances the odometry from what the bridge reports. */
     frame(dt) {
       out.clamped = false;
-      if (loop && snap && snap.body === ROVER && dt > 0) {
-        const [l, r] = wheelsFromState(snap.state, ROVER);
+      if (drives && loop && snap && snap.body === body && dt > 0) {
+        const [l, r] = wheelsFromState(snap.state, body);
         out.clamped = stepPose(pose, l, r, Math.min(dt, 0.1), { radius: playRadius });
         if (out.clamped) api.hold(edgeText());
         else checkObstacle(); // between depth frames too: the odometry says how much nearer it is now

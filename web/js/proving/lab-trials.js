@@ -59,8 +59,8 @@ export async function createLabTrials({ api, isOnline, getSigner, getAgents, toa
       : fit.length
         ? `Runs flown by ${open ? "any of your agents" : `your ${NAMES.class[cls]}`} are verified and added to its on-chain record.`
         : open
-          ? "You have no agents yet. You can still fly as guest."
-          : `This robot is flown by ${NAMES.class[cls]} agents (and every agent flies the AX-1 bodies). You can still fly as guest.`;
+          ? "You have no agents yet."
+          : `This robot is flown by ${NAMES.class[cls]} agents (and every agent flies the AX-1 bodies).`;
   }
 
   // ---------------------------------------------------------------- runs

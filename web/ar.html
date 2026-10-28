@@ -26,7 +26,6 @@
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/pilot/ai/tools.js">
 <link rel="modulepreload" href="js/pilot/twin-transport.js">
-<link rel="modulepreload" href="js/pilot/ax-proto.js">
 <link rel="modulepreload" href="js/pilot/drive-loop.js">
 <link rel="modulepreload" href="js/pilot/twin-pose.js">
 <link rel="modulepreload" href="js/pilot/sensors.js">
@@ -49,6 +48,7 @@
 <link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
+<link rel="modulepreload" href="js/pilot/ax-proto.js">
 <link rel="modulepreload" href="js/pilot/motions.js">
 <link rel="modulepreload" href="js/pilot/bridge-sim.js">
 <link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
@@ -103,12 +103,18 @@
       <p class="pl-label">FIG. 01 · <b>The twin, in your room</b></p>
       <h1 id="arTitle">AX-1 in your room</h1>
       <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone.</p>
+      <fieldset class="ar-bodies" id="arBodies">
+        <legend class="pl-label">Choose a body</legend>
+        <label class="ar-body"><input type="radio" name="arBody" value="rover" checked><span><b>Rover</b> Drives on the floor.</span></label>
+        <label class="ar-body"><input type="radio" name="arBody" value="desk"><span><b>Desk</b> Sits on a table and waves. No wheels.</span></label>
+        <label class="ar-body"><input type="radio" name="arBody" value="walker"><span><b>Walker</b> Holds poses. It does not walk.</span></label>
+      </fieldset>
       <ol class="ar-steps">
         <li>Allow the camera when asked.</li>
-        <li>Point at the floor, then tap to put the Rover down.</li>
-        <li>Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it.</li>
+        <li id="arStep2">Point at the floor, then tap to put the Rover down.</li>
+        <li id="arStep3">Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it.</li>
       </ol>
-      <label class="pl-check ar-look"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
+      <label class="pl-check ar-look" id="arLookRow"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
       <p class="pl-small" id="arLookNote">Off by default. Turning it on downloads the object-finding model once (up to about 19 MB) and runs it on your phone. Nothing leaves the phone.</p>
       <div class="pl-row pl-wrap">
         <button class="pl-btn pl-primary" id="arStartBtn" type="button">Start</button>

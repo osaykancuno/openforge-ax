@@ -174,13 +174,33 @@ describe("AR page: css/ar.css", () => {
   });
 
   it("direction chips: a tap is the short move, a hold drives until the finger lifts, a long press opens no menu", () => {
-    expect(arJs).to.match(/HOLDABLE = new Set\(\["forward", "back", "left", "right"\]\)/);
+    // which chips hold comes from chips.js (the Rover's four direction chips), not from a list in the page
+    expect(arJs).to.not.match(/HOLDABLE/);
+    expect(arJs).to.match(/for \(const c of chipsFor\(key\)\) \{/);
+    expect(arJs).to.match(/if \(c\.hold\) \{/);
     expect(arJs).to.match(/held = controller\.press\(c\.id\)/);
     expect(arJs).to.match(/for \(const t of \["pointerup", "pointercancel", "lostpointercapture"\]\) b\.addEventListener\(t, lift\)/);
     expect(arJs).to.match(/if \(held\) controller\.release\(\)/);
     expect(arJs).to.match(/addEventListener\("contextmenu", \(e\) => e\.preventDefault\(\)\)/);
     expect(arJs).to.match(/if \(!e\.isTrusted \|\| e\.button > 0\) return;/);
     expect(css).to.match(/\.ar-chips \.pl-btn \{[^}]*-webkit-touch-callout: none/);
+  });
+
+  it("bodies: a Rover / Desk / Walker picker, the Walker never claims to walk, the body is fixed while a session runs", () => {
+    const radios = [...html.matchAll(/<input type="radio" name="arBody" value="(\w+)"( checked)?>/g)];
+    expect(radios.map((m) => m[1])).to.deep.equal(["rover", "desk", "walker"]);
+    expect(radios[0][2]).to.equal(" checked");
+    expect(html).to.match(/<b>Walker<\/b> Holds poses\. It does not walk\./);
+    // nothing anywhere says the Walker walks
+    for (const [name, src] of [["ar.html", html], ["ar.js", arJs], ["ar-view.js", viewJs]]) expect(src, name).to.not.match(/Walker[^."]{0,80}\bwalks\b/);
+    // the body is chosen before the session: setBody never runs after the view started
+    expect(viewJs).to.match(/if \(view\.mode\) throw new Error\("Pick the body before AR or the camera view starts"\)/);
+    expect(viewJs).to.not.match(/buildRobot\("ax1-rover"\)[\s\S]*buildRobot\("ax1-rover"\)/); // one default, then setBody
+    expect(fnBody(arJs, "onStart")).to.not.match(/setBody\(/);
+    expect(arJs).to.match(/r\.disabled = starting \|\| live;/);
+    // obstacle sensing only for the body that drives
+    expect(viewJs).to.match(/if \(view\.placed && BODY_LOOK\[bodyKey\]\.senses\) sense\(/);
+    expect(arJs).to.match(/applyTwinState\(rig, snap, controller\.body, p, 0\)/);
   });
 
   it("keeps the middle of the screen clear: that is where the floor ring and the Rover are", () => {
@@ -278,7 +298,7 @@ describe("AR page: js/ar/ar.js and js/ar/ar-view.js", () => {
 
   it("closes the view again when the twin cannot start, and refuses a second placement while a plan runs", () => {
     const start = fnBody(arJs, "onStart");
-    expect(start).to.match(/await controller\.start\(mode\)/);
+    expect(start).to.match(/await controller\.start\(mode, bodyKey\)/);
     expect(start).to.match(/view\.exit\(why\)/);
     expect(arJs).to.match(/place:\s*\(info\)\s*=>/);
     expect(arJs).to.match(/!v\.canPlace\)\s*return false/);

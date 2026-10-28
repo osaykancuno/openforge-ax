@@ -8,14 +8,13 @@
 import { loadConfig, renderChrome } from "../chain.js";
 import { describeStep } from "../pilot/ai/tools.js";
 import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
-import { bodyByKey } from "../pilot/ax-proto.js";
 import { LINK } from "../pilot/drive-loop.js";
 import { applyTwinState } from "../pilot/twin-pose.js";
 import { createWakeLock } from "../pilot/sensors.js";
 import { $, chip, el } from "../pilot/ui.js";
 import { probeAr } from "./ar-caps.js";
-import { NEAR_STOP_M, STOP_GAP_M, createArController } from "./ar-controller.js";
-import { CHIPS } from "./chips.js";
+import { BODY_NAMES, NEAR_STOP_M, STOP_GAP_M, createArController } from "./ar-controller.js";
+import { chipsFor } from "./chips.js";
 import { CAMERA_VIEW, createArView } from "./ar-view.js";
 import { createSeek } from "./seek.js";
 import { createDetector, createLookAround, xrViewOf } from "./vision/detector.js";
@@ -53,7 +52,8 @@ let model = {};
 
 const wake = createWakeLock();
 
-const ROVER = bodyByKey("rover");
+let bodyKey = "rover"; // the body picked on the start card; fixed while a session runs
+const bodyName = () => BODY_NAMES[bodyKey];
 const extensions = []; // parser extensions (object intents); the controller's parser reads this array on every request
 
 // ---- object finding ("Look around"): the world model, the keep-out zones and the trips exist from the start so that
@@ -79,7 +79,7 @@ let intents = null;
 let controller = null;
 if (view) {
   controller = createArController({
-    makeTransport: () => createTwinTransport({ body: ROVER, clock: realTimers, latencyMs: 15 }),
+    makeTransport: (b) => createTwinTransport({ body: b, clock: realTimers, latencyMs: 15 }),
     wake, // no voice on this page for now (2026-10-28): buttons only
     extensions,
     radius: caps.mode === "camera" ? CAMERA_VIEW.radius : 3,
@@ -118,7 +118,7 @@ if (view) {
         }
       }
       const snap = controller.snapshot;
-      applyTwinState(rig, snap, ROVER, p, 0);
+      applyTwinState(rig, snap, controller.body, p, 0);
       if (rig.face) rig.face.setMood(snap && snap.link === LINK.DRIVING ? "happy" : snap && (snap.link === LINK.ARMED) ? "idle" : "alert");
       return p;
     },
@@ -184,7 +184,7 @@ function syncLook() {
   c.hidden = !lookNote;
   if (lookNote) setChip(c, lookNote, lookTone);
   const b = $("arLookBtn");
-  b.hidden = !LIVE.has(stateName()) && !looking;
+  b.hidden = (!LIVE.has(stateName()) && !looking) || bodyKey !== "rover"; // object finding: the Rover only in v1
   b.setAttribute("aria-pressed", String(looking));
   setText(b, "Look around");
 }
@@ -315,11 +315,35 @@ function showCard() {
   }
   show("arStart", true);
   const xr = caps.mode === "xr";
+  const n = bodyName();
   $("arStartBtn").textContent = xr ? "Start AR" : "Start camera view";
+  const does = { rover: "drive it with the buttons", desk: "make it wave, nod and point with the buttons", walker: "pose it with the buttons (it does not walk)" }[bodyKey];
   $("arLead").textContent = xr
-    ? "Meet the AX-1 Rover as a digital twin on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone."
-    : "Meet the AX-1 Rover as a digital twin in front of your camera. Your browser has no WebXR AR, so it is not anchored to your floor. It is not a real robot.";
+    ? `Meet the AX-1 ${n} as a digital twin in your own room. Point your phone at ${bodyKey === "desk" ? "a table or the floor" : "the ground"}, tap to place it, then ${does}. It is not a real robot. Camera pictures never leave this phone.`
+    : `Meet the AX-1 ${n} as a digital twin in front of your camera. Your browser has no WebXR AR, so it is not anchored to your floor. It is not a real robot.`;
+  $("arStep2").textContent = bodyKey === "desk" ? "Point at a table or the floor, then tap to put the Desk down." : `Point at the floor, then tap to put the ${n} down.`;
+  $("arStep3").textContent =
+    bodyKey === "rover" ? "Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it." : `Tap a button: the ${n} does that move. STOP always stops it.`;
+  // object finding is for the Rover in v1
+  show("arLookRow", bodyKey === "rover");
+  show("arLookNote", bodyKey === "rover");
+  if (bodyKey !== "rover") $("arLook").checked = false;
+  $("arPlaceBtn").textContent = `Place the ${n} here`;
+  $("arCanvas").setAttribute("aria-label", `The AX-1 ${n} twin, drawn over your camera picture`);
+}
+
+/** The body picked on the start card: the view draws it, the chips and the texts follow. Never while a session runs. */
+function chooseBody(key) {
+  if (!Object.hasOwn(BODY_NAMES, key) || starting || LIVE.has(stateName())) return;
+  try {
+    view.setBody(key);
+  } catch {
+    return; // a session is running: the body stays
   }
+  bodyKey = key;
+  buildChips(key);
+  showCard();
+}
 
 function leaveLive(message) {
   body.classList.remove("ar-live", "ar-xr");
@@ -356,6 +380,7 @@ function stateName() {
 
 /** The chip: what is ahead, unless something behind is nearer to being hit (reversing). */
 function obstacleText(u, back = lastObstacleBack) {
+  if (model.drives === false) return [model.sensing?.text || "", ""]; // the Desk and the Walker do not drive: no sensing
   if (view && view.mode === "camera") return [NEEDS_AR, "warn"];
   const backNear = back && back.state === "blocked" && Number.isFinite(back.nearM) ? back.nearM : Infinity;
   const frontNear = u && u.state === "blocked" ? (Number.isFinite(u.nearM) ? u.nearM : 0) : Infinity;
@@ -374,7 +399,7 @@ function obstacleText(u, back = lastObstacleBack) {
       return [`Stopped ${Math.round(STOP_GAP_M * 100)} cm before an obstacle`, "bad"];
     }
     case "blind":
-      return ["Point the phone at the Rover", "warn"];
+      return [`Point the phone at the ${bodyName()}`, "warn"];
     default:
       return [u.message ? String(u.message) : "Obstacle sensing is off", "warn"];
   }
@@ -474,7 +499,8 @@ function render() {
   if (view && view.mode === "camera") setText($("arBanner"), view.orientationOn ? BANNER_CAMERA : `${BANNER_CAMERA} Motion access is off, so the view stays still.`);
   applyHint();
   const driving = st === "ARMED" && model.link === LINK.DRIVING;
-  const link = driving ? ["Driving", "live"] : { PLACING: ["Place the Rover", "warn"], ARMED: ["Armed", "ok"], LATCHED: ["Stopped · press ARM", "warn"] }[st] || ["Offline", ""];
+  const link = driving ? ["Driving", "live"] : { PLACING: [`Place the ${bodyName()}`, "warn"], ARMED: [`${bodyName()} · Armed`, "ok"], LATCHED: ["Stopped · press ARM", "warn"] }[st] || ["Offline", ""];
+  for (const r of document.querySelectorAll('input[name="arBody"]')) r.disabled = starting || live; // fixed while a session runs
   setChip($("arLink"), link[0], link[1]);
   $("arArm").disabled = !model.canArm;
   show("arPlaceBtn", st === "PLACING");
@@ -488,13 +514,13 @@ function render() {
 function stateChanged(was, st) {
   if (st === "PLACING") {
     const camera = view && view.mode === "camera";
-    announce(`${camera ? `${BANNER_CAMERA} ` : ""}Place the Rover: ${camera ? "tap the picture" : "point at the floor and tap"}, or press Place the Rover here.`);
+    announce(`${camera ? `${BANNER_CAMERA} ` : ""}Place the ${bodyName()}: ${camera ? "tap the picture" : "point at the floor and tap"}, or press Place the ${bodyName()} here.`);
     focusIfLost($("arPlaceBtn"));
   } else if (st === "ARMED" && (was === "PLACING" || was === "LATCHED")) {
-    announce("Armed. Tap a button for a short move, or hold it to keep moving.");
+    announce(bodyKey === "rover" ? "Armed. Tap a button for a short move, or hold it to keep moving." : `Armed. Tap a button and the ${bodyName()} does that move.`);
     focusIfLost($("arChips").querySelector("button") || $("arStop"));
   } else if (st === "LATCHED") {
-    announce(was === "PLACING" ? "The Rover is placed but not armed. Press ARM to drive." : "Stopped. Press ARM to drive again.", was !== "PLACING");
+    announce(was === "PLACING" ? `The ${bodyName()} is placed but not armed. Press ARM to move it.` : "Stopped. Press ARM to move again.", was !== "PLACING");
     focusIfLost($("arArm").disabled ? $("arStop") : $("arArm"));
   } else if (LIVE.has(was) && !LIVE.has(st)) {
     focusIfLost($("arStartBtn")); // the session is over: back to Start (the focused Exit or STOP is hidden now)
@@ -548,7 +574,7 @@ async function onStart() {
     if (mode === "xr") body.classList.add("ar-xr");
     $("arStartMsg").textContent = "";
     announce("", true); // an earlier failure's alert is over
-    if (!(await controller.start(mode))) {
+    if (!(await controller.start(mode, bodyKey))) {
       // the twin could not start: close the view again and say why
       const why = controller.view.message || "The twin could not start. Tap Start to try again.";
       view.exit(why);
@@ -602,12 +628,18 @@ if (view && controller) {
   });
   $("arExit").addEventListener("click", () => view.exit("Closed"));
   $("arPlaceBtn").addEventListener("click", (e) => e.isTrusted && view.placeHere()); // a tap without a pointer: same path, same rules
-  // A tap is the chip's short move; holding Forward, Back, Left or Right keeps the Rover moving until the finger lifts
-  // (controller.press / release: short leases, the same obstacle and edge guards).
+  for (const r of document.querySelectorAll('input[name="arBody"]')) r.addEventListener("change", () => r.checked && chooseBody(r.value));
+}
+
+/**
+ * The chips of body `key`. A tap is the chip's short move; holding a chip marked `hold` (the Rover's Forward, Back, Left,
+ * Right) keeps it moving until the finger lifts (controller.press / release: short leases, the same obstacle and edge guards).
+ */
+function buildChips(key) {
   const chips = $("arChips");
-  const HOLDABLE = new Set(["forward", "back", "left", "right"]);
+  chips.replaceChildren();
   const HOLD_START_MS = 250;
-  for (const c of CHIPS) {
+  for (const c of chipsFor(key)) {
     const b = el("button", { class: "pl-btn", type: "button", "data-chip": c.id, text: c.label });
     let timer = null;
     let held = false; // a hold happened: the click that follows the lift is not a tap
@@ -618,7 +650,7 @@ if (view && controller) {
       }
       controller.chip(c.id);
     });
-    if (HOLDABLE.has(c.id)) {
+    if (c.hold) {
       const lift = () => {
         clearTimeout(timer);
         timer = null;
@@ -642,6 +674,7 @@ if (view && controller) {
   }
 }
 
+if (view && controller) buildChips(bodyKey);
 showCard();
 render();
 

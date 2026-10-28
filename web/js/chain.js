@@ -309,48 +309,52 @@ export function toast(msg, isErr = false) {
   el._t = setTimeout(() => (el.textContent = ""), isErr ? 9000 : 6000);
 }
 
-/** `wallet`: restore the connected wallet now (loads ethers). Default: only on the pages that sign (WALLET_PAGES). */
+/**
+ * The page chrome. There is no bar of sections: the 3D lab (index.html) is the only menu, one station per section.
+ * Every other page gets "← Lab" (top left, back to the lab) and, top right, one ⚙ button that opens the sounds, music and
+ * theme toggles, plus "Connect wallet" only on the pages that use the wallet (WALLET_PAGES, or `wallet: true`).
+ * `wallet`: restore the connected wallet now (loads ethers). Default: only on the pages that sign (WALLET_PAGES).
+ */
 export function renderChrome(active, { wallet = walletByDefault(active) } = {}) {
+  const home = active === "home";
   const nav = document.createElement("nav");
-  nav.className = "nav";
+  nav.className = home ? "nav" : "nav nav-page";
+  nav.setAttribute("aria-label", home ? "OpenForge AX" : "Back to the lab and settings");
   nav.innerHTML = `<div class="wrap">
-    <a class="logo" href="index.html" aria-label="OpenForge AX, home">OpenForge <b>AX</b></a>
-    <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">☰</button>
-    <div class="links" id="navLinks">
-      <a href="index.html" data-k="home">Lab</a>
-      <a href="bench.html" data-k="bench">Workbench</a>
-      <a href="pilot.html" data-k="pilot">Phone Brain</a>
-      <a href="ar.html" data-k="ar" title="AX-1's twin on your floor, in augmented reality (on a phone)">In your room</a>
-      <a href="arena.html" data-k="arena">Proving Grounds</a>
-      <a href="robot.html" data-k="robot">Robot Link</a>
-      <a href="gallery.html" data-k="gallery">Gallery</a>
-      <a href="agents.html" data-k="mine">My agents</a>
-      <a class="btn sm magenta" id="mintNav" href="market.html" data-k="market" title="Floor price, sales, holders and rarity of the 1,024 agents">Market</a>
-      <button class="btn sm" id="connectBtn" title="Connect to fly your agents and save their verified runs">Connect wallet</button>
+    ${home ? '<a class="logo" href="index.html" aria-label="OpenForge AX, the lab">OpenForge <b>AX</b></a>' : '<a class="logo nav-back" href="index.html" data-sound="move"><span aria-hidden="true">←</span> Lab<span class="sr-only">: back to the lab</span></a>'}
+    <div class="nav-tools">
+      ${wallet ? '<button class="btn sm" id="connectBtn" title="Connect to fly your agents and save their verified runs">Connect wallet</button>' : ""}
+      <button class="btn sm ghost settings-btn" id="settingsBtn" aria-expanded="false" aria-controls="settingsPanel" title="Sounds, music and theme"><span aria-hidden="true">⚙</span><span class="sr-only">Settings: sounds, music and theme</span></button>
+      <div class="nav-settings" id="settingsPanel" hidden></div>
     </div></div>`;
   const skip = document.querySelector(".skip"); // the skip link stays first, so it can skip the nav
   if (skip) skip.after(nav);
   else document.body.prepend(nav);
-  nav.querySelector(`[data-k="${active}"]`)?.classList.add("active");
-  const burger = nav.querySelector(".burger");
-  const links = nav.querySelector(".links");
-  burger.onclick = () => burger.setAttribute("aria-expanded", String(links.classList.toggle("open")));
-  const fold = () => (links.classList.remove("open"), burger.setAttribute("aria-expanded", "false"));
-  links.addEventListener("keydown", (e) => { // Escape closes the folded menu and returns to its button
-    if (e.key !== "Escape" || !links.classList.contains("open")) return;
-    fold();
-    burger.focus();
-  });
-  // a picked link folds the menu: an in-page link (#faq) shows what it opened, and Back (the page restored from the
-  // back/forward cache as it left) does not come back to a menu still covering the page
-  links.addEventListener("click", (e) => e.target.closest("a") && fold());
-  addEventListener("pageshow", fold);
+  const gear = nav.querySelector("#settingsBtn");
+  const panel = nav.querySelector("#settingsPanel");
   const soundsBtn = soundsDom(), musicBtn = musicDom();
-  nav.querySelector("#mintNav").before(soundsBtn, musicBtn, themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
+  panel.append(soundsBtn, musicBtn, themeButton()); // light and quiet by default: soft interface sounds only; dark and music when the visitor picks them
   lazyAudio(soundsBtn, musicBtn); // their code loads on the first gesture, not with the page
+  const close = (focusGear = false) => {
+    if (panel.hidden) return;
+    panel.hidden = true;
+    gear.setAttribute("aria-expanded", "false");
+    if (focusGear) gear.focus();
+  };
+  gear.onclick = () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    gear.setAttribute("aria-expanded", String(open));
+  };
+  panel.addEventListener("keydown", (e) => e.key === "Escape" && close(true)); // Escape closes it and returns to the gear
+  gear.addEventListener("keydown", (e) => e.key === "Escape" && close());
+  document.addEventListener("pointerdown", (e) => !nav.contains(e.target) && close()); // a tap elsewhere closes it
+  addEventListener("pageshow", () => close()); // Back (bfcache) never returns to an open panel
   const btn = nav.querySelector("#connectBtn");
-  btn.onclick = () => connect();
-  onWallet((s) => s && ((btn.textContent = short(s.addressChecksum)), btn.removeAttribute("title")));
+  if (btn) {
+    btn.onclick = () => connect();
+    onWallet((s) => s && ((btn.textContent = short(s.addressChecksum)), btn.removeAttribute("title")));
+  }
 
   const foot = document.createElement("footer");
   foot.innerHTML = `<div class="wrap">
@@ -364,6 +368,4 @@ export function renderChrome(active, { wallet = walletByDefault(active) } = {}) 
   let dlg;
   foot.querySelector("#serversLink").onclick = (e) => (e.preventDefault(), (dlg ??= serversDialog()).showModal());
   if (wallet) autoReconnect();
-  else
-    rememberedAddress().then((a) => a && !signer && ((btn.textContent = a), btn.removeAttribute("title"))); // a click still goes through connect(), which loads ethers
 }

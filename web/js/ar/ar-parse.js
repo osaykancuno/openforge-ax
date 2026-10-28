@@ -83,7 +83,7 @@ export function createArParser({ getBlocked = () => null, getBlockedBack = () =>
     }
     if (!result) {
       try {
-        result = base(spokenAliases(clean), bodyKey, opts);
+        result = base(bodyKey === "rover" ? spokenAliases(clean) : clean, bodyKey, opts); // the aliases are Rover chip phrases
       } catch {
         result = { steps: [], say: "I could not read that. Try: forward 2 s, turn left, look up.", unknown: [], rejected: [] };
       }

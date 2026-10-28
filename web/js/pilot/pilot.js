@@ -40,18 +40,18 @@ renderChrome("pilot"); // the same nav (sounds, music, dark, menu) and footer as
 
 function showCaps() {
   const rows = [
-    { ok: true, title: "3D twin", why: "Always works: the twin runs the real bridge logic in this page." },
+    { ok: true, title: "3D twin", why: "Always works." },
     {
       ok: caps.bluetooth,
       title: "Web Bluetooth (real robot)",
       why: caps.bluetooth
         ? "This browser can pair with an AX-1 bridge. You will need the 6-digit passkey on the board's sticker."
         : caps.ios
-          ? "iPhone and iPad browsers do not offer Web Bluetooth. Drive the twin, or try a BLE-capable browser such as Bluefy."
+          ? "Not available in this browser."
           : "Use Chrome or Edge on Android, Windows, macOS or Linux to drive a real robot.",
     },
     { ok: caps.motion, title: "Motion sensors", why: caps.motion ? `Tilt to steer is available${caps.motionNeedsPermission ? " (the phone will ask first)" : ""}.` : "No tilt steering on this device; use the joystick or buttons." },
-    { ok: caps.camera, title: "Camera", why: caps.camera ? "“Look at movement” can turn the head toward motion. The picture never leaves the phone." : "No camera access here (it needs HTTPS and a camera)." },
+    { ok: caps.camera, title: "Camera", why: caps.camera ? "“Look at movement” can turn the head toward motion." : "No camera access here." },
     { ok: caps.wakeLock, title: "Keep screen on", why: caps.wakeLock ? "The screen stays on while the robot is armed." : "Your screen may dim while driving; that sends STOP." },
   ];
   if (!caps.secure) rows.push({ ok: false, title: "Secure page (HTTPS)", why: "Bluetooth, camera and motion need HTTPS or localhost." });

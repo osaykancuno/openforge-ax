@@ -204,8 +204,8 @@ function endRun() {
     : trial
       ? "Submit it to the pilot ranking: a free signature (no gas). The server replays your run and ranks your best times."
       : apiOnline && !signer
-        ? "Guest run. Connect any wallet before your next run to enter the pilot ranking (allowlist)."
-        : "Guest run: not recorded.";
+        ? "Connect any wallet before your next run to enter the pilot ranking."
+        : "";
   recStop(lastOutcome.success ? "docked" : "run");
   $("resultPanel").hidden = false;
   showOverlay(lastOutcome.success ? "Cell docked" : "Mission failed", lastOutcome.success ? `Docked in ${lastOutcome.seconds}s.` : "Failures are data too. Try again.");
@@ -344,7 +344,7 @@ onWallet(async (sg) => {
   if (arms.length) $("pilot").value = String(arms.includes(wanted) ? wanted : arms[0]);
   $("pilotInfo").textContent = arms.length
     ? "Your Synth Arm runs are verified and added to its on-chain record."
-    : "None of your agents is a Synth Arm. Pick your agent's robot above to fly its lab trials, or play as guest.";
+    : "None of your agents is a Synth Arm. Pick your agent's robot above to fly its lab trials.";
   if (signer !== sg) return; // another wallet event won while these loaded
   myAgents = ids.map((id, i) => ({ id, name: metas[i].name, className: attr(metas[i], "Class") }));
   lab?.refreshPilots();
@@ -425,7 +425,7 @@ async function select(id, mode, { push = true } = {}) {
   const levels = MISSIONS[id].levels.map((l, k) => `L${k + 1} ${l.title}`).join(", ");
   $("pgKicker").textContent = "Lab trials";
   $("pgTitle").textContent = `Test: ${ROBOTS[id].name}`;
-  $("pgLead").textContent = `Three trials in the lab sim: ${levels}. Fly as guest, or fly your agent: passed runs are replayed by the verifier and added to its on-chain record.`;
+  $("pgLead").textContent = `Three trials in the lab sim: ${levels}.`;
   labLoading ??= import("./proving/lab-trials.js").then(({ createLabTrials }) => createLabTrials({ api, isOnline: () => healthy, getSigner: () => signer, getAgents: async () => myAgents, toast, friendlyError }));
   try {
     lab = await labLoading;

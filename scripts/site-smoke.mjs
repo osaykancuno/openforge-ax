@@ -27,7 +27,7 @@ export const PAGES = [
   { path: "arena.html" },
   { path: "robot.html" },
   { path: "codex.html#1" },
-  { path: "codex.html#8" },
+  { path: "codex.html#7" },
   { path: "gallery.html" },
   { path: "market.html" },
   { path: "agent.html?id=1" },

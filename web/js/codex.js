@@ -50,7 +50,7 @@ if (wants3D) {
 let view = null, dio = null, index = -1, busy = false, pending = null;
 let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// chapter index (real buttons, 24px targets) + a "3 / 8" readout
+// chapter index (real buttons, 24px targets) + a "3 / 7" readout
 CHAPTERS.forEach((c, i) => {
   const b = document.createElement("button");
   b.className = "codex-dot";
@@ -149,7 +149,6 @@ function render(i) {
       return b;
     })
   );
-  $("chEnd").hidden = i !== CHAPTERS.length - 1;
   dots.forEach((d, k) => (k === i ? d.setAttribute("aria-current", "page") : d.removeAttribute("aria-current")));
   $("pageCount").textContent = `${i + 1} / ${CHAPTERS.length}`;
   $("prevBtn").setAttribute("aria-disabled", String(i === 0));

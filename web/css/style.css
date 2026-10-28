@@ -54,8 +54,7 @@
 .sound-btn .snd-off { display: none; }
 .sound-btn[aria-pressed="false"] .snd-wave { display: none; }
 .sound-btn[aria-pressed="false"] .snd-off { display: inline; }
-.nav-txt { display: none; font-size: 14px; } /* the words show in the folded menu, where there is room */
-@media (max-width: 1500px) { .nav .links .music-btn, .nav .links .sound-btn, .nav .links .theme-btn { justify-content: flex-start; gap: 10px; } .nav .links .nav-txt { display: inline; } }
+.nav-txt { display: none; font-size: 14px; } /* the words show in the settings panel, where there is room */
 /* sounds and music show their state by shape, not colour alone: waves or a cross, a note or a struck-through note;
    on, they also carry an ink ring */
 .music-btn { display: inline-flex; align-items: center; gap: 6px; }
@@ -105,12 +104,20 @@ h3 { font-size: 18px; letter-spacing: -.01em; }
 .logo { display: inline-flex; align-items: center; gap: 10px; font: 800 18px var(--display); letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
 .logo::before { content: ""; width: 30px; height: 30px; flex: none; background: url("../assets/favicon.svg") center / contain no-repeat; } /* the AX-1 mark (smiling): one source, art/brand/src/mark.mjs */
 .logo b { color: var(--accent-ink); font-weight: 800; }
-.nav .links { display: flex; gap: 4px; margin-left: auto; align-items: center; }
-.nav .links a { color: var(--ink-2); font-size: 14px; font-weight: 550; text-decoration: none; padding: 7px 10px; border-radius: 999px; }
-.nav .links a:hover { background: var(--paper-2); color: var(--ink); }
-.nav .links a.active { background: var(--ink); color: var(--paper); }
-.nav .links .btn { margin-left: 6px; }
-.burger { display: none; margin-left: auto; background: none; border: 1px solid var(--control); color: var(--ink); padding: 6px 12px; border-radius: 999px; font-size: 16px; }
+/* no bar of sections: the 3D lab is the menu. On other pages the nav is two floating pieces, "← Lab" and the tools */
+.nav-page { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
+.nav-page .wrap > * { pointer-events: auto; }
+.nav-back { min-height: 44px; padding: 6px 16px 6px 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--card); font: 700 16px var(--display); box-shadow: var(--shadow); }
+.nav-back::before { width: 26px; height: 26px; }
+.nav-back:hover { background: var(--paper-2); }
+.nav-tools { position: relative; display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.nav-page .nav-tools .btn { background: var(--card); }
+.settings-btn { min-width: 44px; padding-inline: 10px; font-size: 18px; }
+.settings-btn[aria-expanded="true"] { background: var(--ink); color: var(--paper); }
+.nav-settings { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; display: grid; gap: 6px; min-width: 210px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.nav-settings[hidden] { display: none; }
+.nav-settings .btn { justify-content: flex-start; gap: 10px; width: 100%; min-height: 44px; }
+.nav-settings .nav-txt { display: inline; }
 
 /* ---------- buttons */
 .btn {
@@ -228,13 +235,6 @@ footer a { color: var(--ink-2); }
   .hero .grid, .agent-grid { grid-template-columns: 1fr; }
   .hero-art { max-width: 420px; }
   .modes { grid-template-columns: 1fr; }
-}
-/* the full nav needs ~1290 px (7 links, sounds, music, dark, Mint, Connect): below that it folds into the menu */
-@media (max-width: 1500px) {
-  .burger { display: block; }
-  .nav .links { display: none; position: absolute; top: 60px; left: 0; right: 0; flex-direction: column; align-items: stretch; padding: 12px 16px 16px; background: var(--paper); border-bottom: 1px solid var(--line); max-height: calc(100dvh - 60px); overflow: auto; }
-  .nav .links.open { display: flex; }
-  .nav .links .btn { margin: 6px 0 0; }
 }
 
 /* ---------- Proving Grounds and Robot Link plates */
@@ -416,7 +416,7 @@ body.lab footer a { pointer-events: auto; }
 .lab-fade.on { opacity: 1; }
 body.panel-open .lab-hud { opacity: .2; transition: opacity .3s; }
 body.panel-open .lab-stations { opacity: 0; pointer-events: none; transition: opacity .2s; } /* inert already; the camera flies in and they would cross the menu */
-.nav .links a, .nav .links .btn { white-space: nowrap; }
+.nav-back, .nav-tools .btn { white-space: nowrap; }
 .lab-pause { position: absolute; right: 16px; bottom: 46px; z-index: 25; }
 body.panel-open .lab-pause { display: none; }
 body.still .lab-label, body.still .lab-label span, body.still .lab-fade { transition: none; }
@@ -516,7 +516,6 @@ body.no-gl.lab-list .lab-stations { grid-template-columns: repeat(auto-fit, minm
 .codex-try .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .codex-status { min-height: 2.6em; margin: 10px 0 0; font-size: 13.5px; color: var(--ink); }
 .codex-status:not(:empty) { border-left: 3px solid var(--accent); padding-left: 10px; }
-.codex-end { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .codex-nav { position: absolute; z-index: 25; left: 50%; bottom: 44px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--card); padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
 .codex-dots { display: flex; gap: 4px; }
 .codex-dot { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; position: relative; }
@@ -545,13 +544,9 @@ body.codex-lensing .codex-page.on-paper, body.codex-lensing .codex-page.on-paper
 .codex-page.on-paper .codex-status { font-size: calc(13.5px * var(--fit, 1)); min-height: 0; }
 .codex-page.on-paper .codex-status:empty { min-height: 0; margin: 0; } /* no reserved line on paper: room for the text */
 .codex-page.on-paper .codex-try-label, .codex-page.on-paper .kicker { font-size: calc(11px * var(--fit, 1)); }
-.codex-page.on-paper .codex-try .row, .codex-page.on-paper .codex-end { gap: calc(8px * var(--fit, 1)); }
+.codex-page.on-paper .codex-try .row { gap: calc(8px * var(--fit, 1)); }
 .codex-page.on-paper .btn:hover { background: var(--ink); color: var(--paper); }
 .codex-page.on-paper .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.codex-back { position: absolute; z-index: 25; left: 16px; top: 76px; }
-/* the back button sits on the light wooden desk in both themes: paper colours keep it readable */
-.codex-back { background: #fbf8f2; color: #23211e; border-color: #23211e; }
-.codex-back:hover { background: #23211e; color: #fbf8f2; }
 body.codex .lab-pause { bottom: 44px; right: 16px; }
 .codex-page h1:focus { outline: none; }
 .codex-page h1:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
@@ -561,10 +556,8 @@ body.codex .lab-pause { bottom: 44px; right: 16px; }
 .codex-page.sheet .codex-try { order: 1; margin-top: 0; border-top: 0; padding-top: 0; }
 .codex-page.sheet .codex-status { order: 2; min-height: 0; }
 .codex-page.sheet .codex-body { order: 3; margin-top: 10px; }
-.codex-page.sheet .codex-end { order: 4; }
 @media (max-width: 760px) {
   .codex-nav { bottom: 40px; gap: 6px; }
-  .codex-back { top: 70px; }
   .codex-count { display: none; }
   body.codex .lab-pause { top: 70px; bottom: auto; right: 10px; }
 }

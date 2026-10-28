@@ -53,7 +53,6 @@ async function load() {
   $("img").alt = meta.name;
   $("kicker").textContent = attr(meta, "1/1") ? "FIG. 12 · Prime Construct (1/1)" : `FIG. 12 · ${attr(meta, "Faction") ?? "Dormant agent · revealed after the sale"}`;
   $("osLink").href = CONFIG.openseaItemUrl(CONFIG.agents, id);
-  $("scanLink").href = `${CONFIG.explorer}/address/${acct}`;
   $("acct").textContent = acct;
   $("owner").textContent = own;
 
@@ -78,7 +77,6 @@ async function load() {
   $("tasks").textContent = stats ? `${stats.tasks} / ${stats.dataPoints}` : "0 / 0";
   $("sim").textContent = `${attr(meta, "Sim Successes") ?? 0} / ${attr(meta, "Sim Runs") ?? 0}`;
   $("arenaLink").hidden = false; // every class has lab trials in the Proving Grounds
-  $("robotLink").hidden = attr(meta, "Class") !== "Synth Arm"; // Robot Link drives a real SO-101 only
 
   const now = Math.floor(Date.now() / 1000);
   // the lock binds the wallet, whoever holds the agent: nobody can move what's inside until it expires
@@ -128,6 +126,7 @@ async function loadProposals(a) {
 function showOwnerArea() {
   const mine = signer && owner && signer.addressChecksum.toLowerCase() === owner.toLowerCase();
   $("ownerArea").hidden = !mine;
+  $("modeCell").hidden = mine; // owners set the mode in the panel below, which already shows the current one
 }
 
 // ---------------------------------------------------------------- owner actions

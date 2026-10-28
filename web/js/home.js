@@ -39,7 +39,7 @@ const STATIONS = [
   { id: "ar", title: "In your room", line: "AX-1's twin on your floor, in AR on a phone", color: 0xe2b04a, model: "ar", href: "ar.html" },
   { id: "arena", title: "Proving Grounds", line: "Fly scored missions. Agent holders keep a record", color: 0x5f8a6e, model: "arena", href: "arena.html" },
   { id: "robot", title: "Robot Link", line: "Replay a run on a real SO-101", color: 0xe2b04a, model: "robot", href: "robot.html" },
-  { id: "codex", title: "The Codex", line: "Start here: a 3D book in 8 pages", color: 0x5f8a6e, model: "codex", href: "codex.html" },
+  { id: "codex", title: "The Codex", line: "Start here: a 3D book in 7 pages", color: 0x5f8a6e, model: "codex", href: "codex.html" },
   { id: "gallery", title: "Gallery", line: "All 1,024 agents, read from Ethereum", color: 0x8a6a9e, model: "gallery", href: "gallery.html" },
   { id: "agents", title: "My agents", line: "Your agents: wallet, settings, record", color: 0x4f7ea8, model: "agents", href: "agents.html" },
   { id: "market", title: "Market", line: "Floor, sales, holders and rarity", color: 0xe2b04a, model: "mint", href: "market.html" },

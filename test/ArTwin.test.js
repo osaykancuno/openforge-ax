@@ -838,6 +838,32 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
     });
   });
 
+  // ================================================================ chips per body
+  describe("chips per body", () => {
+    it("every Desk and Walker chip parses fully for its body, moves joints only, never holds; the Rover keeps its chips", () => {
+      expect(CH.CHIPS).to.deep.equal(CH.chipsFor("rover"));
+      expect(CH.chipsFor("tank")).to.deep.equal(CH.CHIPS);
+      for (const key of ["rover", "desk", "walker"]) {
+        const chips = CH.chipsFor(key);
+        expect(new Set(chips.map((c) => c.id)).size, key).to.equal(chips.length);
+        for (const c of chips) {
+          const r = GR.parseCommand(c.say, key, { userSpeed: 60 });
+          expect(r.steps.length, `${key}/${c.id}`).to.be.greaterThan(0);
+          expect(r.unknown, `${key}/${c.id}`).to.deep.equal([]);
+          expect(r.rejected, `${key}/${c.id}`).to.deep.equal([]);
+          if (key !== "rover") {
+            expect(c.hold, `${key}/${c.id} never holds`).to.not.equal(true);
+            for (const s of r.steps) expect(s.tool, `${key}/${c.id}`).to.not.equal("drive");
+          }
+        }
+        expect(CH.chipText(chips[0].id, key)).to.equal(chips[0].say);
+      }
+      expect(CH.chipsFor("rover").filter((c) => c.hold).map((c) => c.id)).to.deep.equal(["forward", "back", "left", "right"]);
+      expect(CH.chipText("wave", "rover")).to.equal(null); // the Rover has no arms
+      for (const c of CH.chipsFor("walker")) expect(c.label + c.say, c.id).to.not.match(/\bwalk/i);
+    });
+  });
+
   // ================================================================ controller
   describe("ar-controller: state machine, STOP, guarded drive loop", () => {
     let rigs = [];
@@ -1343,6 +1369,78 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(r.ctl.press("forward")).to.equal(false); // pressing again does not push into it
       expect(r.ctl.press("back")).to.equal(true);
       r.ctl.release();
+    });
+
+    it("Desk and Walker: start(mode, key) connects that twin; no wheels, no sensing, no hold; chips move joints; STOP wins", async () => {
+      const make = (key) => {
+        const clock = fakeClock();
+        let made = null;
+        const ctl = AC.createArController({ clock, makeTransport: (b) => (made = TT.createTwinTransport({ body: b, clock, latencyMs: 0 })) });
+        return { clock, ctl, get made() { return made; } };
+      };
+      // an unknown body starts nothing and makes no transport
+      const bad = make();
+      expect(await bad.ctl.start("xr", "tank")).to.equal(false);
+      expect(bad.made).to.equal(null);
+      expect(bad.ctl.state).to.equal("ready");
+      for (const key of ["desk", "walker"]) {
+        const r = make(key);
+        expect(await r.ctl.start("xr", key)).to.equal(true);
+        expect(r.ctl.body).to.equal(P.bodyByKey(key));
+        expect(r.ctl.snapshot.body).to.equal(P.bodyByKey(key));
+        expect(r.ctl.view.drives).to.equal(false);
+        expect(r.ctl.view.name).to.equal(key === "desk" ? "Desk" : "Walker");
+        expect(r.ctl.view.sensing.level).to.equal("none");
+        expect(r.ctl.view.chips).to.deep.equal(CH.chipsFor(key));
+        // a chip while LATCHED: nothing moves, nothing arms
+        const pos0 = r.ctl.snapshot.state ? r.ctl.snapshot.state.positions.slice() : null;
+        await r.ctl.chip(key === "desk" ? "wave" : "crouch");
+        await r.clock.advance(500);
+        expect(r.ctl.snapshot.link).to.equal(D.LINK.LATCHED);
+        if (pos0) expect(r.ctl.snapshot.state.positions).to.deep.equal(pos0);
+        // placing arms; the chip moves joints
+        expect(await r.ctl.place({ gesture: true })).to.equal(true);
+        await r.clock.advance(150);
+        expect(r.ctl.state).to.equal("armed");
+        await r.ctl.chip(key === "desk" ? "wave" : "crouch");
+        for (let t = 0; t < 1500; t += 33) await r.clock.advance(33);
+        const moved = r.ctl.snapshot.state.positions;
+        expect(moved.some((v, i) => pos0 && v !== pos0[i]), `${key} moved a joint`).to.equal(true);
+        // no hold, no sensing, no odometry
+        expect(r.ctl.press("forward")).to.equal(false);
+        r.ctl.obstacle({ state: "blocked", distanceM: 0.04, nearM: 0.04, message: "x" });
+        expect(r.ctl.view.sensing.level).to.equal("none");
+        for (let t = 0; t < 1000; t += 33) r.ctl.frame(0.033);
+        expect(r.ctl.pose).to.deep.equal({ x: 0, z: 0, yaw: 0 });
+        // STOP latches and freezes the joints
+        await r.ctl.chip(key === "desk" ? "shrug" : "stand");
+        await r.clock.advance(100);
+        await r.ctl.stop("Stopped by you.");
+        await r.clock.advance(1000); // the servos finish the step they were on, then hold
+        const frozen = r.ctl.snapshot.state.positions.slice();
+        for (let t = 0; t < 3000; t += 100) await r.clock.advance(100);
+        expect(r.ctl.state).to.equal("latched");
+        expect(r.ctl.snapshot.state.positions).to.deep.equal(frozen);
+        // the session ends; a new one may take another body
+        await r.ctl.ended("Closed");
+        expect(await r.ctl.start("xr", "rover")).to.equal(true);
+        expect(r.ctl.view.drives).to.equal(true);
+        expect(r.ctl.snapshot.body).to.equal(P.bodyByKey("rover"));
+        await r.ctl.ended("Closed");
+      }
+    });
+
+    it("the Walker never walks: a forward request gives no steps and says so", async () => {
+      const clock = fakeClock();
+      const ctl = AC.createArController({ clock, makeTransport: (b) => TT.createTwinTransport({ body: b, clock, latencyMs: 0 }) });
+      await ctl.start("xr", "walker");
+      await ctl.place({ gesture: true });
+      await clock.advance(150);
+      await ctl.say("forward 2 s", { source: "chip" });
+      await clock.advance(100);
+      expect(ctl.view.ai.plan).to.equal(null);
+      expect(JSON.stringify(ctl.view.ai.messages)).to.contain("can't walk");
+      await ctl.ended("Closed");
     });
 
     it("the default play area is 3 m and says so", async () => {

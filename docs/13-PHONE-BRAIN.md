@@ -283,9 +283,20 @@ model nothing leaves the page at all.
 
 ## 9b. AR twin ("AX-1 in your room")
 
-`ar.html` puts the AX-1 Rover **twin** (never the real robot) in your room at real size (~23 cm) and drives it with
-on-screen buttons through the same plan executor and drive loop as `pilot.html`. There is **no voice on this page for
+`ar.html` puts an AX-1 **twin** (never the real robot) in your room at real size and moves it with on-screen buttons
+through the same plan executor and drive loop as `pilot.html`. The start card picks the body: There is **no voice on this page for
 now** (2026-10-28): it comes back later. Model servers are not used here.
+
+| Body | Height | In AR |
+|---|---|---|
+| **Rover** | 23 cm | Drives on the floor: tap or hold the direction buttons, obstacle sensing ahead and behind |
+| **Desk** | 29 cm | No wheels: wave, nod, point, shrug, turn the torso, look around, home. Sits on a table or the floor |
+| **Walker** | 42 cm | Poses only (stand, crouch, lean, twist, sway, torso turns). **It does not walk**: there is no gait |
+
+The body is fixed for a session (Exit, pick another, Start). The Desk and the Walker have no obstacle sensing and no
+hold-to-drive (their joints move to absolute, bounded angles; a tap is the whole move), and the drawing keeps their
+lowest point on the floor (their models sit 9–11 mm below their origin and the Walker's legs bend). Heights measured with
+`bounds()` on the same models.
 
 **Modes.** The page probes the phone and picks one:
 
@@ -342,7 +353,8 @@ phone is too slow.
   `sendBeacon`; where `_headers` is honoured (not GitHub Pages) the worker's own CSP header blocks it a second time.
 
 **Tested on hardware.** Galaxy S24, Chrome: placement, driving, hold-to-drive and the 5 cm stop ahead work (2026-10-27).
-Not yet: the stop behind, low-light sensing at night, object finding in the dark, the iPhone camera view. Thin, dark,
+Not yet: the stop behind, low-light sensing at night, object finding in the dark, the Desk and Walker twins, the iPhone
+camera view. Thin, dark,
 glossy or moving obstacles are untested. `ar.html?debug` shows the session's real numbers (layer, frames, depth hits
 ahead and behind, floor calibration, light level) for these checks.
 
