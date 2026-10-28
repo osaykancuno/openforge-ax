@@ -41,9 +41,17 @@ const inspect = () => {
   };
 };
 
+/** WebGL errors a browser prints when it has no WebGL at all (a GPU-less CI runner): the page's fallback is what is tested then. */
+const NO_WEBGL = /WebGL context could not be created|WebGL creation failed|Error creating WebGL context/i;
+
+// Firefox gets software WebGL where it can: on Linux CI the workflow runs it headed under xvfb (HEADED_FIREFOX=1).
+const launchOptions = (engine) =>
+  engine === "firefox" ? { headless: !process.env.HEADED_FIREFOX, firefoxUserPrefs: { "webgl.force-enabled": true, "webgl.disable-fail-if-major-performance-caveat": true } } : {};
+
 async function checkPage(pw, profile, origin, entry) {
   const notes = new Set();
-  const browser = await pw[profile.engine].launch();
+  let webgl = true;
+  const browser = await pw[profile.engine].launch(launchOptions(profile.engine));
   try {
     const ctx = await browser.newContext(profile.device ? { ...pw.devices[profile.device] } : { viewport: profile.viewport });
     const page = await ctx.newPage();
@@ -56,6 +64,14 @@ async function checkPage(pw, profile, origin, entry) {
       if (r.url().startsWith(origin) && r.status() >= 400) notes.add(`HTTP ${r.status()} ${r.url().replace(origin, "")}`);
     });
     await page.goto(`${origin}/${entry.path}`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    webgl = await page.evaluate(() => {
+      try {
+        const c = document.createElement("canvas");
+        return !!(c.getContext("webgl2") || c.getContext("webgl"));
+      } catch {
+        return false;
+      }
+    });
     await page.waitForFunction(() => document.querySelector(".sound-btn"), null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
     const m = await page.evaluate(inspect);
@@ -72,7 +88,12 @@ async function checkPage(pw, profile, origin, entry) {
   } finally {
     await browser.close().catch(() => {});
   }
-  return [...notes];
+  // no WebGL in this browser at all: three's own "could not create a context" lines are expected; everything else
+  // (uncaught errors, layout, the fallback's <h1> and buttons) still counts
+  if (webgl) return [...notes];
+  const what = `${profile.name} ${entry.path}: no WebGL in this browser here, the page's no-WebGL fallback was checked instead`;
+  console.log(process.env.GITHUB_ACTIONS ? `::notice title=no WebGL::${what}` : `note ${what}`);
+  return [...notes].filter((n) => !NO_WEBGL.test(n));
 }
 
 export async function run({ engines = process.env.ENGINES, only = process.env.ONLY } = {}) {

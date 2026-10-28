@@ -27,7 +27,8 @@ $("mkNet").textContent = CONFIG.chainName || "Ethereum";
 $("mkBuy").href = CONFIG.openseaDropUrl;
 
 // ---------------------------------------------------------------- rarity (no chain needed: the revealed collection's file, else the target shares)
-const rarity = await fetch("data/rarity.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+// only a published collection has the file (post-reveal copies it): without one, asking would log a 404 on every visit
+const rarity = isDeployed() ? await fetch("data/rarity.json").then((r) => (r.ok ? r.json() : null)).catch(() => null) : null;
 function renderRarity() {
   let rows = traitRows(rarity, "Class");
   if (rows.length) $("rarNote").textContent = `Share of each robot class among the ${rarity.supply} revealed agents.`;

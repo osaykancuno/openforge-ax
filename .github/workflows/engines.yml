@@ -31,5 +31,13 @@ jobs:
           npm ci --legacy-peer-deps --no-audit --no-fund
           npm i --no-save --legacy-peer-deps --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium firefox webkit
+      - name: The public preview's settings (the same defaults as pages.yml, not the local demo's chain)
+        run: |
+          if grep -q '"chainId": *31337' web/deployment.json 2>/dev/null; then
+            printf '{ "chainId": 1, "chainName": "Ethereum" }\n' > web/deployment.json
+          fi
       - name: Every page in Chromium, Firefox and WebKit (desktop, Android, iPhone, iPad)
-        run: node scripts/site-engines.mjs
+        # Firefox runs headed under a virtual display: headless Firefox has no WebGL on a GPU-less runner
+        env:
+          HEADED_FIREFOX: "1"
+        run: xvfb-run -a node scripts/site-engines.mjs
