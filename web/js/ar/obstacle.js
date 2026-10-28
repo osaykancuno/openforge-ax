@@ -16,6 +16,9 @@
 //      FLOOR_ABS or FLOOR_REL of its distance, whichever is more. What is left of the floor error is ignored; anything
 //      rising from the floor still counts.
 //
+// Behind the Rover: the same corridor with the heading turned 180 degrees (the Rover is symmetric: its back bumper is
+// FRONT from the centre too), so reversing stops before obstacles as well.
+//
 // Matrices are column-major Float32Array(16) as WebXR hands them out. View space: the camera looks down -Z, depth is the
 // distance along the view axis. Normalised view coordinates (u, v): origin top-left, v down. Pure: no DOM, no three.
 // Honesty: this is the PHONE's depth sensing, protecting the TWIN. It protects nothing else.
@@ -38,9 +41,13 @@ export const OBST = {
 const OCCLUDED_BY = 0.1; // m: a surface this much nearer than a sample hides it
 export const FLOOR_ABS = 0.05; // m: a surface must be at least this much nearer than the floor along its line of sight...
 export const FLOOR_REL = 0.06; // ...or this share of the floor's distance, whichever is more
+export const FLOOR_REL_DARK = 0.09; // low light: depth from motion is noisier, so a surface must stand out more
+export const ENTER_DARK = 5; // low light: frames with an obstacle before it counts (OBST.ENTER in good light)
 export const FLOOR_K_MIN = 0.7; // the floor calibration never believes the phone is more than 30% short...
 export const FLOOR_K_MAX = 1.2; // ...or 20% long
-const RING = { R: 0.35, STEP_DEG: 30, SKIP_DEG: 50, MIN: 4 }; // calibration ring: 35 cm around the Rover, not within 50 deg of ahead
+// calibration ring: 35 cm around the Rover, never within 50 deg of the corridor being judged (the corridor behind is
+// judged with the heading turned, so each side calibrates away from its own corridor)
+const RING = { R: 0.35, STEP_DEG: 30, SKIP_DEG: 50, MIN: 4 };
 export const BLIND_MESSAGE = "Obstacle sensing: point the phone at the Rover";
 
 const xyz = (p) => (Array.isArray(p) || ArrayBuffer.isView(p) ? [p[0], p[1], p[2]] : [p.x, p.y, p.z]);
@@ -103,7 +110,8 @@ export function unproject(u, v, depthM, invProj, viewToWorld) {
  * floor calibration used (1 when the ring could not be read); floorRatio = corrected depth / floor depth in the corridor
  * (median, about 1 on a clear floor).
  */
-export function evaluateDepth({ samples, getDepth, worldToView, viewToWorld, proj, invProj, worldPose, floorY = worldPose.y }) {
+export function evaluateDepth({ samples, getDepth, worldToView, viewToWorld, proj, invProj, worldPose, floorY = worldPose.y, lowLight = false }) {
+  const rel = lowLight ? FLOOR_REL_DARK : FLOOR_REL;
   const fx = Math.sin(worldPose.yaw);
   const fz = Math.cos(worldPose.yaw);
   const eyeY = viewToWorld[13]; // the camera's height in the world
@@ -120,7 +128,7 @@ export function evaluateDepth({ samples, getDepth, worldToView, viewToWorld, pro
   // 1. the phone's floor error right now, from the floor beside and behind the Rover
   const ring = [];
   for (let deg = 0; deg < 360; deg += RING.STEP_DEG) {
-    if (Math.min(deg, 360 - deg) < RING.SKIP_DEG) continue; // never the corridor ahead
+    if (Math.min(deg, 360 - deg) < RING.SKIP_DEG) continue; // never the corridor being judged
     const a = worldPose.yaw + (deg * Math.PI) / 180;
     const pr = project({ x: worldPose.x + Math.sin(a) * RING.R, y: floorY, z: worldPose.z + Math.cos(a) * RING.R }, worldToView, proj);
     if (!pr) continue;
@@ -142,7 +150,7 @@ export function evaluateDepth({ samples, getDepth, worldToView, viewToWorld, pro
     const floorD = floorDepth(pr.u, pr.v);
     if (Number.isFinite(floorD)) ratios.push(d / floorD);
     // 2. it must stand clearly in front of the floor its line of sight would reach
-    const standsOut = d < floorD - Math.max(FLOOR_ABS, FLOOR_REL * floorD);
+    const standsOut = d < floorD - Math.max(FLOOR_ABS, rel * floorD);
     const [sx, sy, sz] = unproject(pr.u, pr.v, d, invProj, viewToWorld);
     const dx = sx - worldPose.x;
     const dz = sz - worldPose.z;
@@ -189,6 +197,10 @@ export function edgeAhead(localPose, radius) {
 
 /** True when the wheel outputs [l, r] drive the Rover forward. */
 export const isForwardWheels = (w) => Array.isArray(w) && w.length >= 2 && w[0] + w[1] > 0;
+/** True when the wheel outputs [l, r] drive the Rover backwards. */
+export const isBackWheels = (w) => Array.isArray(w) && w.length >= 2 && w[0] + w[1] < 0;
+/** True for a plan step that drives backwards. */
+export const isBackStep = (s) => !!s && s.tool === "drive" && typeof s.direction === "string" && s.direction.startsWith("back");
 /** True for a plan step that drives forward (also the forward curves). */
 export const isForwardStep = (s) => !!s && s.tool === "drive" && typeof s.direction === "string" && s.direction.startsWith("forward");
 
@@ -208,6 +220,7 @@ export function createObstacleTracker() {
   let clear = 0;
   let enterDist = Infinity;
   let recent = [];
+  let enterNeeded = OBST.ENTER; // ENTER_DARK in low light (setLowLight)
   const clearResult = () => ({ state: "clear", distanceM: null, message: "" });
   const blockedResult = () => {
     const m = Math.min(...recent);
@@ -229,7 +242,7 @@ export function createObstacleTracker() {
         clear = 0;
         recent.push(Number.isFinite(near) ? near : 0);
         if (recent.length > 5) recent.shift();
-        if (!blocked && enter >= OBST.ENTER) {
+        if (!blocked && enter >= enterNeeded) {
           blocked = true;
           enterDist = Math.min(...recent);
         }
@@ -250,6 +263,10 @@ export function createObstacleTracker() {
         return clearResult();
       }
       return blockedResult();
+    },
+    /** Low light: an obstacle must be seen in ENTER_DARK frames in a row before it counts. */
+    setLowLight(on) {
+      enterNeeded = on ? ENTER_DARK : OBST.ENTER;
     },
     reset() {
       blocked = false;

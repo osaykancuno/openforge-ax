@@ -98,7 +98,7 @@ goes quiet (firmware experimental). 6) Today: the Phone Brain drives AX-1's twin
 ### Weeks 3–6
 | Week | Phase | Plan | Hooks |
 |---|---|---|---|
-| 3 | Allowlist | Pilot-ranking explainer, leaderboard pinned in Discord, two short videos of top runs, the AR clip (AX-1's twin on your floor, driven by voice, Day 17), build log 03 with real results from different phones | "Steady pilots earn a spot." |
+| 3 | Allowlist | Pilot-ranking explainer, leaderboard pinned in Discord, two short videos of top runs, the AR clip (AX-1's twin on your floor, driven with the buttons, Day 17), build log 03 with real results from different phones | "Steady pilots earn a spot." |
 | 4 | Allowlist closes | Leaderboard snapshot, mint date with a real countdown, how-to-mint guide, scam warning; "a reason a day" (eyes, ears, motion, brain, face) | "Mint is only on OpenSea. Nowhere else." |
 | 5 | Mint | Live thread, daily status, Discord support channel staffed | "Your agent arrives dormant. The reveal comes after the sale." |
 | 6 | Reveal | Publish the draw method first, then the result; class showcase; holder spotlights; first bounty-ideas poll | "The draw is public. Check it yourself." |
@@ -109,32 +109,32 @@ visits, support response time, scam reports handled. Reveal: holders in Discord,
 Set baselines in week 1; no invented targets.
 
 ### Week 3 beat: "AX-1 in your room" (AR twin, `web/ar.html`)
-It follows the "Why a phone?" thread (Day 10, which ends on voice): the same voice, now with the twin in your room. It
+It follows the "Why a phone?" thread (Day 10): the same phone, now with the twin in your room. It
 comes before the mint run-up, so it stays a free lab feature, and Week 4's "a reason a day" reuses it for eyes and ears.
 
 | Day | Channel | Format | Goal | Hook | Asset |
 |---|---|---|---|---|---|
-| 17 (Wed) | X, IG/TikTok, Discord | Vertical video 10–15 s + reply post | Try it on your own phone | "Say it. The twin moves." | `ax1-ar-room-1080x1920.mp4` |
+| 17 (Wed) | X, IG/TikTok, Discord | Vertical video 10–15 s + reply post | Try it on your own phone | "Hold it. The twin moves." | `ax1-ar-room-1080x1920.mp4` |
 | 18 | Discord `#phone-brain` | How-to post + device thread | Real device reports | "Which phone? What did it do?" | 3 screenshots |
 | 20 | X | Thread (4), only with real user clips | Real proof | "Your room, your twin." | Community clips (real, with permission) |
 | 21 (Sun) | X, Discord | Build log 03 | Honesty | "What worked on which phone. What broke." | — |
 
 Rules for this beat:
-- **TWIN** on every frame. The vision line ("Planned: the same voice commands for a real AX-1") appears once per post,
+- **TWIN** on every frame. The vision line ("Planned: driving a real AX-1 the same way") appears once per post,
   never in the hook.
 - No allowlist or Pilot credit for AR use: an AR drive is not a Proving Grounds run.
 - Post Day 17 only after the clip is filmed on a real ARCore phone and the page is live.
 
 **Hero asset `ax1-ar-room-1080x1920.mp4`** (about 14 s, one real screen recording on an Android ARCore phone with depth
-sensing, plain floor, daylight, phone audio on, burned-in subtitles of the recognised words). Never stage the stop: if
+sensing, plain floor, daylight, a visible finger on the buttons, burned-in captions of the button pressed). Never stage the stop: if
 the twin doesn't stop on the take, reshoot or cut it, and note the take count in the build log.
 
-| Time | Visual | Voice | On-screen text |
+| Time | Visual | Sound | On-screen text |
 |---|---|---|---|
 | 0–2 s | The twin on the floor with its shadow | room tone | **TWIN** chip; "AX-1, on my floor. 23 cm." |
-| 2–5 s | It rolls forward about 20 cm | "Forward one second." | *forward 1 second* |
-| 5–8 s | It turns left, then spins | "Turn left. Spin." | *turn left · spin* |
-| 8–12 s | A shoebox comes into frame; it rolls toward it and stops short | "Forward two seconds." | **"Something is in my way (about 30 cm ahead)."** |
+| 2–5 s | It rolls forward about 20 cm | room tone | *hold Forward* |
+| 5–8 s | It turns left, then spins | room tone | *Left · Spin* |
+| 8–12 s | A shoebox comes into frame; it rolls toward it and stops about 5 cm short | room tone | **"Stopped 5 cm before an obstacle"** |
 | 12–15 s | Hold, then the charcoal end card with the smiling mark | — | "Free in the lab. Android Chrome + ARCore." / "Twin only. Real AX-1: planned." / "Your phone is the brain. Open for everything else." |
 
 Alt text: "A phone camera view of a living-room floor. AX-1 Rover's twin stands with a shadow, drives forward, turns,

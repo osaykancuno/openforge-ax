@@ -15,7 +15,8 @@
 //   { type: "close" }
 // Protocol (worker -> page)
 //   { type: "ready" } | { type: "error", stage: "init" }
-//   { type: "result", seq, ms, width, height, detections: [{ categories: [{ categoryName, score }], boundingBox }] }
+//   { type: "result", seq, ms, width, height, light, detections: [{ categories: [{ categoryName, score }], boundingBox }] }
+//                                                             light: the frame's mean luma before auto levels (0..1, -1 unknown)
 //   { type: "result", seq, dropped: true }                    a frame arrived while one was running (never queued)
 //   { type: "error", stage: "detect", seq }
 // The page filters labels again (COCO-80 only); nothing from here is trusted there.
@@ -95,6 +96,42 @@
     return out;
   }
 
+  // Day and night: a dark, washed-out or flat frame is stretched to the full range (from the 2nd to the 98th percentile of
+  // its luma), with a brighter gamma when it is dark, before the detector sees it. A well exposed frame is left alone.
+  // Changes px (RGBA) in place; returns the frame's mean luma before any change, 0..1.
+  function levels(px) {
+    var hist = new Uint32Array(256);
+    var n = 0;
+    var sum = 0;
+    for (var i = 0; i + 2 < px.length; i += 16) {
+      var y = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8;
+      hist[y]++;
+      n++;
+      sum += y;
+    }
+    if (!n) return 0;
+    var mean = sum / n / 255;
+    var lo = 0;
+    var hi = 255;
+    var acc = 0;
+    for (; lo < 255 && (acc += hist[lo]) < n * 0.02; lo++);
+    acc = 0;
+    for (; hi > 0 && (acc += hist[hi]) < n * 0.02; hi--);
+    if (hi - lo >= 180 && mean > 0.25 && mean < 0.75) return mean; // well exposed: untouched
+    var span = Math.max(24, hi - lo);
+    var gamma = mean < 0.25 ? 0.6 : 1;
+    var lut = new Uint8ClampedArray(256);
+    for (var v = 0; v < 256; v++) lut[v] = 255 * Math.pow(Math.min(1, Math.max(0, (v - lo) / span)), gamma);
+    for (var k = 0; k + 2 < px.length; k += 4) {
+      px[k] = lut[px[k]];
+      px[k + 1] = lut[px[k + 1]];
+      px[k + 2] = lut[px[k + 2]];
+    }
+    return mean;
+  }
+  var canvas = null; // reused: a camera-view bitmap is read back through it to adjust its levels
+  var ctx2d = null;
+
   async function init(msg) {
     try {
       mode = msg.mode === "VIDEO" ? "VIDEO" : "IMAGE";
@@ -122,21 +159,34 @@
       var input;
       var w;
       var h;
+      var light = -1;
       if (bitmap) {
         input = bitmap;
         w = bitmap.width;
         h = bitmap.height;
+        if (typeof OffscreenCanvas === "function") {
+          if (!canvas || canvas.width !== w || canvas.height !== h) {
+            canvas = new OffscreenCanvas(w, h);
+            ctx2d = canvas.getContext("2d", { willReadFrequently: true });
+          }
+          if (ctx2d) {
+            ctx2d.drawImage(bitmap, 0, 0);
+            input = ctx2d.getImageData(0, 0, w, h);
+            light = levels(input.data);
+          }
+        }
       } else {
         w = msg.width;
         h = msg.height;
         input = new ImageData(new Uint8ClampedArray(msg.buffer), w, h);
+        light = levels(input.data);
       }
       var result;
       if (mode === "VIDEO") {
         lastTs = Math.max(Math.round(Number(msg.ts) || 0), lastTs + 1); // strictly increasing, as MediaPipe wants
         result = detector.detectForVideo(input, lastTs);
       } else result = detector.detect(input);
-      post({ type: "result", seq: msg.seq, ms: self.performance.now() - t0, width: w, height: h, detections: plain(result) });
+      post({ type: "result", seq: msg.seq, ms: self.performance.now() - t0, width: w, height: h, light: light, detections: plain(result) });
     } catch (e) {
       post({ type: "error", stage: "detect", seq: msg.seq });
     } finally {

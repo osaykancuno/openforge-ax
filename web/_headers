@@ -13,10 +13,10 @@
   Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'
 /ar.html
   ! Permissions-Policy
-  Permissions-Policy: camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
+  Permissions-Policy: camera=(self), microphone=(), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
 /ar
   ! Permissions-Policy
-  Permissions-Policy: camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
+  Permissions-Policy: camera=(self), microphone=(), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()
 /robot.html
   ! Permissions-Policy
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=(), xr-spatial-tracking=()
@@ -29,7 +29,7 @@
 /robot
   ! Permissions-Policy
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), serial=(self), bluetooth=(), xr-spatial-tracking=()
-# voice input (SpeechRecognition) needs the microphone: only on the Phone Brain and AR pages; AR (WebXR) only on /ar
+# voice input (SpeechRecognition) needs the microphone: only on the Phone Brain page; AR (WebXR) only on /ar
 # the free *.pages.dev address is a preview: never indexed by search engines (the custom domain is not affected)
 https://:project.pages.dev/*
   X-Robots-Tag: noindex

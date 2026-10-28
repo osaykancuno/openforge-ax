@@ -42,23 +42,27 @@ const isForward = (s) => !!s && s.tool === "drive" && typeof s.direction === "st
 const isResult = (r) => r !== null && typeof r === "object" && Array.isArray(r.steps);
 
 /**
- * filterBlocked(steps, blocked) -> { steps, note }. `blocked` is null, or { distanceM } of the obstacle. Forward drives
- * (also the forward curves) are dropped; note is "" when nothing was dropped.
+ * filterBlocked(steps, blocked, blockedBack) -> { steps, note }. `blocked` / `blockedBack` are null, or { distanceM } of
+ * the obstacle ahead / behind. Forward drives (also the forward curves) are dropped when blocked ahead, backward drives when
+ * blocked behind; note is "" when nothing was dropped.
  */
-export function filterBlocked(steps, blocked) {
-  if (!blocked) return { steps, note: "" };
-  const kept = steps.filter((s) => !isForward(s));
+export function filterBlocked(steps, blocked, blockedBack = null) {
+  if (!blocked && !blockedBack) return { steps, note: "" };
+  const isBack = (s) => !!s && s.tool === "drive" && typeof s.direction === "string" && s.direction.startsWith("back");
+  const kept = steps.filter((s) => !(blocked && isForward(s)) && !(blockedBack && isBack(s)));
   if (kept.length === steps.length) return { steps, note: "" };
-  const d = Number(blocked.distanceM);
-  const where = Number.isFinite(d) ? ` (about ${Math.round(d * 100)} cm ahead)` : "";
-  return { steps: kept, note: `Something is in my way${where}. I can turn or back up.` };
+  const droppedFwd = blocked && steps.some(isForward);
+  const o = droppedFwd ? blocked : blockedBack;
+  const d = o && o.distanceM;
+  const where = Number.isFinite(d) ? ` (about ${Math.round(d * 100)} cm ${droppedFwd ? "ahead" : "behind"})` : "";
+  return { steps: kept, note: droppedFwd ? `Something is in my way${where}. I can turn or back up.` : `Something is behind me${where}. I can turn or drive forward.` };
 }
 
 /**
  * createArParser({ getBlocked, getMode, extensions, base }) -> (text, bodyKey, opts) => result.
  * getBlocked() -> null | { distanceM }; getMode() -> "xr" | "camera" (extensions may answer differently).
  */
-export function createArParser({ getBlocked = () => null, getMode = () => "xr", extensions = [], base = parseCommand } = {}) {
+export function createArParser({ getBlocked = () => null, getBlockedBack = () => null, getMode = () => "xr", extensions = [], base = parseCommand } = {}) {
   return function arParse(text, bodyKey, opts = {}) {
     const clean = cleanSay(typeof text === "string" ? text : "", MAX_TEXT);
     const ctx = { opts, getMode, getBlocked };
@@ -92,7 +96,7 @@ export function createArParser({ getBlocked = () => null, getMode = () => "xr", 
       unknown: Array.isArray(result.unknown) ? result.unknown : [],
       rejected: [...(Array.isArray(result.rejected) ? result.rejected : []), ...v.rejected],
     };
-    const f = filterBlocked(out.steps, getBlocked());
+    const f = filterBlocked(out.steps, getBlocked(), getBlockedBack());
     if (f.note) {
       out.steps = validatePlan(f.steps, bodyKey, { userSpeed: opts && opts.userSpeed }).steps;
       out.say = out.say ? `${out.say} ${f.note}` : f.note;

@@ -21,6 +21,10 @@
 // The model's labels are untrusted text: only the COCO-80 names survive (world-objects.canonicalLabel).
 import { canonicalLabel } from "./world-objects.js";
 
+// In a dark frame (mean luma under DARK_LUMA, measured in the worker before its auto levels) the bar drops to NIGHT_SCORE:
+// a cup in a dim room scores lower even after the levels are stretched.
+export const DARK_LUMA = 0.25;
+export const NIGHT_SCORE = 0.4;
 const DEFAULTS = { delegate: "CPU", scoreThreshold: 0.5, maxResults: 5, inputWidth: 320, slowMs: 250, maxFailures: 3, initTimeoutMs: 90000, detectTimeoutMs: 5000 };
 const MSG_FAILED = "Object finding stopped working on this device, so I turned it off.";
 const MSG_NO_START = "Object finding could not start on this device.";
@@ -312,7 +316,7 @@ export function createDetector({
         else if (!disabled && !closed) disable(MSG_FAILED);
       };
       try {
-        w.postMessage({ type: "init", mode, scoreThreshold: o.scoreThreshold, maxResults: o.maxResults });
+        w.postMessage({ type: "init", mode, scoreThreshold: Math.min(o.scoreThreshold, NIGHT_SCORE), maxResults: o.maxResults }); // the page applies the real bar
       } catch {
         finish(false);
       }
@@ -328,7 +332,9 @@ export function createDetector({
       stats.calls++;
       stats.lastMs = ms;
       stats.maxMs = Math.max(stats.maxMs, ms);
-      return settle(null, normalise(m, m.width, m.height, o));
+      const dark = isNum(m.light) && m.light >= 0 && m.light < DARK_LUMA;
+      stats.light = isNum(m.light) ? m.light : null;
+      return settle(null, normalise(m, m.width, m.height, dark ? { ...o, scoreThreshold: Math.min(o.scoreThreshold, NIGHT_SCORE) } : o));
     }
     if (m.type === "error") {
       if (++failures >= o.maxFailures) disable(MSG_FAILED);

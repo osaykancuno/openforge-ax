@@ -7,7 +7,6 @@
 //   * Every text is set with textContent; nothing here uses innerHTML or the network.
 import { loadConfig, renderChrome } from "../chain.js";
 import { describeStep } from "../pilot/ai/tools.js";
-import { createVoiceInput } from "../pilot/ai/voice.js";
 import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
 import { bodyByKey } from "../pilot/ax-proto.js";
 import { LINK } from "../pilot/drive-loop.js";
@@ -49,29 +48,9 @@ if (canRun) {
 }
 
 let lastObstacle = null;
-let mic = { listening: false, error: "" };
+let lastObstacleBack = null; // the tracker behind the Rover (reversing)
 let model = {};
 
-// the browser's speech recognition, watched so the mic button can show when it listens
-const rawVoice = createVoiceInput({ lang: "en-US" });
-const voice = {
-  get supported() {
-    return rawVoice.supported;
-  },
-  get listening() {
-    return rawVoice.listening;
-  },
-  start(onText, onState = () => {}) {
-    return rawVoice.start(onText, (s) => {
-      mic = { listening: s === "listening", error: s.startsWith("error:") ? s.slice(6) : "" };
-      showMic();
-      onState(s);
-    });
-  },
-  stop() {
-    rawVoice.stop();
-  },
-};
 const wake = createWakeLock();
 
 const ROVER = bodyByKey("rover");
@@ -101,8 +80,7 @@ let controller = null;
 if (view) {
   controller = createArController({
     makeTransport: () => createTwinTransport({ body: ROVER, clock: realTimers, latencyMs: 15 }),
-    voice,
-    wake,
+    wake, // no voice on this page for now (2026-10-28): buttons only
     extensions,
     radius: caps.mode === "camera" ? CAMERA_VIEW.radius : 3,
     onChange: (m) => {
@@ -153,6 +131,13 @@ if (view) {
       return !busy;
     },
     obstacle: (u) => {
+      if (u && u.side === "back") {
+        // behind: no keep-out zones there, straight to the controller
+        lastObstacleBack = u;
+        controller.obstacle(u);
+        showObstacle();
+        return;
+      }
       rawObstacle = u;
       pushObstacle();
     },
@@ -162,6 +147,7 @@ if (view) {
       leaveLive(reason);
     },
     hint: (t) => showHint(t),
+    light: () => showObstacle(), // the chip says when sensing is less sure in the dark
   };
 }
 
@@ -331,10 +317,9 @@ function showCard() {
   const xr = caps.mode === "xr";
   $("arStartBtn").textContent = xr ? "Start AR" : "Start camera view";
   $("arLead").textContent = xr
-    ? "Meet the AX-1 Rover as a digital twin on your own floor. Point your phone at the ground, tap to place it, then tell it what to do. It is not a real robot."
+    ? "Meet the AX-1 Rover as a digital twin on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone."
     : "Meet the AX-1 Rover as a digital twin in front of your camera. Your browser has no WebXR AR, so it is not anchored to your floor. It is not a real robot.";
-  if (caps.voice) show("arVoiceBtn", true);
-}
+  }
 
 function leaveLive(message) {
   body.classList.remove("ar-live", "ar-xr");
@@ -346,6 +331,7 @@ function leaveLive(message) {
   $("arStartMsg").dataset.tone = "";
   hintNow = "";
   lastObstacle = null;
+  lastObstacleBack = null;
   rawObstacle = null;
   stopObjects();
   seekNotice = { text: "", asked: 0 };
@@ -368,8 +354,15 @@ function stateName() {
   return String(model.state ?? controller?.state ?? "").toUpperCase();
 }
 
-function obstacleText(u) {
+/** The chip: what is ahead, unless something behind is nearer to being hit (reversing). */
+function obstacleText(u, back = lastObstacleBack) {
   if (view && view.mode === "camera") return [NEEDS_AR, "warn"];
+  const backNear = back && back.state === "blocked" && Number.isFinite(back.nearM) ? back.nearM : Infinity;
+  const frontNear = u && u.state === "blocked" ? (Number.isFinite(u.nearM) ? u.nearM : 0) : Infinity;
+  if (backNear < frontNear) {
+    if (backNear <= NEAR_STOP_M) return [`Stopped ${Math.round(STOP_GAP_M * 100)} cm before an obstacle behind`, "bad"];
+    if (!u || u.state !== "blocked") return [`Obstacle about ${Math.round((back.distanceM ?? backNear) * 100)} cm behind`, "warn"];
+  }
   if (!u) return ["Obstacle sensing: waiting", ""];
   switch (u.state) {
     case "clear":
@@ -389,82 +382,18 @@ function obstacleText(u) {
 
 let lastObstacleTone = "";
 function showObstacle() {
-  const [text, tone] = obstacleText(lastObstacle);
+  let [text, tone] = obstacleText(lastObstacle);
+  if (view && view.lowLight && tone !== "bad") {
+    text = `${text} · low light, less sure`;
+    if (tone === "ok") tone = "warn";
+  }
   setChip($("arObstacle"), text, tone); // not a live region: the distance changes every 10 cm
   if (tone === lastObstacleTone) return;
   const was = lastObstacleTone;
   lastObstacleTone = tone;
   if (!LIVE.has(stateName())) return;
-  if (tone === "bad") announce(`I stopped ${Math.round(STOP_GAP_M * 100)} centimetres before something in my way. I can turn or back up.`, true);
+  if (tone === "bad") announce(`I stopped ${Math.round(STOP_GAP_M * 100)} centimetres before something. I can turn or drive the other way.`, true);
   else if (was === "bad" && tone === "ok") announce("Path clear.");
-}
-
-// The microphone permission. The browser asks with a prompt that is not shown inside AR, so it is asked on the start
-// card (Enable microphone); inside AR the mic button does not ask, it says what to do. "unknown": no Permissions API
-// (Safari): the mic button then just tries.
-let micState = "unknown"; // "granted" | "prompt" | "denied" | "unknown"
-let micNote = "";
-const MIC_OFF_NOTE = "Voice needs the microphone, and the browser cannot ask for it inside AR. Tap Exit, then Enable microphone.";
-async function watchMic() {
-  try {
-    const st = await navigator.permissions.query({ name: "microphone" });
-    micState = st.state;
-    st.onchange = () => {
-      micState = st.state;
-      if (micState === "granted") micNote = "";
-      showMicPermission();
-      showMic();
-    };
-  } catch {} // no Permissions API, or no "microphone" in it
-  showMicPermission();
-  showMic();
-}
-/** The start card's microphone button says where the permission stands. */
-function showMicPermission() {
-  const b = $("arVoiceBtn");
-  if (micState === "granted") {
-    b.textContent = "Microphone on";
-    b.setAttribute("aria-disabled", "true");
-  } else {
-    b.textContent = micState === "denied" ? "Microphone blocked" : "Enable microphone";
-    b.removeAttribute("aria-disabled");
-  }
-}
-const micMissing = () => micState === "prompt" || micState === "denied";
-
-/**
- * Why getUserMedia gave no microphone, and where to fix it. On Android a refusal without any question on screen means
- * Android has not given the microphone to Chrome, or Chrome stopped asking after earlier refusals: the site's own
- * permissions do not even list the microphone then (seen on a Galaxy S24).
- */
-export function micFailText(name, siteState) {
-  switch (name) {
-    case "NotAllowedError":
-    case "SecurityError":
-      if (siteState === "denied") return "The microphone is blocked for this site. Tap the icon left of the address, then Permissions, then Microphone: Allow. Then tap Enable microphone again.";
-      return "Chrome did not get the microphone, and no question appeared. On Android: Settings, Apps, Chrome, Permissions, Microphone: Allow. If it still fails: tap the icon left of the address, then Reset permissions, and tap Enable microphone again.";
-    case "NotReadableError":
-    case "AbortError":
-      return "Another app is using the microphone. Close it, then tap Enable microphone again.";
-    case "NotFoundError":
-    case "OverconstrainedError":
-      return "No microphone was found on this device.";
-    default:
-      return `The microphone did not start${name ? ` (${String(name).slice(0, 40)})` : ""}. Tap Enable microphone to try again.`;
-  }
-}
-
-function showMic() {
-  const listening = Boolean(model.listening ?? mic.listening);
-  const mb = $("arMic");
-  mb.setAttribute("aria-pressed", String(listening));
-  setText($("arMicText"), !voice.supported ? "Voice is not available" : listening ? "Listening… tap to stop" : micMissing() ? "Microphone off" : "Tap to talk");
-  mb.disabled = !voice.supported || !LIVE.has(stateName());
-  const priv = $("arPrivacy");
-  if (micNote) setText(priv, micNote);
-  else if (model.voiceNote) setText(priv, model.voiceNote);
-  else if (!voice.supported) setText(priv, "Your browser has no speech recognition. Chrome on Android and Safari on iPhone have it. The quick buttons work everywhere.");
-  else setText(priv, "Your browser's speech service hears the mic (Google in Chrome, Apple in Safari).");
 }
 
 function steps(plan) {
@@ -550,7 +479,6 @@ function render() {
   $("arArm").disabled = !model.canArm;
   show("arPlaceBtn", st === "PLACING");
   body.classList.toggle("ar-placing", st === "PLACING"); // placing: only Place and STOP, the floor ring stays in view
-  showMic();
   showObstacle();
   showTalk();
   if (st !== was) stateChanged(was, st);
@@ -563,8 +491,8 @@ function stateChanged(was, st) {
     announce(`${camera ? `${BANNER_CAMERA} ` : ""}Place the Rover: ${camera ? "tap the picture" : "point at the floor and tap"}, or press Place the Rover here.`);
     focusIfLost($("arPlaceBtn"));
   } else if (st === "ARMED" && (was === "PLACING" || was === "LATCHED")) {
-    announce("Armed. Press Tap to talk, or use the quick commands.");
-    focusIfLost($("arMic").disabled ? $("arStop") : $("arMic"));
+    announce("Armed. Tap a button for a short move, or hold it to keep moving.");
+    focusIfLost($("arChips").querySelector("button") || $("arStop"));
   } else if (st === "LATCHED") {
     announce(was === "PLACING" ? "The Rover is placed but not armed. Press ARM to drive." : "Stopped. Press ARM to drive again.", was !== "PLACING");
     focusIfLost($("arArm").disabled ? $("arStop") : $("arArm"));
@@ -645,32 +573,6 @@ async function onStart() {
 if (view && controller) {
   $("arStartBtn").addEventListener("click", onStart);
 
-  $("arVoiceBtn").addEventListener("click", async () => {
-    // a one-time microphone permission now, on the start card, so no prompt appears inside AR
-    const b = $("arVoiceBtn");
-    if (b.getAttribute("aria-disabled") === "true") return;
-    b.setAttribute("aria-disabled", "true");
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      s.getTracks().forEach((t) => t.stop());
-      micState = "granted";
-      micNote = "";
-      $("arStartMsg").textContent = "Microphone on. Voice is ready.";
-      $("arStartMsg").dataset.tone = "";
-    } catch (e) {
-      // ask the browser where the permission really stands: "denied" only when the SITE is blocked
-      let site = "unknown";
-      try {
-        site = (await navigator.permissions.query({ name: "microphone" })).state;
-      } catch {}
-      if (site === "denied" || site === "prompt" || site === "granted") micState = site;
-      $("arStartMsg").textContent = `${micFailText(e && e.name, site)} The buttons work without it.`;
-      $("arStartMsg").dataset.tone = "bad";
-    }
-    showMicPermission();
-    showMic();
-  });
-
   const stop = (why) => controller.stop(why);
   $("arStop").addEventListener("pointerdown", () => stop("STOP button")); // as early as the finger lands
   $("arStop").addEventListener("click", () => stop("STOP button")); // keyboard and assistive tools
@@ -700,18 +602,6 @@ if (view && controller) {
   });
   $("arExit").addEventListener("click", () => view.exit("Closed"));
   $("arPlaceBtn").addEventListener("click", (e) => e.isTrusted && view.placeHere()); // a tap without a pointer: same path, same rules
-  $("arMic").addEventListener("click", () => {
-    if (micMissing() && !(model.listening ?? mic.listening)) {
-      // the browser's question would be invisible inside AR: say what to do instead of asking
-      micNote = MIC_OFF_NOTE;
-      showMic();
-      announce(MIC_OFF_NOTE);
-      return;
-    }
-    micNote = "";
-    controller.listen(); // starts listening for one sentence, or stops when it already listens
-  });
-
   // A tap is the chip's short move; holding Forward, Back, Left or Right keeps the Rover moving until the finger lifts
   // (controller.press / release: short leases, the same obstacle and edge guards).
   const chips = $("arChips");
@@ -754,7 +644,6 @@ if (view && controller) {
 
 showCard();
 render();
-if (caps.voice) watchMic();
 
 if (DEBUG && view) {
   // inside the overlay: in AR it is the only part of the page on screen

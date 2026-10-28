@@ -87,7 +87,7 @@ describe("AR page: ar.html", () => {
     for (const re of [/<button\b/g, /<a\b/g, /<input\b/g, /<select\b/g, /<textarea\b/g]) {
       expect(count(inside, re), String(re)).to.equal(count(html, re));
     }
-    for (const id of ["arStop", "arMic", "arArm", "arExit", "arChips", "arStartBtn", "arLook", "arHeard", "arPlan", "arObstacle", "arTwin", "arLink", "arHint", "arBanner", "arUrl"]) {
+    for (const id of ["arStop", "arArm", "arExit", "arChips", "arStartBtn", "arLook", "arHeard", "arPlan", "arObstacle", "arTwin", "arLink", "arHint", "arBanner", "arUrl"]) {
       expect(inside, id).to.include(`id="${id}"`);
     }
     // the picture itself is not a control: video and canvas stay outside, behind it
@@ -103,7 +103,6 @@ describe("AR page: ar.html", () => {
     expect(html).to.include('href="pilot.html"');
     expect(html).to.match(/>TWIN</);
     expect(html).to.match(/Obstacle sensing/);
-    expect(html).to.match(/Google in Chrome, Apple in Safari/);
     expect(html).to.match(/Camera pictures (?:stay on|never leave) this phone/);
     expect(html).to.match(/id="arStop"[^>]*>[\s\S]*?STOP/);
     expect(html).to.match(/id="arArm"[^>]*>ARM</);
@@ -130,7 +129,6 @@ describe("AR page: ar.html", () => {
     expect(html.indexOf('id="arStop"')).to.be.lessThan(html.indexOf('id="arHud"'));
     expect(html).to.match(/id="arStop"[^>]*aria-keyshortcuts="Escape"/);
     expect(html).to.match(/id="arLook" aria-describedby="arLookNote"/);
-    expect(html).to.match(/id="arMic"[^>]*aria-pressed="false"/);
     expect(html).to.match(/<canvas id="arCanvas"[^>]*aria-label="[^"]+"/);
     const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
     expect(new Set(ids).size, "ids are unique").to.equal(ids.length);
@@ -166,29 +164,13 @@ describe("AR page: css/ar.css", () => {
     for (const m of css.matchAll(/[^{}]*:xr-overlay[^{]*\{/g)) expect(m[0].trim().split(",").length, m[0]).to.equal(1);
   });
 
-  it("the microphone is enabled on the start card, never asked for inside AR (its prompt would be invisible there)", () => {
-    expect(html).to.match(/id="arVoiceBtn"[^>]*>Enable microphone</);
-    expect(html).to.match(/id="arVoiceNote">Voice: tap <b>Enable microphone<\/b> before you start/);
-    expect(arJs).to.match(/navigator\.permissions\.query\(\{ name: "microphone" \}\)/);
-    // in AR, a missing permission is explained, not asked for: listen() is not called
-    const mic = arJs.slice(arJs.indexOf('$("arMic").addEventListener("click"'), arJs.indexOf("controller.listen();"));
-    expect(mic).to.match(/if \(micMissing\(\) && [^)]*\)\) \{[\s\S]*?micNote = MIC_OFF_NOTE;[\s\S]*?return;/);
-    expect(arJs).to.match(/MIC_OFF_NOTE = "Voice needs the microphone, and the browser cannot ask for it inside AR\. Tap Exit, then Enable microphone\."/);
-  });
-
-  it("a refused microphone says why and where to fix it (Android, the site, another app), and only a blocked SITE reads 'blocked'", () => {
-    const fn = arJs.slice(arJs.indexOf("export function micFailText"), arJs.indexOf("function showMic()"));
-    // eslint-disable-next-line no-new-func -- the page module awaits the network at load; test the pure function alone
-    const micFailText = new Function(`${fn.replace("export ", "")}; return micFailText;`)();
-    expect(micFailText("NotAllowedError", "prompt")).to.match(/On Android: Settings, Apps, Chrome, Permissions, Microphone: Allow/);
-    expect(micFailText("NotAllowedError", "prompt")).to.match(/Reset permissions/);
-    expect(micFailText("NotAllowedError", "denied")).to.match(/blocked for this site.*Permissions, then Microphone: Allow/);
-    expect(micFailText("NotReadableError", "prompt")).to.match(/Another app is using the microphone/);
-    expect(micFailText("NotFoundError")).to.match(/No microphone/);
-    expect(micFailText("WeirdError")).to.match(/\(WeirdError\)/);
-    // the button state follows the site permission, not the error
-    expect(arJs).to.match(/if \(site === "denied" \|\| site === "prompt" \|\| site === "granted"\) micState = site;/);
-    expect(arJs).to.not.match(/micState = "denied";/);
+  it("has no voice for now (user, 2026-10-28): no mic button, no microphone request, no speech recognition", () => {
+    expect(html).to.not.match(/id="arMic"|id="arVoiceBtn"|id="arPrivacy"|Enable microphone|Tap to talk/);
+    expect(html).to.not.match(/your voice|voice\.js/i);
+    expect(arJs).to.not.match(/voice\.js|createVoiceInput|getUserMedia\(\{ audio|name: "microphone"|controller\.listen\(/);
+    expect(arJs).to.not.match(/\bvoice,/); // the controller gets no voice input
+    // the drive buttons say how they work
+    expect(html).to.match(/Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving\. STOP always stops it\./);
   });
 
   it("direction chips: a tap is the short move, a hold drives until the finger lifts, a long press opens no menu", () => {
@@ -205,7 +187,7 @@ describe("AR page: css/ar.css", () => {
     // the HUD is a <section>: the site's 72 px section padding must not apply, and it sits at the bottom of its row
     expect(css).to.match(/\.ar-hud\s*\{[^}]*align-self:\s*end[^}]*padding:\s*0[;\s]/);
     // placing: only Place and STOP; the talk panel shows only with text
-    expect(css).to.match(/body\.ar-placing \.ar-privacy, body\.ar-placing \.ar-chips, body\.ar-placing \.ar-mic-row > :not\(#arPlaceBtn\)\s*\{\s*display:\s*none/);
+    expect(css).to.match(/body\.ar-placing \.ar-chips, body\.ar-placing \.ar-drive-row > :not\(#arPlaceBtn\)\s*\{\s*display:\s*none/);
     expect(html).to.match(/id="arTalk" hidden/);
     expect(arJs).to.match(/body\.classList\.toggle\("ar-placing", st === "PLACING"\)/);
     expect(arJs).to.match(/show\("arTalk", /);
@@ -214,9 +196,9 @@ describe("AR page: css/ar.css", () => {
     expect(viewJs).to.match(/const HIT_TILT_DEG = [5-9];/);
   });
 
-  it("has a big STOP, 44 px targets, visible focus and respects reduced motion", () => {
+  it("has a big STOP, thumb-sized drive buttons (52 px), 44 px targets, visible focus and respects reduced motion", () => {
     expect(css).to.match(/\.ar-stop\s*\{[^}]*min-height:\s*(?:6[4-9]|[7-9]\d)px/);
-    expect(css).to.match(/\.ar-chips \.pl-btn\s*\{[^}]*min-height:\s*44px/);
+    expect(css).to.match(/\.ar-chips \.pl-btn\s*\{[^}]*min-height:\s*52px/);
     expect(css).to.match(/\.ar-exit\s*\{[^}]*min-height:\s*44px/);
     expect(css).to.match(/:focus-visible/);
     expect(css).to.match(/prefers-reduced-motion:\s*reduce\)\s*\{[^}]*animation:\s*none/);
@@ -346,7 +328,9 @@ describe("AR page: js/ar/ar.js and js/ar/ar-view.js", () => {
     const push = fnBody(arJs, "pushObstacle");
     expect(push).to.match(/zoneHit\(zones, w\)/);
     expect(push.indexOf("zoneHit")).to.be.lessThan(push.indexOf("controller.obstacle(u)"));
-    expect((arJs.match(/controller\.obstacle\(/g) || []).length).to.equal(1);
+    // two paths reach the controller: ahead (through the keep-out merge) and behind (straight: no zones behind)
+    expect((arJs.match(/controller\.obstacle\(/g) || []).length).to.equal(2);
+    expect(arJs).to.match(/if \(u && u\.side === "back"\) \{[\s\S]{0,200}?controller\.obstacle\(u\);/);
     // off / exit / pagehide: detector closed, labels cleared, trips cancelled
     const stop = fnBody(arJs, "stopObjects");
     for (const part of [/detector\?\.close\(\)/, /reader\?\.close\(\)/, /view\.setLabels\(\[\]\)/, /view\.onCameraFrame\(null\)/, /seek\.cancel\(\)/, /intents\.clearAvoid\(\)/]) expect(stop).to.match(part);

@@ -374,6 +374,14 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
 
     const blocked = { distanceM: 0.3, message: "Something is in my way (about 30 cm ahead)." };
 
+    it("something right behind: backward drives are dropped with a note, forward and turns stay", () => {
+      const parse = ARP.createArParser({ getBlocked: () => null, getBlockedBack: () => ({ distanceM: 0.04 }) });
+      const r = parse("back 2 s then turn left 45 then forward 1 s", "rover", { userSpeed: 60 });
+      expect(r.steps.map((x) => x.tool + ":" + (x.direction || x.degrees))).to.deep.equal(["turn:45", "drive:forward"]);
+      expect(r.say).to.contain("Something is behind me (about 4 cm behind). I can turn or drive forward.");
+      expect(ARP.filterBlocked([{ tool: "drive", direction: "back", seconds: 1 }], null, null).note).to.equal("");
+    });
+
     it("blocked: forward drives are dropped with the honest note; turns, back and looks stay", () => {
       const parse = ARP.createArParser({ getBlocked: () => blocked, getMode: () => "xr" });
       const r = parse("forward 2 s then turn left 45 then back 1 s then look up", "rover", { userSpeed: 60 });
@@ -597,6 +605,21 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(r.message).to.equal("Something is in my way (about 30 cm ahead).");
     });
 
+    it("behind the Rover: the same corridor with the heading turned finds a wall 0.4 m behind, about 30 cm from the back", () => {
+      const cam = camera([0, 1.2, 1.2], [0, 0, -0.2]); // the phone ahead of the Rover, looking past it
+      const behind = { ...pose0, yaw: Math.PI };
+      const e = OB.evaluateDepth({ samples: OB.corridorSamples(behind), getDepth: sceneDepth(cam, { wall: { z: -0.4 } }), worldToView: cam.worldToView, viewToWorld: cam.viewToWorld, proj: cam.proj, invProj: cam.invProj, worldPose: behind, floorY: 0 });
+      expect(e.hits).to.be.at.least(OB.OBST.MIN_HITS);
+      expect(e.nearestM).to.be.within(0.25, 0.37);
+      // ...and the corridor ahead does not see it
+      const ahead = OB.evaluateDepth({ samples: OB.corridorSamples(pose0), getDepth: sceneDepth(cam, { wall: { z: -0.4 } }), worldToView: cam.worldToView, viewToWorld: cam.viewToWorld, proj: cam.proj, invProj: cam.invProj, worldPose: pose0, floorY: 0 });
+      expect(ahead.hits).to.equal(0);
+      expect(OB.isBackWheels([-200, -200])).to.equal(true);
+      expect(OB.isBackWheels([200, 200])).to.equal(false);
+      expect(OB.isBackStep({ tool: "drive", direction: "back", seconds: 1 })).to.equal(true);
+      expect(OB.isBackStep({ tool: "drive", direction: "forward", seconds: 1 })).to.equal(false);
+    });
+
     it("a wall off to the side, or beyond the look-ahead, is not a hit", () => {
       const cam = camera();
       expect(evalScene(cam, { wall: { z: -0.5 } }).hits).to.equal(0); // behind the rover
@@ -708,6 +731,21 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       const r = t.update(hit(0.6));
       expect(r.state).to.equal("blocked");
       expect(r.distanceM).to.be.at.least(0.5);
+    });
+
+    it("low light: an obstacle counts after ENTER_DARK frames, and a real wall is still found", () => {
+      const t = OB.createObstacleTracker();
+      t.setLowLight(true);
+      for (let i = 0; i < OB.ENTER_DARK - 1; i++) expect(t.update(hit()).state, `frame ${i + 1}`).to.equal("clear");
+      expect(t.update(hit()).state).to.equal("blocked");
+      t.reset();
+      t.setLowLight(false);
+      for (let i = 0; i < OB.OBST.ENTER - 1; i++) t.update(hit());
+      expect(t.update(hit()).state).to.equal("blocked");
+      const cam = camera();
+      const e = OB.evaluateDepth({ samples: OB.corridorSamples(pose0), getDepth: sceneDepth(cam, { wall: { z: 0.4 } }), worldToView: cam.worldToView, viewToWorld: cam.viewToWorld, proj: cam.proj, invProj: cam.invProj, worldPose: pose0, floorY: 0, lowLight: true });
+      expect(e.hits).to.be.at.least(OB.OBST.MIN_HITS);
+      expect(OB.FLOOR_REL_DARK).to.be.greaterThan(OB.FLOOR_REL);
     });
 
     it("a single hit frame in the middle of a clear run restarts the 8-frame count", () => {
@@ -1198,6 +1236,34 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
         await r.ctl.say("back 1 s", { source: "voice" });
         await r.frames(400);
         expect(r.ctl.snapshot.wheels[0]).to.be.lessThan(0);
+      }
+    });
+
+    it("reversing: the Rover stops about 5 cm before an obstacle behind (a plan and a held Back), forward still works", async () => {
+      for (const how of ["plan", "hold"]) {
+        const r = await rig();
+        await r.place();
+        const start = r.ctl.pose.z;
+        if (how === "plan") await r.ctl.say("back 3 s", { source: "chip" });
+        else expect(r.ctl.press("back")).to.equal(true);
+        const gap0 = 0.35;
+        for (let t = 0; t < 4000; t += 66) {
+          const gap = gap0 - (start - r.ctl.pose.z); // reversing: pose.z goes down
+          r.ctl.obstacle({ state: "blocked", distanceM: Math.round(gap * 100) / 100, nearM: gap, message: "x", side: "back" });
+          await r.frames(66);
+        }
+        const gap = gap0 - (start - r.ctl.pose.z);
+        expect(gap, how).to.be.within(0.03, 0.09); // about 5 cm: 3-9 cm by speed (the stop starts by the braking distance)
+        expect(stick(wheels(r)), how).to.equal(false);
+        expect(r.ctl.view.notice, how).to.equal(AC.STOP_BACK_TEXT);
+        expect(r.ctl.view.sensing, how).to.deep.equal({ level: "blocked", text: AC.STOP_BACK_TEXT });
+        expect(r.ctl.press("back"), how).to.equal(false); // not further into it
+        expect(r.ctl.press("forward"), how).to.equal(true); // away from it is fine
+        r.ctl.release();
+        // an obstacle behind never stops a forward drive
+        await r.ctl.say("forward 1 s", { source: "chip" });
+        await r.frames(300);
+        expect(stick(wheels(r)), how).to.equal(true);
       }
     });
 

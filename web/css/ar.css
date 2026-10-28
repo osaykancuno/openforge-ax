@@ -66,31 +66,24 @@ body.ar-xr .ar-overlay { position: fixed; inset: 0; width: 100%; height: 100%; b
 /* padding 0: it is a <section>, and the site's sections carry 72 px above and below (invisible here, but over the Rover) */
 .ar-hud { grid-area: hud; align-self: end; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-height: 0; padding: 0; pointer-events: none; }
 /* The Rover and the floor ring sit in the middle of the screen (where the phone points): the HUD stays in the lower part.
-   The talk panel shows only when it has text; while placing, only Place and STOP are shown. */
+   The plan panel shows only when it has text; while placing, only Place and STOP are shown. */
 .ar-talk { max-height: 16dvh; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px; }
 .ar-heard { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .ar-heard:empty { display: none; }
-body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-row > :not(#arPlaceBtn) { display: none; }
-.ar-privacy { font-size: 12px; line-height: 1.3; }
+body.ar-placing .ar-chips, body.ar-placing .ar-drive-row > :not(#arPlaceBtn) { display: none; }
 .ar-plan:empty { display: none; }
 .ar-plan .pl-ai-steps { margin: 2px 0 2px; padding-left: 1.3em; }
 .ar-plan .pl-ai-note { margin: 2px 0 0; }
 .ar-plan-head { margin: 4px 0 0; font: 600 11px/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.ar-mic { padding: 8px 10px; }
-.ar-mic-row { margin-top: 0; gap: 8px; flex-wrap: wrap; }
+.ar-drive { padding: 8px 10px; }
+.ar-drive-row { margin-top: 0; gap: 8px; flex-wrap: wrap; }
 #arPlaceBtn { flex: 1 1 100%; min-height: 52px; } /* placing without a pointer: only while placing */
 .ar-app .pl-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; } /* looks disabled, keeps the focus */
-.ar-micbtn { flex: 1; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; }
-.ar-micdot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; flex: none; }
-.ar-micbtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.ar-micbtn[aria-pressed="true"] .ar-micdot { background: var(--accent); border-color: var(--accent); animation: ar-pulse 1.1s ease-in-out infinite; }
-@keyframes ar-pulse { 50% { transform: scale(0.7); } }
-.ar-armbtn { min-width: 96px; min-height: 52px; letter-spacing: 0.06em; }
+.ar-armbtn { flex: 1; min-width: 96px; min-height: 52px; letter-spacing: 0.06em; }
 .ar-armbtn:not(:disabled) { background: var(--ink); color: var(--paper); }
-.ar-privacy { margin: 6px 0 0; font-size: 12px; line-height: 1.35; }
 .ar-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .ar-chips::-webkit-scrollbar { display: none; }
-.ar-chips .pl-btn { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; font-size: 14px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* held down to drive: no text selection, no callout */
+.ar-chips .pl-btn { flex: none; min-height: 52px; min-width: 52px; padding: 0 16px; font-size: 15px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* held down to drive: no text selection, no callout */
 
 /* ---------------------------------------------------------------- STOP: always on screen, big, red, thumb reach */
 .ar-stop {
@@ -112,7 +105,6 @@ body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-
   }
   .ar-hud { align-self: end; }
   .ar-talk { max-height: 26dvh; }
-  .ar-privacy { display: none; }
   .ar-start, .ar-desktop { width: min(100%, 520px); }
   .ar-stop { min-height: 56px; }
   .ar-start .pl-lead { display: none; }
@@ -120,7 +112,6 @@ body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-
 }
 /* very short portrait screens: less chrome, the same controls */
 @media (orientation: portrait) and (max-height: 560px) {
-  .ar-privacy { display: none; }
   .ar-talk { max-height: 18dvh; }
   .ar-stop { min-height: 56px; }
   .ar-start .pl-lead { display: none; }
@@ -133,7 +124,7 @@ body.ar-placing .ar-privacy, body.ar-placing .ar-chips, body.ar-placing .ar-mic-
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ar-micbtn[aria-pressed="true"] .ar-micdot { animation: none; }
+  .ar-app * { transition: none !important; animation: none !important; } /* nothing on this page moves except the 3D */
 }
 @media (forced-colors: active) {
   .ar-panel, .ar-stop { border: 2px solid CanvasText; }

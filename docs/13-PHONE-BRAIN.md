@@ -283,64 +283,68 @@ model nothing leaves the page at all.
 
 ## 9b. AR twin ("AX-1 in your room")
 
-`ar.html` puts the AX-1 Rover **twin** (never the real robot) in your room at real size (~23 cm) and drives it by voice
-or chips through the same AI Pilot, built-in parser and drive loop as `pilot.html`. Model servers are not used here.
+`ar.html` puts the AX-1 Rover **twin** (never the real robot) in your room at real size (~23 cm) and drives it with
+on-screen buttons through the same plan executor and drive loop as `pilot.html`. There is **no voice on this page for
+now** (2026-10-28): it comes back later. Model servers are not used here.
 
 **Modes.** The page probes the phone and picks one:
 
 | Mode | Where | What you get |
 |---|---|---|
-| **AR** | Android Chrome on ARCore phones (WebXR `immersive-ar`) | The twin anchored to the floor (hit-test, anchors, light estimation, shadow), obstacle sensing |
+| **AR** | Android Chrome on ARCore phones (WebXR `immersive-ar`) | The twin anchored to the floor (hit-test, anchors, light estimation, shadow), obstacle sensing ahead and behind |
 | **Camera view** | iPhone and browsers without WebXR AR | The twin drawn over the live camera; not anchored to the floor, no obstacle sensing (the page says both) |
 | **Desktop** | No phone | "Open this on your phone" with the page address and a link to the 3D twin |
 
-**Safety.** The same rules as §9a, plus:
+**Driving and safety.** The same rules as §9a, plus:
 
 - Only placing the Rover (a tap on the floor, or the **Place the Rover here** button for keyboard and screen-reader
-  users) or the **ARM** button arms it, and only from a real tap or key press. Voice, chips and object requests never arm.
-- STOP, Esc, voice "stop" anywhere in a sentence (also "halt", "freeze", "brake", "abort"), the page going to the
-  background, the page being closed and the AR session ending all latch it; nothing resumes until ARM.
-- A blurred AR session, an obstacle 5 cm ahead or the edge of the 3 m play area **hold** it: the wheels go to zero
-  within one tick, the plan ends, the Rover stays armed.
+  users) or the **ARM** button arms it, and only from a real tap or key press. Buttons and object finding never arm.
 - **Buttons:** a tap on Forward, Back, Left or Right is a short move; **holding** one keeps the Rover moving until the
   finger lifts (leases of 0.4 s renewed while held, through the same obstacle and edge checks; a frozen page stops by
-  itself within one lease). Voice also reads "left", "right" and "spin" alone, like the buttons.
-- **Microphone:** the browser's permission question is not shown inside AR, so the start card has **Enable
-  microphone** (it shows "Microphone on" once allowed). Inside AR, without the permission, the mic button says
-  "Microphone off" and explains instead of asking.
-- **Obstacles** (AR mode, phones with the ARCore Depth API): the phone's depth is read along the twin's forward
-  corridor (60 cm ahead, Rover width, 5–26 cm above the floor). An obstacle seen there is tracked after three frames
-  ("Obstacle about 30 cm ahead"); the Rover drives on and stops about **5 cm** before it (it starts stopping 0.2 s of
-  travel earlier, so the stop ends at the gap at any speed; between depth frames the odometry counts the distance
-  closed). Then forward is refused; turns and backing up still work; eight clear frames unblock. Without depth a forward
-  hit-test ray is used. When the corridor is out of view the chip says so and nothing is blocked. Most phones (a Galaxy
-  S24 too) have no depth sensor and estimate depth from motion, which reads a plain floor several per cent short: every
-  evaluation calibrates that error on the floor beside and behind the Rover, and a surface counts only when it stands
-  clearly in front of the floor (5 cm or 6% of its distance). Things about 20 cm tall or more are found; lower ones only
-  with the phone about a metre away or closer.
+  itself within one lease). Spin, Curious and Wiggle are short routines.
+- STOP, Esc, the page going to the background, the page being closed and the AR session ending all latch it; nothing
+  resumes until ARM. A blurred AR session, an obstacle or the edge of the 3 m play area **hold** it: the wheels go to
+  zero within one tick, the move ends, the Rover stays armed.
+- **Obstacles, ahead and behind** (AR mode, phones with the ARCore Depth API): the phone's depth is read along a
+  corridor in front of the twin and the same corridor behind it (60 cm long, Rover width, 5–26 cm above the floor). An
+  obstacle seen there is tracked ("Obstacle about 30 cm ahead" / "behind"); the Rover drives on and stops **about 5 cm**
+  before it (3–9 cm in tests, by speed: it starts stopping 0.2 s of travel earlier; between depth frames the odometry
+  counts the distance closed). Then that direction is refused; turning and driving the other way still work. Without
+  depth a forward hit-test ray is used (ahead only). When the corridor is out of view the chip says so and nothing is
+  blocked.
+- **Phone depth error:** most phones (a Galaxy S24 too) have no depth sensor and estimate depth from motion, which reads
+  a plain floor several per cent short. Every evaluation calibrates that error on the floor beside the Rover (away from
+  the corridor being judged), and a surface counts only when it stands clearly in front of the floor (5 cm or 6% of its
+  distance). Things about 20 cm tall or more are found; lower ones only with the phone about a metre away or closer.
+- **Low light:** WebXR light estimation gives ARCore's main light level (shown in `ar.html?debug`). Under 0.2 (back
+  above 0.3) the page switches to low-light sensing: an obstacle must be seen in 5 frames in a row instead of 3, and
+  must stand out 9% instead of 6%. The chip adds "low light, less sure", and while placing the hint asks for a light.
+  The thresholds are first guesses, to be tuned with real readings.
 
 **Look around (optional, off by default).** Finds the 80 COCO object types (cup, chair, person, …) with MediaPipe
 Tasks Vision 1.1.1 and the EfficientDet-Lite0 int8 model, both self-hosted under `vendor/mediapipe/` (Apache 2.0, the
-model checked by sha256 at build). Turning it on downloads up to about 19 MB once (about 8 MB if the host compresses).
-Requests: "what do you see", "go to the cup", "find the cup", "avoid the chair". Trips re-plan at most 5 times within
-45 s and end when the Rover arrives, loses the object for 2 s, or you say anything else. Detection runs in a Web Worker
-on 320 px frames, at most twice a second and one frame at a time (measured on a desktop: 105–125 ms per frame in the
-worker, no main-thread task over 50 ms). If the worker cannot start it falls back to the main thread only while the Rover
-is not armed, and turns itself off when the phone is too slow.
+model checked by sha256 at build), and shows labels on them in the room. Turning it on downloads up to about 19 MB once
+(about 8 MB if the host compresses). Without voice there are no object requests for now ("go to the cup" returns with
+voice). Detection runs in a Web Worker on 320 px frames, at most twice a second and one frame at a time (measured on a
+desktop: 100–125 ms per frame in the worker, no main-thread task over 50 ms). **Day and night:** a dark, washed-out or
+flat frame is stretched to its full range (2nd–98th percentile, a brighter gamma when dark) before detection, and in a
+dark frame (mean luma under 0.25) the confidence bar drops from 0.5 to 0.4; the stretch costs no measurable time. If the
+worker cannot start it falls back to the main thread only while the Rover is not armed, and turns itself off when the
+phone is too slow.
 
 **Privacy.**
 
-- Camera pictures never leave the phone: detection is on the device, and `ar.html` has `connect-src 'self'`.
+- Camera pictures never leave the phone: detection is on the device, and `ar.html` has `connect-src 'self'`. The page
+  asks for no microphone (`Permissions-Policy: microphone=()` on `/ar`).
 - **MediaPipe telemetry is blocked.** MediaPipe 1.1.1 always starts a usage logger that posts to a Google logging
   endpoint and has no setting to turn it off. The worker (and the fallback) reject every `fetch`, `XMLHttpRequest` and
   `importScripts` to another origin locally, before the network, and remove `WebSocket`, `EventSource` and
-  `sendBeacon`; the worker's own CSP header (`connect-src 'self'`) blocks it a second time.
-- **Voice:** the browser's speech service turns your words into text. In Chrome the audio may be processed on Google's
-  servers; in Safari, Apple's. The page says so next to the mic.
+  `sendBeacon`; where `_headers` is honoured (not GitHub Pages) the worker's own CSP header blocks it a second time.
 
-**Not verified yet.** Built and tested in desktop Chrome and with emulated phones only: no real ARCore phone or iPhone
-yet. To check on hardware: the depth-buffer convention, stalls during placement and detection, the mic prompt inside an
-AR session, select vs overlay taps, and the iPhone camera view. Thin, dark, glossy or moving obstacles are untested.
+**Tested on hardware.** Galaxy S24, Chrome: placement, driving, hold-to-drive and the 5 cm stop ahead work (2026-10-27).
+Not yet: the stop behind, low-light sensing at night, object finding in the dark, the iPhone camera view. Thin, dark,
+glossy or moving obstacles are untested. `ar.html?debug` shows the session's real numbers (layer, frames, depth hits
+ahead and behind, floor calibration, light level) for these checks.
 
 ## 10. Limitations
 

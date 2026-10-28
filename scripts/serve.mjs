@@ -18,7 +18,7 @@ const guard = HOST && isLoopbackHost(HOST) ? hostsOf([process.env.PUBLIC_URL, pr
 const OVERRIDES = process.env.SITE_OVERRIDES ? JSON.parse(process.env.SITE_OVERRIDES) : null;
 const PILOT_POLICY = "bluetooth=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), microphone=(self), geolocation=(), serial=(), xr-spatial-tracking=()";
 const WORKER_CSP = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'";
-const AR_POLICY = "camera=(self), microphone=(self), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()";
+const AR_POLICY = "camera=(self), microphone=(), xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(), screen-wake-lock=(self), geolocation=(), serial=(), bluetooth=()";
 const TYPES = {
   ".webmanifest": "application/manifest+json",
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json",

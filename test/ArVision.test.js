@@ -482,6 +482,25 @@ describe("AR vision: objects, intents, seek", () => {
       expect(await next).to.equal(null); // the worker was busy: its drop is a drop here too
     });
 
+    it("in a dark frame the bar drops to NIGHT_SCORE; in a normal one it stays (a 0.45 cup counts only at night)", async () => {
+      expect(DET.NIGHT_SCORE).to.equal(0.4);
+      const fw = fakeWorkers({ reply: "manual" });
+      const d = mk(fw, { mode: "IMAGE" });
+      await d.load();
+      expect(fw.log.posts[0].msg.scoreThreshold).to.equal(0.4); // the worker uses the lower bar, the page applies the real one
+      const ask = async (light) => {
+        const p = d.detect(pixels(), 0);
+        await flush();
+        const seq = fw.log.posts[fw.log.posts.length - 1].msg.seq;
+        fw.log.worker.emit({ type: "result", seq, ms: 30, width: 320, height: 240, light, detections: [mp("cup", 0.45, 32, 24, 64, 48)] });
+        return (await p).map((x) => x.label);
+      };
+      expect(await ask(0.1)).to.deep.equal(["cup"]);
+      expect(d.stats.light).to.equal(0.1);
+      expect(await ask(0.5)).to.deep.equal([]);
+      expect(await ask(-1)).to.deep.equal([]); // unknown light: the normal bar
+    });
+
     it("an answer for a frame we gave up on is ignored", async () => {
       const fw = fakeWorkers({ reply: "manual" });
       const timers = fakeTimers();
@@ -738,7 +757,7 @@ describe("AR vision: objects, intents, seek", () => {
     const flush = () => new Promise((r) => setImmediate(r));
 
     function scope({ importThrows = false } = {}) {
-      const s = { posts: [], imported: [], fileset: [], created: [], fetched: [], opened: [], closed: 0, detectorClosed: 0, bitmapClosed: 0, ts: [] };
+      const s = { posts: [], imported: [], fileset: [], created: [], fetched: [], opened: [], closed: 0, detectorClosed: 0, bitmapClosed: 0, ts: [], inputs: [] };
       const detection = { categories: [{ categoryName: "cup", score: 0.9, index: 41, displayName: "" }], boundingBox: { originX: 1, originY: 2, width: 3, height: 4, angle: 0 }, keypoints: [{ x: 1 }] };
       const Vision = {
         FilesetResolver: { forVisionTasks: async (base) => (s.fileset.push(base), { base }) },
@@ -746,7 +765,7 @@ describe("AR vision: objects, intents, seek", () => {
           createFromOptions: async (fileset, opts) => {
             s.created.push(opts);
             return {
-              detect: () => ({ detections: [detection, detection, detection, detection, detection, detection, detection, detection, detection, detection, detection, detection] }),
+              detect: (img) => (s.inputs.push(img), { detections: [detection, detection, detection, detection, detection, detection, detection, detection, detection, detection, detection, detection] }),
               detectForVideo: (img, ts) => (s.ts.push(ts), { detections: [detection] }),
               close: () => s.detectorClosed++,
             };
@@ -788,6 +807,33 @@ describe("AR vision: objects, intents, seek", () => {
       s.send = (data) => sb.onmessage({ data });
       return s;
     }
+
+    it("day and night: a dark frame is brightened before detection and its light is reported; a well exposed one is left alone", async () => {
+      const s = scope();
+      s.send({ type: "init", mode: "IMAGE" });
+      await flush();
+      const W = 64;
+      const H = 48;
+      const dark = new Uint8ClampedArray(W * H * 4);
+      for (let i = 0; i < dark.length; i += 4) dark.set([10 + (i % 23), 12 + (i % 19), 8 + (i % 17), 255], i); // a dim room
+      s.send({ type: "detect", seq: 1, ts: 0, buffer: dark.buffer, width: W, height: H });
+      const r1 = s.posts.find((m) => m.type === "result" && m.seq === 1);
+      expect(r1.light).to.be.within(0.02, 0.15);
+      const seen = s.inputs[s.inputs.length - 1].data;
+      let mean = 0;
+      for (let i = 0; i < seen.length; i += 4) mean += seen[i] + seen[i + 1] + seen[i + 2];
+      expect(mean / (seen.length * 0.75)).to.be.greaterThan(90); // stretched to a usable range
+      // a well exposed frame (full range, mid mean) is passed through unchanged
+      const good = new Uint8ClampedArray(W * H * 4);
+      for (let i = 0; i < good.length; i += 4) {
+        const v = Math.round(((i / 4) % W) * (255 / (W - 1)));
+        good.set([v, v, v, 255], i);
+      }
+      const copy = good.slice();
+      s.send({ type: "detect", seq: 2, ts: 0, buffer: good.buffer, width: W, height: H });
+      expect(Array.from(s.inputs[s.inputs.length - 1].data)).to.deep.equal(Array.from(copy));
+      expect(s.posts.find((m) => m.type === "result" && m.seq === 2).light).to.be.within(0.4, 0.6);
+    });
 
     it("init: loads the same-origin IIFE bundle, wasm folder and model, CPU delegate, then says ready", async () => {
       const s = scope();

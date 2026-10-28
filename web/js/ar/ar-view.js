@@ -21,6 +21,9 @@ const CAMERA_CB_MS = 100; // object finding looks at 10 Hz at most (the detector
 const WARM_SCALE = 1e-4; // the Rover is drawn this small before it is placed, so its shaders are compiled before the drive loop runs
 const HIT_FRESH_MS = 400; // a tap places the Rover only if the floor was seen this recently
 const HIT_TILT_DEG = 7; // the floor ring sits about 10% of the screen above the middle, clear of the controls
+// Low light, from WebXR light estimation: ARCore's primary light intensity (three r160 floors its own intensity at 1, so
+// the level is rebuilt as colour x intensity), smoothed. Thresholds to tune on phones: ar.html?debug shows the level.
+export const LIGHT = { LOW: 0.2, OK: 0.3, EMA: 0.1 };
 const DEPTH_MISS_FRAMES = 45; // frames without a depth picture before the chip says sensing is off
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -29,10 +32,11 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * handlers (all optional, set or replaced at any time through view.handlers):
  *   frame(dt, rig) -> { x, z, yaw } | null   local pose of the Rover (and the place to move its joints and wheels)
  *   place(info) -> false to refuse          info = { gesture: true, source: "xr" | "tap", x, y, z, yaw }
- *   obstacle(update)                        tracker result { state, distanceM, message }
+ *   obstacle(update)                        tracker result { state, distanceM, nearM, message, side: "front" | "back" }
  *   visibility(state)                       XR session visibility: "visible" | "visible-blurred" | "hidden"
  *   ended(reason)                           the session or the camera view is over
  *   hint(text | null)                       what to tell the person while they look for a floor
+ *   light(lowLight)                         the room went dark (true) or light again (false)
  * debug: true adds a magenta test cube 60 cm in front of where AR started and fills view.diagnostics() (ar.html?debug).
  */
 export function createArView({ canvas, video, overlay, handlers = {}, debug = false }) {
@@ -99,7 +103,12 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
   const dbg = { frames: 0, hitResults: 0, upHits: 0, calls: 0, tris: 0, glErr: 0, ndc: null, cube: null };
   const dbgV = new THREE.Vector3();
 
-  const tracker = createObstacleTracker();
+  const tracker = createObstacleTracker(); // ahead
+  const trackerBack = createObstacleTracker(); // behind (reversing)
+  const resetTrackers = () => {
+    tracker.reset();
+    trackerBack.reset();
+  };
   const view = {
     handlers,
     renderer,
@@ -111,6 +120,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     cameraAccess: false, // camera-access granted (object finding inside AR)
     depthSensing: false, // the phone gave us CPU depth
     orientationOn: false, // camera view follows the phone's turning
+    lowLight: false, // AR light estimation says it is dark: obstacle sensing is more careful
     get floorY() {
       return placeRoot.position.y;
     },
@@ -205,8 +215,8 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
   }
   const keyDir = new THREE.Vector3(0.3, 0.8, 0.45).normalize();
 
-  function sendObstacle(update) {
-    view.handlers.obstacle?.(update);
+  function sendObstacle(update, side = "front") {
+    view.handlers.obstacle?.({ ...update, side });
   }
   function sendOff(message) {
     if (offSent) return;
@@ -222,7 +232,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       if (ok === false) unplace();
       else {
         view.placed = true;
-        tracker.reset();
+        resetTrackers();
         offSent = false;
         depthMisses = 0;
         say(null);
@@ -243,7 +253,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     dropAnchor();
     placeRoot.visible = view.mode === "camera" || view.mode === "xr"; // in AR it waits at a tiny size (see WARM_SCALE)
     placeRoot.scale.setScalar(view.mode === "xr" ? WARM_SCALE : 1);
-    tracker.reset();
+    resetTrackers();
   }
 
   // ---------------------------------------------------------------- WebXR
@@ -399,7 +409,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
         say("Tap to put the Rover here.");
         // keep the warm-up Rover next to the reticle (it is invisible at this size)
         placeRoot.position.set(hit.x, hit.y, hit.z);
-      } else say("Move your phone slowly to find the floor.");
+      } else say(lowLight ? "It's dark here: turn on a light, then move your phone slowly to find the floor." : "Move your phone slowly to find the floor.");
     }
   }
 
@@ -410,10 +420,23 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     if (p) placeRoot.position.set(p.transform.position.x, p.transform.position.y, p.transform.position.z);
   }
 
+  let lightLevel = null; // smoothed light estimate (null: unknown)
+  let lowLight = false;
   function updateLight() {
     if (!estimating || !xrLight) return;
     const d = xrLight.directionalLight;
     if (!d) return;
+    const level = Math.max(d.color.r, d.color.g, d.color.b) * d.intensity;
+    if (Number.isFinite(level)) {
+      lightLevel = lightLevel === null ? level : lightLevel + LIGHT.EMA * (level - lightLevel);
+      if (lowLight ? lightLevel > LIGHT.OK : lightLevel < LIGHT.LOW) {
+        lowLight = !lowLight;
+        tracker.setLowLight(lowLight);
+        trackerBack.setLowLight(lowLight);
+        view.lowLight = lowLight;
+        view.handlers.light?.(lowLight);
+      }
+    }
     const dir = d.position;
     if (dir.lengthSq() > 1e-6) {
       keyDir.copy(dir).normalize();
@@ -436,7 +459,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       // placing again: ask first, move only if the controller agrees
       if (view.handlers.place?.(info) === false) return;
       moveTo(info);
-      tracker.reset();
+      resetTrackers();
       makeAnchor(e, info);
       return;
     }
@@ -523,7 +546,9 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       `hit results ${dbg.hitResults} · floor hits ${dbg.upHits} · up ${dbg.upY ?? "-"} · reticle ${reticle.visible}`,
       `placed ${view.placed} · root visible ${placeRoot.visible} scale ${r2(placeRoot.scale.x)} · rover ${w ? [w.x, w.y, w.z].map(r2).join(", ") : "-"}`,
       `camera ${[cam.x, cam.y, cam.z].map(r2).join(", ")} · distance ${w ? r2(Math.hypot(w.x - cam.x, w.y - cam.y, w.z - cam.z)) : "-"} m · rover on screen ${dbg.ndc ? dbg.ndc.join(", ") : "-"}`,
+      `behind: hits ${dbg.depthBack ? dbg.depthBack.hits : "-"} · nearest ${dbg.depthBack && Number.isFinite(dbg.depthBack.nearestM) ? r2(dbg.depthBack.nearestM) : "-"} m`,
       `depth: hits ${dbg.depth ? dbg.depth.hits : "-"} · in view ${dbg.depth ? r2(dbg.depth.visibleFrac) : "-"} · nearest ${dbg.depth && Number.isFinite(dbg.depth.nearestM) ? r2(dbg.depth.nearestM) : "-"} m · floor k ${dbg.depth ? r2(dbg.depth.floorK) : "-"} · depth/floor ${dbg.depth && dbg.depth.floorRatio !== null ? r2(dbg.depth.floorRatio) : "-"}`,
+      `light ${lightLevel === null ? "unknown" : r2(lightLevel)} (low under ${LIGHT.LOW}) · low light ${lowLight}`,
       `test cube ${dbg.cube ? "magenta, 60 cm ahead of the start" : "off"}`,
     ].join("\n");
   }
@@ -552,21 +577,29 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     invM.fromArray(v.projectionMatrix).invert().toArray(invProj);
     const world = view.worldPose();
     const floorY = placeRoot.position.y;
-    const res = evaluateDepth({
-      samples: corridorSamples(world, { floorY }),
-      getDepth: (u, w) => {
-        const d = di.getDepthInMeters(clamp01(u), clamp01(w));
-        return d > 0 && Number.isFinite(d) ? d : 0;
-      },
-      worldToView: v.transform.inverse.matrix,
-      viewToWorld: v.transform.matrix,
-      proj: v.projectionMatrix,
-      invProj,
-      worldPose: world,
-      floorY,
-    });
-    if (debug) dbg.depth = res;
+    const judge = (pose) =>
+      evaluateDepth({
+        samples: corridorSamples(pose, { floorY }),
+        getDepth: (u, w) => {
+          const d = di.getDepthInMeters(clamp01(u), clamp01(w));
+          return d > 0 && Number.isFinite(d) ? d : 0;
+        },
+        worldToView: v.transform.inverse.matrix,
+        viewToWorld: v.transform.matrix,
+        proj: v.projectionMatrix,
+        invProj,
+        worldPose: pose,
+        floorY,
+        lowLight,
+      });
+    const res = judge(world);
+    const resBack = judge({ ...world, yaw: world.yaw + Math.PI }); // the same corridor behind the Rover
+    if (debug) {
+      dbg.depth = res;
+      dbg.depthBack = resBack;
+    }
     sendObstacle(tracker.update({ hits: res.hits, nearestM: res.nearestM, visibleFrac: res.visibleFrac, source: "depth" }));
+    sendObstacle(trackerBack.update({ hits: resBack.hits, nearestM: resBack.nearestM, visibleFrac: resBack.visibleFrac, source: "depth" }), "back");
   }
 
   function senseRay(frame, t) {
@@ -690,7 +723,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     if (view.mode !== "camera" || (e && e.isTrusted === false)) return; // a scripted click is not a person's tap
     const info = { gesture: true, source: "tap", x: 0, y: 0, z: 0, yaw: placeRoot.rotation.y };
     if (view.placed) {
-      if (view.handlers.place?.(info) !== false) tracker.reset();
+      if (view.handlers.place?.(info) !== false) resetTrackers();
       return;
     }
     pending = info;

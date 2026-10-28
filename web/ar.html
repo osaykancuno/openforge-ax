@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>AX-1 in your room · OpenForge AX</title>
-<meta name="description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with your voice. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
+<meta name="description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
 <meta name="theme-color" content="#f4efe6">
 <link rel="icon" href="assets/pilot-icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/pilot-192.png">
@@ -25,7 +25,6 @@
 <link rel="modulepreload" href="js/ar/ar-view.js">
 <link rel="modulepreload" href="js/chain.js">
 <link rel="modulepreload" href="js/pilot/ai/tools.js">
-<link rel="modulepreload" href="js/pilot/ai/voice.js">
 <link rel="modulepreload" href="js/pilot/twin-transport.js">
 <link rel="modulepreload" href="js/pilot/ax-proto.js">
 <link rel="modulepreload" href="js/pilot/drive-loop.js">
@@ -68,7 +67,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OpenForge AX">
 <meta property="og:title" content="AX-1 in your room · OpenForge AX">
-<meta property="og:description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with your voice. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
+<meta property="og:description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
 <meta name="twitter:card" content="summary_large_image">
 <!--/seo-->
 </head>
@@ -103,18 +102,16 @@
     <section class="ar-panel ar-start" id="arStart" aria-labelledby="arTitle" hidden>
       <p class="pl-label">FIG. 01 · <b>The twin, in your room</b></p>
       <h1 id="arTitle">AX-1 in your room</h1>
-      <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then tell it what to do. It is not a real robot.</p>
+      <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone.</p>
       <ol class="ar-steps">
         <li>Allow the camera when asked.</li>
         <li>Point at the floor, then tap to put the Rover down.</li>
-        <li>Press the mic and say <span class="pl-mono">forward</span>, <span class="pl-mono">turn left</span> or <span class="pl-mono">spin</span>. Or tap a button for a short move, and hold it to keep moving.</li>
+        <li>Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it.</li>
       </ol>
       <label class="pl-check ar-look"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
       <p class="pl-small" id="arLookNote">Off by default. Turning it on downloads the object-finding model once (up to about 19 MB) and runs it on your phone. Nothing leaves the phone.</p>
-      <p class="pl-small" id="arVoiceNote">Voice: tap <b>Enable microphone</b> before you start. Inside AR the browser cannot show its question, so it has to be asked here. Your browser's speech service turns your words into text. In Chrome the audio may be processed on Google's servers; in Safari, Apple's. Camera pictures never leave this phone.</p>
       <div class="pl-row pl-wrap">
         <button class="pl-btn pl-primary" id="arStartBtn" type="button">Start</button>
-        <button class="pl-btn" id="arVoiceBtn" type="button" hidden>Enable microphone</button>
       </div>
       <p class="pl-msg" id="arStartMsg" role="status" aria-live="polite"></p>
     </section>
@@ -131,20 +128,18 @@
     <!-- placing: aim at the floor and tap -->
     <p class="ar-hint ar-panel" id="arHint" role="status" aria-live="polite" hidden></p>
 
-    <!-- driving: transcript, plan, mic, chips -->
+    <!-- driving: the plan, ARM, the drive buttons -->
     <section class="ar-hud" id="arHud" aria-label="Drive the twin" hidden>
       <div class="ar-panel ar-talk" id="arTalk" hidden>
         <p class="ar-heard" id="arHeard" role="status" aria-live="polite"></p>
         <div class="ar-plan" id="arPlan" role="status" aria-live="polite" aria-atomic="false"></div>
       </div>
-      <div class="ar-panel ar-mic">
-        <div class="pl-row ar-mic-row">
+      <div class="ar-panel ar-drive">
+        <div class="pl-row ar-drive-row">
           <button class="pl-btn pl-primary" id="arPlaceBtn" type="button" hidden>Place the Rover here</button>
-          <button class="pl-btn pl-primary ar-micbtn" id="arMic" type="button" aria-pressed="false"><span aria-hidden="true" class="ar-micdot"></span><span id="arMicText">Tap to talk</span></button>
           <button class="pl-btn ar-armbtn" id="arArm" type="button" disabled>ARM</button>
         </div>
-        <p class="pl-small ar-privacy" id="arPrivacy">Your browser's speech service hears the mic (Google in Chrome, Apple in Safari).</p>
-        <div class="ar-chips" id="arChips" role="group" aria-label="Quick commands"></div>
+        <div class="ar-chips" id="arChips" role="group" aria-label="Drive: tap for a short move, hold to keep moving"></div>
       </div>
     </section>
 

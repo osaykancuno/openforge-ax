@@ -84,7 +84,7 @@ describe("Self-hosting server hardening", () => {
       const headersFile = require("fs").readFileSync(require("path").join(__dirname, "..", "web", "_headers"), "utf8");
       const wanted = headersFile.match(/^\/ar\.html\r?\n {2}! Permissions-Policy\r?\n {2}Permissions-Policy: (.+?)\r?$/m)[1];
       expect((await policy("/ar.html"))["permissions-policy"]).to.equal(wanted);
-      expect(wanted).to.include("xr-spatial-tracking=(self)").and.include("camera=(self)").and.include("microphone=(self)");
+      expect(wanted).to.include("xr-spatial-tracking=(self)").and.include("camera=(self)").and.include("microphone=()"); // no voice on the AR page for now
       expect((await policy("/index.html"))["permissions-policy"]).to.include("xr-spatial-tracking=()");
       expect((await policy("/pilot.html"))["permissions-policy"]).to.include("xr-spatial-tracking=()");
       expect((await policy("/vendor/mediapipe/wasm/vision_wasm_internal.wasm"))["content-type"]).to.equal("application/wasm"); // instantiateStreaming needs it

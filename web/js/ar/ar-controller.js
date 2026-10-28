@@ -18,7 +18,7 @@ import { cleanSay } from "../pilot/ai/tools.js";
 import { VMAX, stepPose, wheelsFromState } from "../pilot/twin-pose.js";
 import { CHIPS, chipText } from "./chips.js";
 import { createArParser } from "./ar-parse.js";
-import { edgeAhead, isForwardStep, isForwardWheels } from "./obstacle.js";
+import { edgeAhead, isBackStep, isBackWheels, isForwardStep, isForwardWheels } from "./obstacle.js";
 
 export const STATES = { READY: "ready", STARTING: "starting", PLACING: "placing", ARMED: "armed", LATCHED: "latched" };
 export const CAMERA_SENSING = "Obstacle sensing needs Android Chrome AR";
@@ -28,6 +28,7 @@ const MAX_SAY = 500;
 export const STOP_GAP_M = 0.05;
 export const BRAKE_S = 0.2;
 export const STOP_TEXT = `I stopped about ${Math.round(STOP_GAP_M * 100)} cm before something in my way. I can turn or back up.`;
+export const STOP_BACK_TEXT = `I stopped about ${Math.round(STOP_GAP_M * 100)} cm before something behind me. I can turn or drive forward.`;
 const stopAt = (v) => STOP_GAP_M + Math.max(0, v) * BRAKE_S;
 /** Nearer than this, even a full-speed start would end inside the gap: sensing says "blocked" (and the page's chip turns red). */
 export const NEAR_STOP_M = stopAt(VMAX);
@@ -73,6 +74,8 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   let snap = null; // latest drive-loop snapshot
   let obst = null; // latest obstacle tracker result
   let obstPose = null; // the odometry pose when that result was measured
+  let obstBack = null; // the same, behind the Rover (reversing)
+  let obstBackPose = null;
   let pressing = null; // hold-to-drive: { dir, timer } while a chip is held down
   let seek = null; // an object-seeking helper with cancel(), set by the page
   let placed = false;
@@ -97,15 +100,19 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     pose.z = 0;
     pose.yaw = 0;
   };
-  /** Metres from the bumper to the obstacle now: the measured distance minus what the Rover drove since. Infinity: none. */
-  const obstacleAhead = () => {
-    if (mode !== "xr" || !obst || obst.state !== "blocked") return Infinity;
-    const p = obstPose || pose;
-    const driven = (pose.x - p.x) * Math.sin(p.yaw) + (pose.z - p.z) * Math.cos(p.yaw);
-    return obst.nearM - driven;
+  /**
+   * Metres from the bumper to the obstacle now (side "front" or "back"): the measured distance minus what the Rover drove
+   * toward it since. Infinity: none.
+   */
+  const obstacleAhead = (side = "front") => {
+    const o = side === "back" ? obstBack : obst;
+    if (mode !== "xr" || !o || o.state !== "blocked") return Infinity;
+    const p = (side === "back" ? obstBackPose : obstPose) || pose;
+    const driven = (pose.x - p.x) * Math.sin(p.yaw) + (pose.z - p.z) * Math.cos(p.yaw); // forward along the heading
+    return o.nearM - (side === "back" ? -driven : driven);
   };
-  /** Blocked = too close to drive forward at speed v (m/s): the stop would end nearer than STOP_GAP_M. */
-  const isBlocked = (v = 0) => obstacleAhead() <= stopAt(v);
+  /** Blocked = too close to drive toward that side at speed v (m/s): the stop would end nearer than STOP_GAP_M. */
+  const isBlocked = (v = 0, side = "front") => obstacleAhead(side) <= stopAt(v);
   const forwardSpeed = () => {
     if (!snap || snap.body !== ROVER) return 0;
     const [l, r] = wheelsFromState(snap.state, ROVER);
@@ -115,6 +122,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
 
   function sensing() {
     if (mode === "camera") return { level: "off", text: CAMERA_SENSING };
+    if (isBlocked(VMAX, "back") && !isBlocked(VMAX)) return { level: "blocked", text: STOP_BACK_TEXT }; // backed up to something
     if (!obst) return { level: "off", text: "" };
     if (obst.state === "blocked" && !isBlocked(VMAX)) return { level: "ahead", text: obst.message || "" }; // seen, still room to drive
     const text = obst.state === "clear" ? "Obstacle sensing: clear" : obst.state === "blocked" ? STOP_TEXT : obst.message || "";
@@ -148,8 +156,11 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       get(target, prop) {
         if (prop === "holdFor") {
           return (ms, x = 0, y = 1) => {
+            // the speed this lease will really drive at: the stick times the speed cap the bridge applies
+            const v = Math.abs(y) * VMAX * ((target.snapshot && Number.isFinite(target.snapshot.speed) ? target.snapshot.speed : 100) / 100);
+            if (y < 0 && isBlocked(v, "back")) return api.hold(STOP_BACK_TEXT), false;
             if (y > 0) {
-              if (isBlocked(y * VMAX)) return api.hold(STOP_TEXT), false;
+              if (isBlocked(v)) return api.hold(STOP_TEXT), false;
               if (edgeAhead(pose, playRadius) < 0.01) return api.hold(edgeText()), false;
             }
             return target.holdFor(ms, x, y);
@@ -168,13 +179,16 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     pressing = null;
   }
 
-  /** Holds a forward move that would end nearer than STOP_GAP_M to the obstacle ahead. */
+  /** Holds a move that would end nearer than STOP_GAP_M to an obstacle ahead (driving forward) or behind (reversing). */
   function checkObstacle() {
-    if (state !== STATES.ARMED || !loop || !Number.isFinite(obstacleAhead())) return;
+    if (state !== STATES.ARMED || !loop) return;
     const step = ai && ai.running ? (ai.view.progress || {}).step : null;
-    const wheelsFwd = isForwardWheels(loop.snapshot.wheels);
-    if (!wheelsFwd && !isForwardStep(step)) return;
-    if (isBlocked(wheelsFwd ? forwardSpeed() : 0)) api.hold(STOP_TEXT);
+    const w = loop.snapshot.wheels;
+    if (isForwardWheels(w) || (!isBackWheels(w) && isForwardStep(step))) {
+      if (isBlocked(isForwardWheels(w) ? forwardSpeed() : 0)) api.hold(STOP_TEXT);
+    } else if (isBackWheels(w) || isBackStep(step)) {
+      if (isBlocked(isBackWheels(w) ? -forwardSpeed() : 0, "back")) api.hold(STOP_BACK_TEXT);
+    }
   }
 
   function onLoop(s) {
@@ -251,6 +265,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       resetPose();
       placed = false;
       obst = null;
+      obstBack = null;
       message = "";
       notice = "";
       heard = "";
@@ -259,7 +274,14 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       const mine = createDriveLoop({ transport, clock, onChange: onLoop });
       loop = mine;
       guarded = guard(mine);
-      const arParse = parse || createArParser({ getBlocked: () => (isBlocked() ? { distanceM: Math.max(0, obstacleAhead()), message: STOP_TEXT } : null), getMode: () => mode, extensions });
+      const arParse =
+        parse ||
+        createArParser({
+          getBlocked: () => (isBlocked() ? { distanceM: Math.max(0, obstacleAhead()), message: STOP_TEXT } : null),
+          getBlockedBack: () => (isBlocked(0, "back") ? { distanceM: Math.max(0, obstacleAhead("back")), message: STOP_BACK_TEXT } : null),
+          getMode: () => mode,
+          extensions,
+        });
       ai = createAi({ getLoop: () => guarded, getBodyKey: () => "rover", getMode: () => "twin", getModel: () => null, parse: arParse, clock, onChange: () => emit() });
       emit();
       await mine.connect();
@@ -294,6 +316,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       if (ai) ai.takeover();
       resetPose();
       obst = null;
+      obstBack = null;
       placed = true;
       notice = "";
       if (state !== STATES.PLACING) {
@@ -445,8 +468,15 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       if (mode !== "xr") return;
       if (update && typeof update === "object") {
         const near = Number.isFinite(update.nearM) ? update.nearM : Number.isFinite(update.distanceM) ? update.distanceM : 0;
-        obst = { state: update.state, distanceM: update.distanceM ?? null, nearM: near, message: String(update.message || "") };
-        obstPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
+        const o = { state: update.state, distanceM: update.distanceM ?? null, nearM: near, message: String(update.message || "") };
+        const at = { x: pose.x, z: pose.z, yaw: pose.yaw };
+        if (update.side === "back") {
+          obstBack = o;
+          obstBackPose = at;
+        } else {
+          obst = o;
+          obstPose = at;
+        }
       } else obst = null;
       checkObstacle();
       emit();
@@ -491,6 +521,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         guarded = null;
         snap = null;
         obst = null;
+        obstBack = null;
         mode = null;
         placed = false;
         listening = false;
