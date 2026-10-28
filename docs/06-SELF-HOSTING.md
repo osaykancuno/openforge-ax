@@ -66,3 +66,39 @@ Plug an SO-101 follower arm into the computer running the browser and open **Rob
 1. `npx hardhat node`, left running.
 2. `npm run demo`: deploys to the local chain, mints, reveals and writes `web/deployment.json`.
 3. `npm run selfhost`.
+
+## 7. The production site on Cloudflare (openforge-ax.tech)
+
+The public site is static (`web/`) and is served by Cloudflare Pages from its global network: HTTPS, HTTP/3, Brotli,
+edge caching close to every visitor, Early Hints from the pages' `modulepreload` tags, and `web/_headers` for the
+security, permission and cache headers. It deploys from GitHub Actions (`.github/workflows/cloudflare.yml`) only after
+the cross-browser check (`engines.yml`: Chromium, Firefox, WebKit) passed on the same commit, so a page that breaks in
+one browser never goes live. `scripts/prepare-site.mjs` makes the published copy (the same script makes the github.io
+preview): it checks every vendored file against `web/vendor/SHA256SUMS`, replaces the local demo's config with the
+public one, keeps loopback hosts out of every CSP but the Phone Brain's, and, until the launch, asks search engines
+not to index anything.
+
+**Cache:** pages, JS and CSS are revalidated on every visit (an ETag check: a deploy shows at once and never half old,
+half new); the vendored libraries (three.js, ethers, MediaPipe) are kept a day and refreshed in the background, the
+fonts 30 days. The site reads the chain through `web/js/chain.js` with public RPC fallbacks (`config.js`
+`rpcFallbacks`): when one RPC is slow (1.5 s) or down, the next one answers.
+
+**One-time setup (owner):**
+1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom token with **Account · Cloudflare Pages ·
+   Edit** on your account. Copy the token. Also copy your **Account ID** (Account home, right-hand column).
+2. GitHub → the repository → Settings → Secrets and variables → Actions → New repository secret:
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Never put them in the repository or in `.env` files that are
+   committed.
+3. Push to `main` (or Actions → Cloudflare → Run workflow). The first run creates the Pages project **openforge-ax**
+   and deploys it to `openforge-ax.pages.dev` (never indexed, see `web/_headers`).
+4. Workers & Pages → openforge-ax → Custom domains → add **openforge-ax.tech**, then **www.openforge-ax.tech** (the
+   domain is on Cloudflare, so DNS and the certificate are set up automatically).
+5. Rules → Redirect Rules → template "Redirect from WWW to root" (one address for search engines and links).
+6. On the domain: SSL/TLS → Edge Certificates → Always Use HTTPS **on**; Speed → Optimization → Early Hints **on**;
+   Network → HTTP/3 **on** (usually already on).
+7. Launch day: GitHub → Settings → Secrets and variables → Actions → Variables → `SITE_INDEX` = `yes`, then re-run the
+   Cloudflare workflow: robots.txt allows indexing and the sitemap is published.
+
+The build writes the canonical address, Open Graph links and the sitemap for `SITE_URL` (`.env`,
+`https://openforge-ax.tech`); run `npm run web:build` after changing it. The github.io copy stays a preview whose
+canonical links point to the domain.

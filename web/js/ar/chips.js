@@ -4,6 +4,8 @@
 // `hold: true`: holding the chip keeps the Rover or the Walker moving (controller.press). The Walker's Forward, Back,
 // Left and Right are walk leases in the controller (its twin walks; the bridge has no walking command), not phrases.
 // The Desk's joints are absolute and bounded: a tap is the whole move.
+// "showcase": the eight classes that are not AX-1 bodies (ar.html?agent=<id>). Nothing drives, so these are not phrases for the
+// parser: showcase.js plays the token's own gesture (move) or turns the twin on the spot (left, right: a tap turns 45°, a hold keeps turning).
 
 export const CHIPS_BY_BODY = Object.freeze({
   rover: Object.freeze([
@@ -36,12 +38,17 @@ export const CHIPS_BY_BODY = Object.freeze({
     { id: "lean-right", label: "Lean right", say: "lean right" },
     { id: "twist", label: "Twist", say: "twist" },
   ]),
+  showcase: Object.freeze([
+    { id: "move", label: "Its move" },
+    { id: "left", label: "Turn left", hold: true },
+    { id: "right", label: "Turn right", hold: true },
+  ]),
 });
 
 /** The Rover's chips (the page's default body). */
 export const CHIPS = CHIPS_BY_BODY.rover;
 
-/** The chips of body `key` ("rover" | "desk" | "walker"); the Rover's for anything else. */
+/** The chips of body `key` ("rover" | "desk" | "walker" | "showcase"); the Rover's for anything else. */
 export function chipsFor(key) {
   return typeof key === "string" && Object.hasOwn(CHIPS_BY_BODY, key) ? CHIPS_BY_BODY[key] : CHIPS;
 }
@@ -49,5 +56,5 @@ export function chipsFor(key) {
 /** The phrase of chip `id` for body `bodyKey`, or null for an unknown id. */
 export function chipText(id, bodyKey = "rover") {
   const c = typeof id === "string" ? chipsFor(bodyKey).find((x) => x.id === id) : null;
-  return c ? c.say : null;
+  return c ? (c.say ?? null) : null;
 }

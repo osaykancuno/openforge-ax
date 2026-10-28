@@ -79,6 +79,10 @@ body.ar-xr .ar-overlay { position: fixed; inset: 0; width: 100%; height: 100%; b
 .ar-desktop .pl-row { justify-content: center; margin-top: 0; }
 .ar-desktop .pl-msg:empty { min-height: 0; margin: 0; }
 .ar-start .pl-row { margin-top: 12px; }
+/* ar.html?agent=<id>: what happened to the agent's lookup (a short line under the lead) and Retry */
+.ar-agent-note { margin: 0 0 10px; font-weight: 600; overflow-wrap: anywhere; }
+.ar-agent-note[data-tone="warn"] { color: var(--ink); border-left: 3px solid var(--sun); padding-left: 8px; }
+.ar-start #arAgentRetryRow { margin: -4px 0 10px; }
 /* the photo preview: between the top bar and STOP (which stays in reach), the photo shrinks to fit */
 .ar-shot {
   position: fixed; z-index: 5; inset: calc(env(safe-area-inset-top, 0px) + 64px) 12px calc(env(safe-area-inset-bottom, 0px) + 104px);

@@ -4,6 +4,8 @@ export const CONFIG = {
   chainId: 1,
   chainName: "Ethereum",
   rpcUrl: "https://ethereum-rpc.publicnode.com",
+  // Ethereum mainnet only: free public RPCs tried when the one above is slow or down (first answer wins)
+  rpcFallbacks: ["https://eth.drpc.org", "https://1rpc.io/eth"],
   explorer: "https://etherscan.io",
   openseaDropUrl: "https://opensea.io/collection/openforge-agents/overview",
   openseaItemUrl: (contract, id) => `https://opensea.io/item/ethereum/${contract}/${id}`,

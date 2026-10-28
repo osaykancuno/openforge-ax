@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' http://127.0.0.1:8545; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>My IRL lab · OpenForge AX</title>
 <meta name="description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
@@ -35,6 +35,10 @@
 <link rel="modulepreload" href="js/qr.js">
 <link rel="modulepreload" href="js/ar/ar-caps.js">
 <link rel="modulepreload" href="js/ar/quick-look.js">
+<link rel="modulepreload" href="js/ar/agent-token.js">
+<link rel="modulepreload" href="js/ar/agent-rig.js">
+<link rel="modulepreload" href="js/ar/showcase.js">
+<link rel="modulepreload" href="js/ar/orientation.js">
 <link rel="modulepreload" href="js/ar/photo.js">
 <link rel="modulepreload" href="js/ar/ar-controller.js">
 <link rel="modulepreload" href="js/ar/chips.js">
@@ -48,13 +52,15 @@
 <link rel="modulepreload" href="js/models/look.js">
 <link rel="modulepreload" href="js/models/robots.js">
 <link rel="modulepreload" href="js/ar/obstacle.js">
-<link rel="modulepreload" href="js/ar/orientation.js">
 <link rel="modulepreload" href="js/theme.js">
 <link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
 <link rel="modulepreload" href="js/pilot/motions.js">
 <link rel="modulepreload" href="js/pilot/bridge-sim.js">
+<link rel="modulepreload" href="js/traits-data.js">
+<link rel="modulepreload" href="js/models/token-look.js">
+<link rel="modulepreload" href="js/models/motion.mjs">
 <link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
 <link rel="modulepreload" href="js/ar/ar-parse.js">
 <link rel="modulepreload" href="vendor/three/addons/geometries/RoundedBoxGeometry.js">
@@ -73,6 +79,13 @@
 <meta property="og:title" content="My IRL lab · OpenForge AX">
 <meta property="og:description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://openforge-ax.tech/ar">
+<meta property="og:url" content="https://openforge-ax.tech/ar">
+<meta property="og:image" content="https://openforge-ax.tech/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="OpenForge AX: Build a robot. Your phone is the brain.">
+<meta name="twitter:image" content="https://openforge-ax.tech/assets/og.png">
 <!--/seo-->
 </head>
 <body class="pilot ar">
@@ -105,9 +118,14 @@
 
     <!-- start card (before AR or the camera view begins) -->
     <section class="ar-panel ar-start" id="arStart" aria-labelledby="arTitle" hidden>
-      <p class="pl-label">FIG. 01 · <b>The twin, in real life</b></p>
+      <p class="pl-label" id="arFig">FIG. 01 · <b>The twin, in real life</b></p>
       <h1 id="arTitle">My IRL lab</h1>
       <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone.</p>
+      <!-- ar.html?agent=<id>: what happened to the agent's lookup (ar.js writes it with textContent), and Retry after a network error -->
+      <p class="pl-msg ar-agent-note" id="arAgentNote" role="status" aria-live="polite" hidden></p>
+      <div class="pl-row pl-wrap" id="arAgentRetryRow" hidden>
+        <button class="pl-btn" id="arAgentRetry" type="button">Retry</button>
+      </div>
       <fieldset class="ar-bodies" id="arBodies">
         <legend class="pl-label">Choose a body</legend>
         <label class="ar-body"><input type="radio" name="arBody" value="rover" checked><span><b>Rover</b> Drives on the floor.</span></label>

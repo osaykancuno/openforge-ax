@@ -50,3 +50,11 @@ https://:project.pages.dev/*
   Content-Type: application/manifest+json
 /deployment.json
   Cache-Control: no-cache
+# Cache (Cloudflare): pages, JS and CSS keep the default (revalidated on every visit with an ETag, so a deploy is seen
+# at once and never half old, half new); the vendored libraries change only with a dependency upgrade (a day, then
+# refreshed in the background); the fonts only with a font upgrade. No two rules match the same path (Cloudflare would
+# join their values).
+/vendor/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/assets/fonts/*
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800

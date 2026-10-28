@@ -1,0 +1,49 @@
+# Publishes the production site to Cloudflare Pages (project "openforge-ax", custom domain https://openforge-ax.tech),
+# ONLY after the cross-browser check (engines.yml) passed on the same commit: a page that breaks in Chrome, Firefox or
+# Safari never goes live. Also runs on demand (Actions tab -> Cloudflare -> Run workflow).
+# Needs two repository secrets (Settings -> Secrets and variables -> Actions): CLOUDFLARE_API_TOKEN (a token with the
+# "Cloudflare Pages: Edit" permission) and CLOUDFLARE_ACCOUNT_ID. Without them the job says so and deploys nothing.
+# The repository variable SITE_INDEX=yes (set it on launch day) lets search engines index the site; until then the
+# site is live but asks not to be indexed (scripts/prepare-site.mjs).
+# Actions are pinned to a full commit SHA, Wrangler to an exact version.
+name: Cloudflare
+
+on:
+  workflow_run:
+    workflows: [Engines]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare
+  cancel-in-progress: false # a deploy in flight finishes; the next one follows
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: The production copy (vendored files checked, public config, no loopback hosts)
+        run: node scripts/prepare-site.mjs --target cloudflare --out _site ${{ vars.SITE_INDEX == 'yes' && '--index' || '' }}
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice title=Cloudflare not set up::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to deploy https://openforge-ax.tech"
+            exit 0
+          fi
+          W="npx --yes wrangler@4.20.0"
+          # the project is created once (production branch main); later runs find it and only deploy
+          $W pages project create openforge-ax --production-branch main 2>/dev/null || true
+          $W pages deploy _site --project-name openforge-ax --branch main --commit-hash "$SHA" --commit-dirty=true

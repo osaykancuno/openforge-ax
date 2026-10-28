@@ -22,7 +22,7 @@ async function goodEnv() {
     TEAM_RESERVE: "100",
     ROYALTY_BPS: "500",
     REVEAL_DEADLINE_DAYS: "21",
-    PUBLIC_PRICE_ETH: "0.015",
+    PUBLIC_PRICE_ETH: "0.01024",
     MAX_PER_WALLET: "3",
     OPENSEA_FEE_BPS: "1000",
     PUBLIC_START: String(NOW + 2 * DAY),
@@ -83,15 +83,15 @@ describe("deploy.js mainnetGuard - launch values", () => {
     expect(await refusal(env)).to.match(/PUBLIC_END \+ 3 days must be on or before the reveal deadline/);
   });
 
-  it("price and per-wallet cap must be the decided 0.015 / 3 unless confirmed explicitly", async () => {
+  it("price and per-wallet cap must be the decided 0.01024 / 3 unless confirmed explicitly", async () => {
     const env = await goodEnv();
     env.PUBLIC_PRICE_ETH = "0.02";
-    expect(await refusal(env)).to.match(/not the decided 0\.015: set CONFIRM_PRICE=0\.02/);
+    expect(await refusal(env)).to.match(/not the decided 0\.01024: set CONFIRM_PRICE=0\.02/);
     env.CONFIRM_PRICE = "0.025"; // a confirmation that does not match is not a confirmation
     expect(await refusal(env)).to.match(/CONFIRM_PRICE=0\.02/);
     env.CONFIRM_PRICE = "0.02";
     expect(await refusal(env)).to.equal(null);
-    for (const zero of ["0.00", "0.000", "0.0000"]) { // a free mint is never a typo to confirm
+    for (const zero of ["0.00", "0.000", "0.0000", "0.000000"]) { // a free mint is never a typo to confirm
       env.PUBLIC_PRICE_ETH = env.CONFIRM_PRICE = zero;
       expect(await refusal(env)).to.match(/PUBLIC_PRICE_ETH must be set explicitly/);
     }

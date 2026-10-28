@@ -29,7 +29,7 @@ Then Claude runs, on its own: `npm run assets` (images on IPFS), the full Sepoli
 | --- | --- | --- | --- |
 | 10 | Send ETH to the deploy wallet (about 0.05–0.1 ETH; Claude gives the exact figure from the rehearsal), then say "go" in chat: Claude deploys to mainnet | your exchange or wallet | 10 min |
 | 11 | **Safe**: accept ownership on the 3 contracts (Claude prepares the three transactions) | Safe → Transaction Builder | 15 min |
-| 12 | **OpenSea Studio**: log in, upload the images from `art/launch-assets/`, paste the texts from `08-LAUNCH-COPY.md`, set the two stages (0.01 / 0.015 ETH, max 3 per wallet), check the fee recipient | opensea.io/studio | 30 min |
+| 12 | **OpenSea Studio**: log in, upload the images from `art/launch-assets/`, paste the texts from `08-LAUNCH-COPY.md`, set the two stages (allowlist then public, both 0.01024 ETH, max 3 per wallet), check the fee recipient | opensea.io/studio | 30 min |
 | 13 | **Reserve**: mint the 100 team agents from the Safe **before the public phase ends** | Safe (Claude prepares it) | 10 min |
 | 14 | **Domain** (optional): point your domain at the Pages project; Claude switches the site config to the live contracts and pushes | Cloudflare → your Pages project → Custom domains | 10 min |
 

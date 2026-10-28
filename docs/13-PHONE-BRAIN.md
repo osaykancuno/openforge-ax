@@ -365,12 +365,30 @@ phone is too slow.
 
 **Privacy.**
 
-- Camera pictures never leave the phone: detection is on the device, and `ar.html` has `connect-src 'self'`. The page
+- Camera pictures never leave the phone: detection is on the device, and `ar.html` has `connect-src 'self'` (plus, only for `?agent=`, the deployment's public RPC for the one token read). The page
   asks for no microphone (`Permissions-Policy: microphone=()` on `/ar`).
 - **MediaPipe telemetry is blocked.** MediaPipe 1.1.1 always starts a usage logger that posts to a Google logging
   endpoint and has no setting to turn it off. The worker (and the fallback) reject every `fetch`, `XMLHttpRequest` and
   `importScripts` to another origin locally, before the network, and remove `WebSocket`, `EventSource` and
   `sendBeacon`; where `_headers` is honoured (not GitHub Pages) the worker's own CSP header blocks it a second time.
+
+### Your agent in My IRL lab
+
+`ar.html?agent=<tokenId>` (the Agent page links to it) brings one agent's token to life: the twin is that agent's robot, in
+its own look. The page reads the token's metadata with the same call as every other page (`tokenMeta`, the chain's public
+RPC; that is its only network use, and only with this parameter), turns the traits into the token art's look (`web/js/models/token-look.js`: pose, finish,
+add-on, side; the same file the token art uses) and puts it in the room at real size. Camera pictures never leave the phone.
+
+| The agent's class | In My IRL lab |
+|---|---|
+| **AX-1 Rover, Desk, Walker** (classes 8, 9, 10) | The body above, **driven as always** (Rover drives, Desk gestures, Walker walks), dressed in the token's finish and add-on. The title is "AX-0042 · Callsign"; no body picker |
+| **The other eight** (Synth Arm, Street Rover, Cyber Hound, Ghost Hand, Spider Mech, Sky Drone, Fab Rig, Replicant) | A **showcase**: the robot at real size (13 to 48 cm), placed on the floor (a table for the Synth Arm, Ghost Hand and Fab Rig), in the token's pose. Buttons: **Its move** (plays the token's gesture once, frame by frame at 15 fps, the same frames as its animated NFT, and ends on the token's pose), **Turn left** / **Turn right** (a tap turns 45° on the spot, a hold keeps turning, at most 69°/s), **Take a photo** (with the brand badge) and **Exit**. There is no ARM and no STOP: nothing drives. The page says so: only the AX-1 bodies are driven in AR today |
+
+On iPhone and iPad, "See it on my floor (Apple AR)" makes the USDZ of the dressed robot in the token's pose; the camera view
+plays its move. Honest fallbacks on the start card, each leading to the normal AX-1 picker: no collection deployed yet ("Agents are
+not minted yet: meet the AX-1 twins meanwhile"), the read failed (Retry), the token is still dormant ("it wakes at the reveal"), or the
+number is not an agent. A Prime Construct is shown in gold with its crown. It is a twin of the token's robot class, not a real
+robot, and no robot of these eight classes is built or sold by this project.
 
 **Tested on hardware.** Galaxy S24, Chrome: placement, driving, hold-to-drive and the 5 cm stop ahead work (2026-10-27).
 Not yet: the stop behind, low-light sensing at night, object finding in the dark, the Desk and Walker twins, the iPhone
@@ -397,3 +415,29 @@ pinch, cut, burn or start fires. Build and test on a bench with the wheels or li
 and children away, use a fused battery with a protection board and a kill switch within reach, never leave a
 powered robot unattended, and charge lithium cells only with a proper charger on a non-flammable surface. The
 software watchdogs reduce risk; they do not replace the kill switch. You are responsible for what you build.
+
+## 12. Demonstrations (groundwork)
+
+Not shipped to users yet. This only fixes the format, so that what a holder shows their agent later never needs a
+migration.
+
+- **Envelope `openforge.demo.v1`** (`web/js/sim/demo-episode.js`): `chainId`, `agents`, `tokenId` (null for a guest),
+  `holder`, `robot` (a `ROBOTS` id) and `body`, `proto` (`PROTO_MAJOR.PROTO_MINOR`), `source` (`phone-brain`,
+  `ar-twin`, `workbench`, `robot-link`, `ai-pilot`), `actor` (`human` or `ai`), `fps`, `units`, the feature names, the
+  `frames` (`{ t, a }`: the command after the drive loop's clamping, joints in degrees, wheels in permille), a
+  `consent` block (`{ recorded: true, at, scope: "local" }`) and a SHA-256 hash chain over header and frames. The
+  validator is strict: unknown formats, versions, fields or enum values, non-monotonic `t`, non-finite numbers and
+  anything over the size caps (30 minutes, 54,000 frames) are refused. The hash catches corruption and edits; it is
+  not a signature. AI Pilot runs are their own `actor` and are never mixed into human demonstrations.
+- **Recording** is a passive, opt-in tap in the drive loop (`setRecorder`), after clamping, the one place every source
+  passes through. It is off by default, only reads, and cannot change a frame, the watchdog, STOP, a lease or ARM.
+- **Local-first.** `web/js/sim/demo-store.js` keeps demonstrations on the device (IndexedDB) with no network. They are
+  keyed to the owner: the `tokenId` and the `holder` at the time of recording. When the NFT is sold they stay on the
+  seller's device unless the seller exported them as a file. `toLeRobotRows` turns a demonstration into the same
+  episode line the LeRobot export already uses (`scripts/lerobot-prep.mjs`).
+- **Not the same as Proving Grounds.** Those episodes are already public on the verifier and replayed there; a
+  demonstration is private until its owner exports it.
+- **A future policy** trained on demonstrations is just another untrusted plan source: its output goes through
+  `validatePlan` and the executor like the AI Pilot's, and the human still ARMs, the bridge watchdog still holds and
+  STOP still wins. The next protocol minor (1.1) is set aside for an "autonomous source" capability flag; 1.0 has no
+  such field and nothing in this section changes the protocol.

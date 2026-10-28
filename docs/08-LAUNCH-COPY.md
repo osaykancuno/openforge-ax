@@ -66,7 +66,7 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 >
 > OpenForge Lab is open: take robots apart in 3D, play their missions in the browser, and follow the open build of AX-1, a robot whose brain is the phone you already have.
 >
-> 1,024 OpenForge agents on Ethereum are the lab's members and its on-chain record. Allowlist 0.01 ETH · public 0.015 ETH · max 3 per wallet · CC0. No promise of returns.
+> 1,024 OpenForge agents on Ethereum are the lab's members and its on-chain record. 0.01024 ETH for everyone (allowlist first) · max 3 per wallet · CC0. No promise of returns.
 > Mint only on OpenSea: [link]
 
 ## AR announcement (Week 3, Day 17; see docs/17)

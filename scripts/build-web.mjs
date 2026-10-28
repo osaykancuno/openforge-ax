@@ -1,6 +1,7 @@
 // Builds the site's static assets from art/ (single source of truth for traits).
 //   node scripts/build-web.mjs  -> web/js/traits-data.js, web/assets/*, web/data/rarity.json (if art/out exists)
 import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, readdirSync, rmSync } from "node:fs";
+import { arConnectSrc, rpcOrigins } from "./lib/rpc-origins.mjs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,11 +127,20 @@ let LOCAL_DEMO = true;
 try {
   LOCAL_DEMO = JSON.parse(readFileSync(join(web, "deployment.json"), "utf8")).chainId === 31337;
 } catch {} // no deployment yet: the demo setup
+// The RPC origins the site reads the chain from (deployment.json's rpcUrl, else config.js's default plus its mainnet
+// fallbacks, as chain.js rpcUrls() picks them): the AR page may reach those and nothing else, to read the token of
+// "bring your agent to life" (ar.html?agent=<id>). https only, or loopback in the local demo.
+let deploymentFile = null;
+try {
+  deploymentFile = JSON.parse(readFileSync(join(web, "deployment.json"), "utf8"));
+} catch {} // no deployment yet
+const AR_CONNECT = arConnectSrc(rpcOrigins({ configJs: readFileSync(join(web, "js/config.js"), "utf8"), deployment: deploymentFile, localDemo: LOCAL_DEMO }));
 const NARROW = {
   "pilot.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self' http://localhost:* http://127.0.0.1:*" /* Chrome rejects http://[::1]:* as a CSP source */ },
-  // the AR page holds the camera and the microphone: no remote anything. Its on-phone object detector (MediaPipe) is
-  // WebAssembly served from this site, which needs 'wasm-unsafe-eval' (wasm compilation only: eval() stays blocked)
-  "ar.html": { img: "img-src 'self' data: blob:", connect: "connect-src 'self'", script: "'wasm-unsafe-eval'" },
+  // the AR page holds the camera: nothing remote but the chain's one RPC origin (the agent's token). Its on-phone object
+  // detector (MediaPipe) is WebAssembly served from this site, which needs 'wasm-unsafe-eval' (wasm compilation only:
+  // eval() stays blocked)
+  "ar.html": { img: "img-src 'self' data: blob:", connect: AR_CONNECT, script: "'wasm-unsafe-eval'" },
 };
 // Search and link previews: every page gets Open Graph / Twitter tags from its own <title> and description; the
 // absolute ones (canonical, og:url, og:image, sitemap) only when the site's address is known (SITE_URL, else

@@ -1,5 +1,6 @@
-// Token motion: the short gesture each robot class plays in its animated token (art/token/token.html, art/token-render.mjs).
-// Plain ESM with no imports: the page and Node (the GIF timing) both load it.
+// Token motion: the short gesture each robot class plays in its animated token (art/token/token.html, art/token-render.mjs)
+// and in My IRL lab when an agent comes to life (web/js/ar/showcase.js). Plain ESM with no imports: pages and Node (the
+// GIF timing) all load it.
 // One loop = a few seconds of movement, then a still pause on the token's own pose, so the first frame and the pause are
 // the still image and the loop restarts without a jump. Every gesture starts and ends at the token's pose (envelopes are
 // 0 at both ends), wheels and props turn a whole number of times, and nothing is random: same token, same animation.

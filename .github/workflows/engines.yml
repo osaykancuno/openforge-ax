@@ -7,9 +7,9 @@ name: Engines
 on:
   push:
     branches: [main]
-    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", ".github/workflows/engines.yml"]
+    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", "scripts/prepare-site.mjs", ".github/workflows/engines.yml", ".github/workflows/cloudflare.yml"]
   pull_request:
-    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", ".github/workflows/engines.yml"]
+    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", "scripts/prepare-site.mjs", ".github/workflows/engines.yml", ".github/workflows/cloudflare.yml"]
   workflow_dispatch:
 
 permissions:

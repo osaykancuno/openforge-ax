@@ -24,7 +24,7 @@ async function generatorHash() {
 const intIn = (v, lo, hi) => /^\d+$/.test(v || "") && Number(v) >= lo && Number(v) <= hi;
 
 // decided launch values: anything else needs an explicit CONFIRM_* that repeats it
-const DECIDED_PRICE_ETH = "0.015";
+const DECIDED_PRICE_ETH = "0.01024"; // one price for everyone, allowlist included (user, 2026-10-28): 1,024 agents
 const DECIDED_MAX_PER_WALLET = "3";
 const OPENSEA_FEE_BPS_RANGE = [500, 2000]; // OpenSea's primary fee is 1000 (10%): 5-20% catches typos, not policy
 const REVEAL_MARGIN = 3 * 86400; // the public phase must end this long before the reveal deadline
@@ -52,7 +52,7 @@ async function mainnetGuard(env, deployer, nowSec = Math.floor(Date.now() / 1000
   if (env.TEAM_RESERVE !== "100") problems.push("TEAM_RESERVE must be exactly 100");
   if (!intIn(env.ROYALTY_BPS, 0, 1000)) problems.push("ROYALTY_BPS must be set, 0-1000");
   if (!intIn(env.REVEAL_DEADLINE_DAYS, 7, 45)) problems.push("REVEAL_DEADLINE_DAYS must be set, 7-45 (it can only be moved later)");
-  if (!/^0\.0\d{1,3}$/.test(env.PUBLIC_PRICE_ETH || "") || !(Number(env.PUBLIC_PRICE_ETH) > 0)) problems.push(`PUBLIC_PRICE_ETH must be set explicitly (decided: ${DECIDED_PRICE_ETH})`);
+  if (!/^0\.0\d{1,5}$/.test(env.PUBLIC_PRICE_ETH || "") || !(Number(env.PUBLIC_PRICE_ETH) > 0)) problems.push(`PUBLIC_PRICE_ETH must be set explicitly (decided: ${DECIDED_PRICE_ETH})`);
   else if (env.PUBLIC_PRICE_ETH !== DECIDED_PRICE_ETH && env.CONFIRM_PRICE !== env.PUBLIC_PRICE_ETH) {
     problems.push(`PUBLIC_PRICE_ETH=${env.PUBLIC_PRICE_ETH} is not the decided ${DECIDED_PRICE_ETH}: set CONFIRM_PRICE=${env.PUBLIC_PRICE_ETH} to confirm it`);
   }

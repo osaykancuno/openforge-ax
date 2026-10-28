@@ -14,6 +14,10 @@
 <link rel="modulepreload" href="js/agent.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/chain.js">
+<link rel="modulepreload" href="js/agent/policy.js">
+<link rel="modulepreload" href="js/agent/decode.js">
+<link rel="modulepreload" href="js/agent/links.js">
+<link rel="modulepreload" href="js/agent/dom.js">
 <link rel="modulepreload" href="js/theme.js">
 <link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/servers.js">
@@ -39,6 +43,8 @@
       <div class="row">
         <a class="btn sm magenta" id="osLink" target="_blank" rel="noopener">View on OpenSea<span class="sr-only"> (opens in a new tab)</span></a>
         <a class="btn sm yellow" id="arenaLink" href="arena.html" hidden>Test in the Proving Grounds</a>
+        <a class="btn sm" id="arLink" hidden>Bring it to life (AR)</a>
+        <a class="btn sm" id="buildLink" hidden>Build it for real</a>
       </div>
     </div>
     <div class="app-scroll agent-info">
@@ -67,18 +73,17 @@
         <div class="panel">
           <h3>Agent mode</h3>
           <div class="modes" role="group" aria-label="Agent mode">
-            <button class="mode" data-l="1"><b>MANUAL</b><span>Proposes actions, you approve. Recommended.</span></button>
-            <button class="mode" data-l="2"><b>ASSISTED</b><span>Will act alone within a daily limit. Needs agent software that isn't released yet.</span></button>
-            <button class="mode" data-l="3"><b>AUTONOMOUS</b><span>Will act freely within the daily limit. Needs agent software that isn't released yet.</span></button>
+            <button class="mode" data-l="1"><b>MANUAL</b><span>Watches its wallet and lab record and suggests; you do each action. Recommended.</span></button>
+            <button class="mode" data-l="2"><b>ASSISTED</b><span>A key in this browser acts alone, only on actions you allow, up to a daily limit (up to twice that across the reset). Works while this page is open.</span></button>
+            <button class="mode" data-l="3"><b>AUTONOMOUS</b><span>For your own agent software. Full trust: it can move the tokens and NFTs in this agent's wallet through other apps. ETH is capped.</span></button>
           </div>
-          <div class="row" id="modeOpts" hidden>
-            <label class="small">Daily limit
-              <select id="limit"><option value="0.01">0.01 ETH</option><option value="0.05" selected>0.05 ETH</option><option value="0.1">0.1 ETH</option><option value="0.5">0.5 ETH</option></select>
-            </label>
-            <input type="text" id="operator" placeholder="Agent software address (0x…)" style="flex:1;min-width:220px" aria-label="Agent software address">
-            <button class="btn sm primary" id="applyMode">Apply</button>
-          </div>
-          <p class="muted small" style="margin-top:12px">In no mode can the agent move your other tokens or NFTs, or sign messages for you. Approvals you gave other apps still stand: check them before selling.</p>
+          <div class="mode-pane" id="modePane" hidden></div>
+          <p class="muted small" style="margin-top:12px">The agent can never touch your own wallet or sign for you. In Manual and Assisted it can't move this wallet's tokens or NFTs; in Autonomous it can. Approvals you gave other apps still stand: check them before selling.</p>
+        </div>
+
+        <div class="panel" id="consolePanel">
+          <h3>Agent console</h3>
+          <div id="consoleBody"><p class="muted small">Loading the console…</p></div>
         </div>
 
         <div class="panel">

@@ -129,9 +129,19 @@ function serversDialog() {
 
 // ---------------------------------------------------------------- provider
 let readProvider;
+/** The RPCs the site reads from: the configured one, plus the public fallbacks on Ethereum mainnet (https only). */
+export function rpcUrls(config = CONFIG) {
+  const extra = config.chainId === 1 && Array.isArray(config.rpcFallbacks) ? config.rpcFallbacks.filter((u) => /^https:\/\//.test(u)) : [];
+  return [...new Set([config.rpcUrl, ...extra])];
+}
 export async function reader() {
-  const { JsonRpcProvider } = await eth();
-  readProvider ??= new JsonRpcProvider(CONFIG.rpcUrl, CONFIG.chainId, { staticNetwork: true });
+  const { JsonRpcProvider, FallbackProvider } = await eth();
+  if (!readProvider) {
+    const urls = rpcUrls();
+    const one = (url) => new JsonRpcProvider(url, CONFIG.chainId, { staticNetwork: true });
+    // one slow or failing public RPC never stalls the site: after 1.5 s the next one is asked too, first answer wins
+    readProvider = urls.length === 1 ? one(urls[0]) : new FallbackProvider(urls.map((url, i) => ({ provider: one(url), priority: i + 1, weight: 1, stallTimeout: 1500 })), CONFIG.chainId, { quorum: 1 });
+  }
   return readProvider;
 }
 

@@ -199,7 +199,7 @@ describe("AR page: css/ar.css", () => {
     expect(fnBody(arJs, "onStart")).to.not.match(/setBody\(/);
     expect(arJs).to.match(/r\.disabled = starting \|\| live;/);
     // obstacle sensing only for the body that drives
-    expect(viewJs).to.match(/if \(view\.placed && BODY_LOOK\[bodyKey\]\.senses\) sense\(/);
+    expect(viewJs).to.match(/if \(view\.placed && bodyLook\.senses\) sense\(/);
     expect(arJs).to.match(/applyTwinState\(rig, snap, controller\.body, p, 0\)/);
   });
 
@@ -385,12 +385,12 @@ describe("AR page: iPhone and iPad (Apple AR Quick Look, camera-view floor)", ()
   });
   it("makes the model before the tap and offers it only where Quick Look exists and WebXR AR does not", () => {
     expect(arJs).to.match(/const ql = QUICK_LOOK && !xr;/);
-    expect(fnBody(arJs, "showCard")).to.include("prepareQuickLook(bodyKey)");
+    expect(fnBody(arJs, "showCard")).to.include("prepareQuickLook(qlKey())");
     expect(fnBody(arJs, "onQuickLook")).to.include('openQuickLook($("arQlLink"), url, key)');
   });
   it("the camera view's floor mode: real tilt, a phone height, the lens's field of view, taps on the floor", () => {
     expect(viewJs).to.match(/orientationQuat\(oriLatest\.a - oriA0, oriLatest\.b, oriLatest\.g, sa\)/);
-    expect(fnBody(viewJs, "enterFloorMode")).to.include("PHONE_HEIGHT[bodyKey]");
+    expect(fnBody(viewJs, "enterFloorMode")).to.include("phoneHeightFor(bodyKey)");
     expect(fnBody(viewJs, "fitFov")).to.include("cameraFovDeg(");
     expect(fnBody(viewJs, "onCanvasTap")).to.match(/e\.isTrusted === false/); // a scripted click never places
     expect(arJs).to.include("It does not follow your steps");

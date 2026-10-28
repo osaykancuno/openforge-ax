@@ -58,6 +58,7 @@ export function createDriveLoop({ transport, clock, nonce = defaultNonce, onChan
   let armConfirmed = false;
   let armDeadline = 0;
   let leaseEnd = 0; // holdFor(): the drive ends by itself at this time (0 = no lease)
+  let recorder = null; // opt-in passive demonstration recorder (setRecorder); null = nothing recorded, nothing allocated
 
   const snap = () => ({
     link, info, body, compatible, message, state: last, held, speed, wheels: wheels.slice(), targets: targets.slice(), seq, sent,
@@ -93,6 +94,14 @@ export function createDriveLoop({ transport, clock, nonce = defaultNonce, onChan
     return P.encodeJoints({ seq, mask: P.fullMask(body), targets, speed });
   }
 
+  /** Passive tap on the clamped values of the frame just built. Reads only; a recorder that throws is ignored. */
+  function record() {
+    try {
+      const drive = P.BODIES[body].drive;
+      recorder.push({ joints: targets.map((d) => d / 10), drive: drive ? (held ? wheels.slice() : [0, 0]) : undefined });
+    } catch {} // a recorder never breaks the loop
+  }
+
   function tick() {
     const now = clock.now();
     if (link !== LINK.ARMED && link !== LINK.DRIVING) return stopSender();
@@ -123,6 +132,7 @@ export function createDriveLoop({ transport, clock, nonce = defaultNonce, onChan
       return api.stop("A command could not be built, so the robot was told to hold. Press ARM to continue."); // never send a guess
     }
     sent++;
+    if (recorder) record();
     transport.sendCmd(bytes).catch(() => {}); // write without response: the latest frame wins, a lost one is replaced in 33 ms
   }
 
@@ -350,6 +360,15 @@ export function createDriveLoop({ transport, clock, nonce = defaultNonce, onChan
     },
     setSpeed(pct) {
       speed = Math.max(5, Math.min(100, Math.round(pct)));
+    },
+    /**
+     * Opt-in demonstration recording: `rec.push({ joints, drive })` gets the clamped values of every frame the loop
+     * sends (joints in degrees, wheels -1000..1000). null (the default) turns it off. It is read-only and cannot
+     * change a frame, the watchdog, STOP, the lease or ARM.
+     */
+    setRecorder(rec) {
+      if (rec !== null && !(rec && typeof rec.push === "function")) throw new TypeError("a recorder needs push(sample), or null");
+      recorder = rec;
     },
     /** For tests: run one sender tick now. */
     _tick: tick,

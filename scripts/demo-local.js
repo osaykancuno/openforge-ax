@@ -35,7 +35,7 @@ async function main() {
   await wait(rep.setSimAttester(attester.address, true));
 
   const sd = await seaDrop.getAddress();
-  const price = ethers.parseEther("0.015"); // public launch price
+  const price = ethers.parseEther("0.01024"); // public launch price (allowlist: the same)
   await wait(agents.updateCreatorPayoutAddress(sd, treasury.address));
   await wait(agents.updateAllowedFeeRecipient(sd, FEE, true));
   await wait(agents.updatePublicDrop(sd, { mintPrice: price, startTime: now, endTime: now + 7 * 86400, maxTotalMintableByWallet: 10, feeBps: 1000, restrictFeeRecipients: true }));

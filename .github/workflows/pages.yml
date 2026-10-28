@@ -1,4 +1,5 @@
-# Publishes the static site (web/) to GitHub Pages on every push to main: https://osaykancuno.github.io/openforge-ax/
+# Publishes a PREVIEW copy of the static site (web/) to GitHub Pages on every push to main:
+# https://osaykancuno.github.io/openforge-ax/ (the production site is https://openforge-ax.tech, see cloudflare.yml).
 # web/ is already built and committed (npm run web:build), so this only copies it. Until the launch the copy is a
 # preview: no local-demo config (visitors' browsers never contact 127.0.0.1) and no search-engine indexing.
 # GitHub Pages ignores web/_headers; the CSP is a <meta> tag in each page and theme-boot.js blocks framing.
@@ -27,26 +28,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # the same copy as the production site (scripts/prepare-site.mjs: vendored files checked, the local demo's config
+      # replaced by the public defaults, no loopback hosts in any CSP but the Phone Brain's), minus what GitHub Pages
+      # ignores, and never indexed: the real site is https://openforge-ax.tech
       - name: Prepare the preview copy
-        run: |
-          cp -r web _site
-          # the vendored libraries must still be the exact files web:build copied from node_modules (before any pruning below)
-          (cd _site/vendor && sha256sum -c SHA256SUMS)
-          # the local demo points at 127.0.0.1: the preview gets the public defaults instead (mainnet, no contracts yet,
-          # so the blockchain pages say "not published yet" and never contact the visitor's machine)
-          if grep -q '"chainId": *31337' _site/deployment.json 2>/dev/null; then
-            printf '{ "chainId": 1, "chainName": "Ethereum" }\n' > _site/deployment.json
-            # and no page may allow loopback hosts in its CSP (the pilot page keeps its own: the visitor's local model server)
-            for f in _site/*.html; do
-              [ "$f" = "_site/pilot.html" ] && continue
-              sed -i -E 's# (http|ws)://(localhost|127\.0\.0\.1):\*##g' "$f"
-            done
-          fi
-          # never referenced by a page: the unminified three.js (art renders only), the demo token images (local demo only), unused showcase previews
-          rm -rf _site/assets/showcase _site/demo-images _site/vendor/three/three.module.js
-          rm -f _site/_headers _site/sitemap.xml
-          printf 'User-agent: *\nDisallow: /\n' > _site/robots.txt
-          touch _site/.nojekyll
+        run: node scripts/prepare-site.mjs --target github --out _site
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:

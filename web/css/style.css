@@ -668,3 +668,27 @@ body.app > main.legal { padding-inline: max(20px, calc((100% - 1180px) / 2)) !im
   .mk-kpis b { font-size: 18px; }
   .mk-table th:nth-child(4), .mk-table td:nth-child(4) { display: none; } /* phones: agent, event, price, when */
 }
+
+/* ---------- agent console (agent.html: mode pane, wallet watch, coach, report, journal, proposals with risk flags) */
+.mode-pane { margin-top: 14px; padding: 14px; border: 1px dashed var(--line-2); border-radius: var(--radius-sm); }
+.mode-pane p { margin: 0 0 8px; }
+.mode-pane input[type="password"], .console-sec input[type="text"], .mode-pane input[type="text"] { min-width: 180px; flex: 1; }
+.mode-pane input[type="password"] { background: var(--card); color: var(--ink); border: 1px solid var(--control); border-radius: var(--radius-sm); padding: 10px 12px; font: 14px var(--sans); min-height: 44px; }
+.mode-pane input[type="password"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.own-software { margin-top: 12px; }
+.own-software summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.own-software summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.console-sec { padding-top: 12px; margin-top: 12px; border-top: 1px dashed var(--line); }
+.console-sec h4 { margin: 0 0 6px; font: 700 14px var(--display); }
+.console-item { margin: 4px 0; font-size: 14px; padding-left: 12px; border-left: 3px solid var(--line-2); }
+.console-item.warn { border-left-color: var(--warn); color: var(--warn); }
+.journal-list { margin: 8px 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.journal-list:empty { display: none; }
+.proposal { padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.proposal-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; flex-wrap: wrap; word-break: break-all; }
+.proposal.risk-high { border-left: 3px solid var(--danger); padding-left: 10px; }
+.proposal.risk-medium { border-left: 3px solid var(--warn); padding-left: 10px; }
+.flags { margin: 6px 0; padding-left: 18px; font-size: 13px; }
+.flags li.high { color: var(--danger); }
+.flags li.medium { color: var(--warn); }
+.flags li.low { color: var(--muted); }

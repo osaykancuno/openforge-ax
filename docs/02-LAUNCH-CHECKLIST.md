@@ -21,7 +21,7 @@ Four ECC audits ran (contracts and launch scripts, verifier and servers, website
 - [x] 🤖 **Provenance**: the art was declared final on 2026-10-27 and `npm run assets` ran then, so `PROVENANCE_HASH` is current. If the art or the traits change again, run it again. `deploy.js` now recomputes the generator hash on mainnet and refuses a stale `PROVENANCE_HASH` (it is locked at the first mint).
 - [ ] 🧑 **Supply values are explicit**: on mainnet `deploy.js` requires `MAX_SUPPLY=1024`, `TEAM_RESERVE=100`, `ROYALTY_BPS` (0-1000), `REVEAL_DEADLINE_DAYS` (7-45), `PUBLIC_PRICE_ETH` and `MAX_PER_WALLET` in `.env`. No silent defaults.
   - Since the 2026-10-27 audit it also requires `OPENSEA_FEE_BPS` (500–2000, check Studio), a `PUBLIC_START` in the future and a `PUBLIC_END` at least 3 days before the reveal deadline (both unix seconds).
-  - A price other than 0.015 or a cap other than 3 is refused unless `CONFIRM_PRICE` / `CONFIRM_MAX_PER_WALLET` repeat the value.
+  - A price other than 0.01024 or a cap other than 3 is refused unless `CONFIRM_PRICE` / `CONFIRM_MAX_PER_WALLET` repeat the value.
 - [ ] 🧑 **The contracts changed on 2026-10-27** (wallet-bound sale lock, reveal seed without `blockhash`): run the Sepolia rehearsal again with `REHEARSAL_PIN=yes` before mainnet.
 - [ ] 🧑 **Ownership**: the Safe must call `acceptOwnership` on all three contracts (Ownable2Step) before the drop opens. Keep the deploy key on a minimal balance until then.
 - [ ] 🧑 **Reserve before the end of the public phase** (see §3 step 4): an unminted reserve is lost if anyone commits the reveal at the deadline.
@@ -81,8 +81,8 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
 
 - [ ] 🧑 Log into OpenSea Studio with the owner wallet (the deploy wallet until the Safe accepts), find the collection and complete the profile: name, description, logo, banner, links.
 - [ ] 🧑 Drop stages in Studio:
-  - allowlist phase at **0.01 ETH**, with the list uploaded;
-  - public phase at **0.015 ETH**, max 3 per wallet. Its end date must be before `revealDeadline` (read `revealDeadline()` on Etherscan; the deploy also prints it);
+  - allowlist phase at **0.01024 ETH** (the same price: the allowlist only mints earlier), with the list uploaded;
+  - public phase at **0.01024 ETH**, max 3 per wallet. Its end date must be before `revealDeadline` (read `revealDeadline()` on Etherscan; the deploy also prints it);
   - creator earnings 5%.
 - [ ] 🧑 Check the OpenSea primary fee and fee recipient in Studio (repo default: 10% to `0x0000a26b…a719`). If they differ, update them before the sale.
 - [ ] 🧑 Test mint from a secondary wallet, then request collection verification.

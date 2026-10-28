@@ -5,7 +5,12 @@
 //   * The Rover is armed only by a tap on the floor (the view calls place) or by the ARM button (below).
 //   * STOP button, Esc, the page going to the background, the page being closed and the AR session ending all stop it.
 //   * Every text is set with textContent; nothing here uses innerHTML or the network.
-import { loadConfig, renderChrome } from "../chain.js";
+//
+// ar.html?agent=<tokenId> (bring your agent to life): the page reads the token's look through chain.js (tokenMeta, the one
+// network read of this page, only with this parameter) and dresses the twin with it (agent-rig.js on top of the token art's own
+// look). An AX-1 class (Rover, Desk, Walker) is driven as always. The other eight classes are a SHOWCASE (showcase.js): the
+// same shape as the controller, with nothing to arm or stop, that plays the token's signature move and turns on the spot.
+import { isDeployed, loadConfig, renderChrome, tokenMeta } from "../chain.js";
 import { describeStep } from "../pilot/ai/tools.js";
 import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
 import { LINK } from "../pilot/drive-loop.js";
@@ -17,6 +22,10 @@ import { $, chip, el } from "../pilot/ui.js";
 import { qrArt } from "../qr.js";
 import { probeAr } from "./ar-caps.js";
 import { openQuickLook, quickLookSupported, usdzUrl } from "./quick-look.js";
+import { agentFromMeta, parseAgentParam } from "./agent-token.js";
+import { dressAgent, robotIdOf } from "./agent-rig.js";
+import { SHOWCASE_NOTE, createShowcase } from "./showcase.js";
+import { onTable } from "./orientation.js";
 import { canShareFile, composePhoto, photoFileName, savePhoto, sharePhoto, toJpeg } from "./photo.js";
 import { BODY_NAMES, NEAR_STOP_M, STOP_GAP_M, createArController } from "./ar-controller.js";
 import { chipsFor } from "./chips.js";
@@ -60,8 +69,10 @@ let model = {};
 
 const wake = createWakeLock();
 
-let bodyKey = "rover"; // the body picked on the start card; fixed while a session runs
-const bodyName = () => BODY_NAMES[bodyKey];
+let bodyKey = "rover"; // the body picked on the start card ("showcase" for an agent shown, not driven); fixed while a session runs
+let agent = null; // ar.html?agent=<id>, once its token is read: { id, tag, callsign, className, traits, kind: "ax1" | "showcase", body, prime }
+let showing = false; // the agent is a showcase (its class is not an AX-1 body): no ARM, no STOP, nothing drives
+const bodyName = () => (showing ? agent.className : BODY_NAMES[bodyKey]);
 const extensions = []; // parser extensions (object intents); the controller's parser reads this array on every request
 
 // ---- object finding ("Look around"): the world model, the keep-out zones and the trips exist from the start so that
@@ -98,18 +109,22 @@ let lastZoneT = 0;
 let seek = null;
 let intents = null;
 
-let controller = null;
+let controller = null; // the AX-1 controller, or the showcase when the agent is shown (dressTwin)
+let axController = null;
+let showcase = null;
+/** Every change of the twin's state (either controller): the page shows what it says. */
+const onModel = (m) => {
+  model = m || {};
+  if (seek) seek.onAiChange(model.ai); // go to / find: the trips follow the pilot's plans
+  render();
+};
 if (view) {
-  controller = createArController({
+  controller = axController = createArController({
     makeTransport: (b) => createTwinTransport({ body: b, clock: realTimers, latencyMs: 15 }),
     wake, // no voice on this page for now (2026-10-28): buttons only
     extensions,
     radius: caps.mode === "camera" ? CAMERA_VIEW.radius : 3,
-    onChange: (m) => {
-      model = m || {};
-      if (seek) seek.onAiChange(model.ai); // go to / find: the trip follows the pilot's plans
-      render();
-    },
+    onChange: onModel,
   });
   seek = createSeek({
     now: nowMs,
@@ -131,6 +146,7 @@ if (view) {
   view.handlers = {
     // every render frame: the controller advances the odometry from what the bridge reports; the twin's joints, wheels and face follow
     frame: (dt, rig) => {
+      if (showing) return showcase.frame(dt); // the joints and the body follow the token's own motion (showcase.js); the turn is the yaw
       const p = controller.frame(dt);
       if (intents.avoidLabels().length || zoneBlocked) {
         const t = nowMs();
@@ -357,14 +373,32 @@ function showCard() {
   show("arStart", true);
   const xr = caps.mode === "xr";
   const n = bodyName();
+  const a = agent;
   $("arStartBtn").textContent = xr ? "Start AR" : "Start camera view";
   const does = { rover: "drive it with the buttons", desk: "make it wave, nod and point with the buttons", walker: "walk it and pose it with the buttons" }[bodyKey];
-  $("arLead").textContent = xr
-    ? `Meet the AX-1 ${n} as a digital twin in your own room. Point your phone at ${bodyKey === "desk" ? "a table or the floor" : "the ground"}, tap to place it, then ${does}. It is not a real robot. Camera pictures never leave this phone.`
-    : `Meet the AX-1 ${n} as a digital twin. Your browser has no WebXR AR, so the camera view is used: point at ${bodyKey === "desk" ? "a table" : "the floor"}, tap to place it, then ${does}. It stays put when you turn your phone but does not follow your steps. It is not a real robot. Camera pictures never leave this phone.`;
-  $("arStep2").textContent = bodyKey === "desk" ? "Point at a table or the floor, then tap to put the Desk down." : `Point at the floor, then tap to put the ${n} down.`;
-  $("arStep3").textContent =
-    bodyKey === "rover" ? "Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it." : bodyKey === "walker" ? "Tap Forward, Back, Left or Right for a few steps, or hold one to keep walking; the other buttons are poses. STOP always stops it." : `Tap a button: the ${n} does that move. STOP always stops it.`;
+  const onDesk = showing ? onTable(`agent:${robotIdOf(a)}`) : bodyKey === "desk";
+  const surface = onDesk ? "a table" : "the floor";
+  const where = xr ? `Point your phone at ${onDesk ? "a table or the floor" : "the ground"}` : `Your browser has no WebXR AR, so the camera view is used: point at ${surface}`;
+  const camera = xr ? "" : " It stays put when you turn your phone but does not follow your steps.";
+  if (a) {
+    // ar.html?agent=<id>: the title and the lead name the agent; the twin is honest about being a twin
+    $("arFig").replaceChildren(document.createTextNode("FIG. 01 · "), el("b", { text: "Your agent, in real life" }));
+    $("arTitle").textContent = `${a.tag} · ${a.callsign}`;
+    const what = showing ? `your ${a.className} as a digital twin, at its real size` : `its AX-1 ${n} body as a digital twin, in the finish and add-on of your token`;
+    const then = showing ? "play its signature move, turn it around and take a photo" : does;
+    $("arLead").textContent = `Bring ${a.tag} ${a.callsign} to life: ${what}, ${xr ? "in your own room" : "on your floor"}. ${where}, tap to place it, then ${then}.${camera} It is a twin, not a real robot. Camera pictures never leave this phone.`;
+  } else {
+    $("arFig").replaceChildren(document.createTextNode("FIG. 01 · "), el("b", { text: "The twin, in real life" }));
+    $("arTitle").textContent = "My IRL lab";
+    $("arLead").textContent = xr
+      ? `Meet the AX-1 ${n} as a digital twin in your own room. Point your phone at ${bodyKey === "desk" ? "a table or the floor" : "the ground"}, tap to place it, then ${does}. It is not a real robot. Camera pictures never leave this phone.`
+      : `Meet the AX-1 ${n} as a digital twin. Your browser has no WebXR AR, so the camera view is used: point at ${bodyKey === "desk" ? "a table" : "the floor"}, tap to place it, then ${does}. It stays put when you turn your phone but does not follow your steps. It is not a real robot. Camera pictures never leave this phone.`;
+  }
+  show("arBodies", !a); // an agent has its own body: no picker
+  $("arStep2").textContent = showing ? `Point at ${surface}, then tap to put the ${n} down.` : bodyKey === "desk" ? "Point at a table or the floor, then tap to put the Desk down." : `Point at the floor, then tap to put the ${n} down.`;
+  $("arStep3").textContent = showing
+    ? "Tap Its move to see its signature move. Tap Turn left or Turn right to turn it, or hold to keep turning. Take a photo whenever you like."
+    : bodyKey === "rover" ? "Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it." : bodyKey === "walker" ? "Tap Forward, Back, Left or Right for a few steps, or hold one to keep walking; the other buttons are poses. STOP always stops it." : `Tap a button: the ${n} does that move. STOP always stops it.`;
   // photos with the room in AR need the camera picture: asked for only with this option (the camera view has it anyway)
   show("arPhotosRow", xr);
   show("arPhotosNote", xr);
@@ -373,12 +407,118 @@ function showCard() {
   show("arLookNote", bodyKey === "rover");
   if (bodyKey !== "rover") $("arLook").checked = false;
   $("arPlaceBtn").textContent = `Place the ${n} here`;
-  $("arCanvas").setAttribute("aria-label", `The AX-1 ${n} twin, drawn over your camera picture`);
+  $("arCanvas").setAttribute("aria-label", a ? `${a.tag} ${a.callsign}, your ${showing ? a.className : `AX-1 ${n}`} twin, drawn over your camera picture` : `The AX-1 ${n} twin, drawn over your camera picture`);
+  document.title = a ? `${a.tag} · ${a.callsign} · My IRL lab · OpenForge AX` : BASE_TITLE;
   // iPhone and iPad: true floor placement through Apple's AR viewer, next to the camera view that drives it
   const ql = QUICK_LOOK && !xr;
   show("arQlRow", ql);
   show("arQlNote", ql);
-  if (ql) prepareQuickLook(bodyKey);
+  setText($("arQlNote"), showing ? "Apple AR shows the twin at its real size on your floor: walk around it. To play its move, use the camera view." : QL_NOTE);
+  if (ql) prepareQuickLook(qlKey());
+  showLookup();
+}
+
+// ================================================================ ar.html?agent=<id>: read the token, then dress the twin
+
+const PARAM = parseAgentParam(location.search); // null | { id } | { bad: true }
+const BASE_TITLE = document.title;
+const LOOKUP_MS = 15000; // a read that hangs this long is an error with a Retry
+let lookup = PARAM ? (PARAM.bad ? { status: "bad" } : { status: "loading" }) : { status: "none" };
+let lookupToken = 0; // bumped on every read: an old answer never wins
+let lookupDeferred = false; // an answer arrived while a session ran: it is applied when the session is over
+
+const tagOf = () => `AX-${String(PARAM && PARAM.id ? PARAM.id : 0).padStart(4, "0")}`;
+/** What the start card says about the agent's lookup, and whether Retry shows: [text, tone, retry]. */
+function lookupText() {
+  const meanwhile = "meet the AX-1 twins meanwhile";
+  switch (lookup.status) {
+    case "loading":
+      return [`Looking up ${tagOf()}…`, "", false];
+    case "unminted":
+      return [`Agents are not minted yet: ${meanwhile}.`, "warn", false];
+    case "error":
+      return [`${tagOf()} could not be read just now (the network, or it does not exist yet). Retry, or ${meanwhile}.`, "warn", true];
+    case "dormant":
+      return [`This agent is still dormant: it wakes at the reveal. Or ${meanwhile}.`, "warn", false];
+    case "bad":
+      return [PARAM && PARAM.bad ? `That is not an agent number: ${meanwhile}.` : `${tagOf()} could not be read as an agent: ${meanwhile}.`, "warn", false];
+    case "ready":
+      return [showing ? SHOWCASE_NOTE : "", "", false];
+    default:
+      return ["", "", false];
+  }
+}
+function showLookup() {
+  const [text, tone, retry] = lookupText();
+  const note = $("arAgentNote");
+  note.hidden = !text;
+  setText(note, text);
+  if (tone) note.dataset.tone = tone;
+  else delete note.dataset.tone;
+  show("arAgentRetryRow", retry);
+}
+
+async function readAgent() {
+  const token = ++lookupToken;
+  if (!PARAM || PARAM.bad || !view) return;
+  setLookup({ status: "loading" });
+  if (!isDeployed()) return setLookup({ status: "unminted" });
+  let meta = null;
+  let timer = 0;
+  try {
+    meta = await Promise.race([tokenMeta(PARAM.id), new Promise((_, no) => (timer = setTimeout(() => no(new Error("timeout")), LOOKUP_MS)))]);
+  } catch {
+    if (token === lookupToken) setLookup({ status: "error" });
+    return;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (token !== lookupToken) return;
+  const found = agentFromMeta(PARAM.id, meta);
+  setLookup(found.status === "ready" ? found : { status: found.status });
+}
+
+function setLookup(next) {
+  lookup = next;
+  lookupDeferred = true;
+  flushLookup();
+}
+
+/** Applies the latest answer, unless a session is running (then leaveLive does it): the body never changes under a session. */
+function flushLookup(sessionOver = false) {
+  if (!lookupDeferred || (!sessionOver && (starting || LIVE.has(stateName())))) return;
+  lookupDeferred = false;
+  if (lookup.status === "ready" && !agent) {
+    try {
+      dressTwin(lookup);
+    } catch {
+      lookup = { status: "bad" }; // the robot could not be dressed: the plain twins stay
+    }
+  }
+  showCard();
+  render();
+}
+
+/** The twin of this agent: its robot, its look. The AX-1 classes keep the drive controller, the others get the showcase. */
+function dressTwin(a) {
+  if (a.kind === "ax1") {
+    view.setBody(a.body, { dress: (rig) => dressAgent(rig, a, { pose: false }) }); // the drive loop owns the joints
+    agent = a;
+    showing = false;
+    bodyKey = a.body;
+    controller = axController;
+  } else {
+    const made = createShowcase({ name: a.className, onChange: onModel });
+    const dressed = view.setRobot(robotIdOf(a), { name: a.className, dress: (rig) => dressAgent(rig, a, { pose: true, motion: true }) });
+    made.attach(dressed);
+    showcase = made;
+    agent = a;
+    showing = true;
+    bodyKey = "showcase";
+    controller = showcase;
+  }
+  model = {};
+  buildChips(bodyKey);
 }
 
 // ================================================================ Take a photo (photo.js composes it; nothing is uploaded here)
@@ -462,22 +602,31 @@ if (view) {
 // ================================================================ AR Quick Look (iPhone, iPad)
 
 const QUICK_LOOK = quickLookSupported();
-const qlReady = new Map(); // body -> blob URL of its USDZ model
+const QL_NOTE = "Apple AR shows the twin at its real size on your floor: walk around it. To drive it, use the camera view.";
+const qlReady = new Map(); // body, or "agent-<id>" -> blob URL of its USDZ model
+
+/** The Quick Look model of what the page shows: the AX-1 body, or the agent's own robot in its token's look. */
+const qlKey = () => (agent ? `agent-${agent.id}` : bodyKey);
+function qlModel(key) {
+  if (!agent) return usdzUrl(key);
+  const a = agent;
+  return usdzUrl(key, { id: key, robotId: robotIdOf(a), dress: (rig) => dressAgent(rig, a, { pose: true }) }); // the token's own pose
+}
 
 /** Makes the body's model ahead of the tap: Safari opens Quick Look only from the tap itself, with nothing awaited. */
 function prepareQuickLook(key) {
-  if (!qlReady.has(key)) usdzUrl(key).then((u) => qlReady.set(key, u), () => {});
+  if (!qlReady.has(key)) qlModel(key).then((u) => qlReady.set(key, u), () => {});
 }
 
 async function onQuickLook() {
-  const key = bodyKey;
+  const key = qlKey();
   const msg = $("arStartMsg");
   let url = qlReady.get(key);
   if (!url) {
     msg.textContent = "Making the 3D model…";
     msg.dataset.tone = "";
     try {
-      url = await usdzUrl(key);
+      url = await qlModel(key);
       qlReady.set(key, url);
     } catch {
       msg.textContent = "The 3D model could not be made on this phone. Use the camera view.";
@@ -492,7 +641,7 @@ if (QUICK_LOOK) $("arQlBtn").addEventListener("click", onQuickLook);
 
 /** The body picked on the start card: the view draws it, the chips and the texts follow. Never while a session runs. */
 function chooseBody(key) {
-  if (!Object.hasOwn(BODY_NAMES, key) || starting || LIVE.has(stateName())) return;
+  if (agent || !Object.hasOwn(BODY_NAMES, key) || starting || LIVE.has(stateName())) return;
   try {
     view.setBody(key);
   } catch {
@@ -509,6 +658,7 @@ function leaveLive(message) {
   for (const id of ["arTop", "arHud", "arStop", "arBanner", "arHint"]) show(id, false);
   showCard();
   starting = false;
+  flushLookup(true); // the agent's answer, if it came while the session ran (the controller says READY a moment later)
   $("arStartBtn").removeAttribute("aria-disabled");
   $("arStartMsg").textContent = message ? String(message) : "";
   $("arStartMsg").dataset.tone = "";
@@ -652,13 +802,17 @@ function render() {
   else if (!starting) body.classList.remove("ar-live", "ar-xr"); // the controller says READY after leaveLive (ended() is async): the site chrome comes back
   show("arTop", live);
   show("arHud", live);
-  show("arStop", live);
+  show("arStop", live && !showing); // a showcase drives nothing: no STOP, no ARM
+  show("arArm", !showing);
+  show("arObstacle", !showing);
   syncLook();
   show("arBanner", live && view && view.mode === "camera");
   if (view && view.mode === "camera") setText($("arBanner"), view.orientationOn ? BANNER_CAMERA : BANNER_CAMERA_STILL);
   applyHint();
   const driving = st === "ARMED" && model.link === LINK.DRIVING;
-  const link = driving ? ["Driving", "live"] : { PLACING: [`Place the ${bodyName()}`, "warn"], ARMED: [`${bodyName()} · Armed`, "ok"], LATCHED: ["Stopped · press ARM", "warn"] }[st] || ["Offline", ""];
+  const link = showing
+    ? { PLACING: [`Place the ${bodyName()}`, "warn"], ARMED: model.playing ? [`${agent.callsign} · its move`, "live"] : [`${agent.callsign} · on show`, "ok"] }[st] || ["Offline", ""]
+    : driving ? ["Driving", "live"] : { PLACING: [`Place the ${bodyName()}`, "warn"], ARMED: [`${bodyName()} · Armed`, "ok"], LATCHED: ["Stopped · press ARM", "warn"] }[st] || ["Offline", ""];
   for (const r of document.querySelectorAll('input[name="arBody"]')) r.disabled = starting || live; // fixed while a session runs
   setChip($("arLink"), link[0], link[1]);
   $("arArm").disabled = !model.canArm;
@@ -675,6 +829,9 @@ function stateChanged(was, st) {
     const camera = view && view.mode === "camera";
     announce(`${camera ? `${view.orientationOn ? BANNER_CAMERA : BANNER_CAMERA_STILL} ` : ""}Place the ${bodyName()}: ${camera && !view.orientationOn ? "tap the picture" : "point at the floor and tap"}, or press Place the ${bodyName()} here.`);
     focusIfLost($("arPlaceBtn"));
+  } else if (st === "ARMED" && showing) {
+    if (was === "PLACING") announce(`${agent.callsign} is on show. Tap Its move to see its signature move, or Turn left or Turn right to turn it.`);
+    focusIfLost($("arChips").querySelector("button") || $("arExit"));
   } else if (st === "ARMED" && (was === "PLACING" || was === "LATCHED")) {
     announce(bodyKey === "rover" ? "Armed. Tap a button for a short move, or hold it to keep moving." : bodyKey === "walker" ? "Armed. Tap Forward, Back, Left or Right for a few steps, or hold one to keep walking." : `Armed. Tap a button and the ${bodyName()} does that move.`);
     focusIfLost($("arChips").querySelector("button") || $("arStop"));
@@ -758,6 +915,10 @@ async function onStart() {
 
 if (view && controller) {
   $("arStartBtn").addEventListener("click", onStart);
+  $("arAgentRetry").addEventListener("click", () => {
+    readAgent().catch(() => {});
+    focusIfLost($("arStartBtn"));
+  });
 
   const stop = (why) => controller.stop(why);
   $("arStop").addEventListener("pointerdown", () => stop("STOP button")); // as early as the finger lands
@@ -837,6 +998,7 @@ function buildChips(key) {
 if (view && controller) buildChips(bodyKey);
 showCard();
 render();
+readAgent().catch(() => {}); // ar.html?agent=<id>: the one network read of this page (chain.js), only with that parameter
 
 if (DEBUG && view) {
   // inside the overlay: in AR it is the only part of the page on screen

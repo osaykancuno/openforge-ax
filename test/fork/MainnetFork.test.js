@@ -11,7 +11,7 @@ const SEADROP = "0x00005EA00Ac477B1030CE78506496e8C2dE24bf5";
 const FORKED = Boolean(hre.network.config.forking?.enabled);
 
 (FORKED ? describe : describe.skip)("Mainnet fork - real ERC-6551 registry + SeaDrop", () => {
-  const price = ethers.parseEther("0.015"); // public launch price
+  const price = ethers.parseEther("0.01024"); // public launch price (allowlist: the same)
   let owner, treasury, alice, bob, agents, renderer, seaDrop, registry, impl, start;
 
   before(async () => {

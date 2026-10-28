@@ -1,17 +1,21 @@
 import { CONFIG } from "./config.js";
 import {
   eth, loadConfig, renderChrome, agents, account, reputation, reader, onWallet, send, toast,
-  tokenMeta, ipfs, attr, short, isDeployed, esc,
+  tokenMeta, ipfs, attr, isDeployed,
 } from "./chain.js";
+import { MODE_NAMES, effectiveMode, fmtEth } from "./agent/policy.js";
+import { decodeCall } from "./agent/decode.js";
+import { arLink, buildLink, cleanMeta } from "./agent/links.js";
+import { h } from "./agent/dom.js";
 
 await loadConfig();
 renderChrome("mine");
 
 const $ = (id) => document.getElementById(id);
 const id = Number(new URLSearchParams(location.search).get("id"));
-const MODES = ["", "Manual", "Assisted", "Autonomous"];
+const MODES = MODE_NAMES;
 const DAY = 86400;
-let acctAddr, owner, signer;
+let acctAddr, owner, signer, meta;
 let locked = false, lockEnd = 0; // the wallet's sale lock (it binds every holder until lockEnd)
 const lockTarget = () => Math.floor(Date.now() / 1000) + 7 * DAY;
 
@@ -27,12 +31,11 @@ const failed = (e) => {
   }
   console.warn("Ethereum RPC unreachable");
   $("name").textContent = OFFLINE;
-  $("desc").innerHTML = `<button class="btn sm" type="button">Retry</button>`;
-  $("desc").querySelector("button").onclick = () => {
+  $("desc").replaceChildren(h("button", { class: "btn sm", type: "button", onclick: () => {
     $("name").textContent = "Loading…";
     $("desc").textContent = "";
     refresh();
-  };
+  } }, "Retry"));
 };
 const refresh = () => load().catch(failed);
 const readFailed = (e) => (isOffline(e) ? (console.warn("Ethereum RPC unreachable"), toast(OFFLINE, true)) : toast(e?.shortMessage || "Something went wrong.", true));
@@ -43,7 +46,8 @@ if (!available) {
 
 async function load() {
   const c = await agents();
-  const [meta, own, acct] = await Promise.all([tokenMeta(id), c.ownerOf(id), c.accountOf(id)]);
+  const [m, own, acct] = await Promise.all([tokenMeta(id), c.ownerOf(id), c.accountOf(id)]);
+  meta = cleanMeta(m); // a token whose attributes are not a list must not break the page
   owner = own;
   acctAddr = acct;
   document.title = `${meta.name} — OpenForge AX`;
@@ -57,22 +61,30 @@ async function load() {
   $("owner").textContent = own;
 
   const skip = new Set(["Agent Wallet", "Autonomy", "Reputation", "Tasks", "Successes", "Failures Logged", "Data Points", "Sim Runs", "Sim Successes"]);
-  $("traits").innerHTML = meta.attributes
+  $("traits").replaceChildren(...meta.attributes
     .filter((a) => !skip.has(a.trait_type))
-    .map((a) => `<div><small>${esc(a.trait_type)}</small>${esc(a.value)}</div>`)
-    .join("");
+    .map((a) => h("div", {}, h("small", {}, a.trait_type), String(a.value ?? ""))));
+
+  // the agent's robot: the AR twin runs for any agent; the build guide needs its class (a dormant token has none yet)
+  $("arLink").href = arLink(id);
+  $("arLink").hidden = false;
+  const build = buildLink(attr(meta, "Class"));
+  if (build) $("buildLink").href = build;
+  $("buildLink").hidden = !build;
 
   const { formatEther } = await eth(); // ethers loads on demand: the static page is already drawn
   const a = await account(acct);
-  const [bal, lvl, paused, lockedUntil, stats] = await Promise.all([
+  const [bal, lvl, op, paused, lockedUntil, stats] = await Promise.all([
     reader().then((r) => r.getBalance(acct)),
     a.autonomyLevel(),
+    a.operator(),
     a.paused(),
     a.lockedUntil(),
     CONFIG.reputation && !/^0x0{40}$/i.test(CONFIG.reputation) ? reputation().then((r) => r.statsOf(id)) : null,
   ]);
+  const mode = effectiveMode({ operator: op, level: Number(lvl) }); // a revoked operator leaves the stored level behind
   $("bal").textContent = `${Number(formatEther(bal)).toFixed(4)} ETH`;
-  $("lvl").textContent = MODES[Number(lvl)];
+  $("lvl").textContent = MODES[mode];
   $("rep").textContent = attr(meta, "Reputation") ?? "Rookie";
   $("tasks").textContent = stats ? `${stats.tasks} / ${stats.dataPoints}` : "0 / 0";
   $("sim").textContent = `${attr(meta, "Sim Successes") ?? 0} / ${attr(meta, "Sim Runs") ?? 0}`;
@@ -83,15 +95,15 @@ async function load() {
   locked = Number(lockedUntil) > now;
   lockEnd = Number(lockedUntil);
   const until = new Date(lockEnd * 1000).toLocaleString("en-US");
-  $("badges").innerHTML = [
-    paused ? `<span class="badge bad">PAUSED</span>` : `<span class="badge ok">ACTIVE</span>`,
-    locked ? `<span class="badge warn">LOCKED until ${until}: nobody can move what's inside, the holder gets control after</span>` : "",
-    attr(meta, "1/1") ? `<span class="badge warn">1/1</span>` : "",
-  ].join("");
+  $("badges").replaceChildren(
+    h("span", { class: `badge ${paused ? "bad" : "ok"}` }, paused ? "PAUSED" : "ACTIVE"),
+    locked ? h("span", { class: "badge warn" }, `LOCKED until ${until}: nobody can move what's inside, the holder gets control after`) : null,
+    attr(meta, "1/1") ? h("span", { class: "badge warn" }, "1/1") : null
+  );
 
   document.querySelectorAll(".mode").forEach((b) => {
-    b.classList.toggle("on", Number(b.dataset.l) === Number(lvl));
-    b.setAttribute("aria-pressed", String(Number(b.dataset.l) === Number(lvl)));
+    b.classList.toggle("on", Number(b.dataset.l) === mode);
+    b.setAttribute("aria-pressed", String(Number(b.dataset.l) === mode));
   });
   $("pauseBtn").textContent = paused ? "Resume agent" : "Emergency pause";
   $("pauseBtn").dataset.paused = paused ? "1" : "";
@@ -106,7 +118,25 @@ async function load() {
   $("wdBtn").title = locked ? "Locked for sale until the lock expires" : "";
 
   await loadProposals(a);
+  const first = consoleReady === null;
   showOwnerArea();
+  if (!first) (await consoleReady)?.update(); // the console re-reads the chain after every change made here
+}
+
+// ---------------------------------------------------------------- proposals: what each one does, with risk flags
+const RISK = { high: "HIGH RISK", medium: "CHECK", low: "" };
+
+/** True / false when the node says whether `addr` holds code, undefined when it could not be asked. */
+async function isContract(addr) {
+  try {
+    return (await (await reader()).getCode(addr)) !== "0x";
+  } catch {
+    return undefined;
+  }
+}
+
+function describe(d) {
+  return d.kind === "eth" ? "ETH transfer" : `${d.name ?? "contract call"} ${d.selector ?? ""}${d.bytes > 4 ? ` (${d.bytes} bytes)` : ""}`.trim();
 }
 
 async function loadProposals(a) {
@@ -116,17 +146,43 @@ async function loadProposals(a) {
   for (let i = n - 1; i >= 0 && rows.length < 10; i--) {
     const p = await a.proposalAt(i);
     if (!p.valid) continue;
-    rows.push(`<div class="row" style="justify-content:space-between;border-bottom:1px dashed var(--line);padding:8px 0">
-      <span>#${i} → <span class="mono">${esc(p.to)}</span> · ${formatEther(p.value)} ETH · ${p.data.length > 2 ? `contract call <span class="mono">${esc(p.data.slice(0, 10))}</span>${p.data.length > 10 ? `<span class="muted small"> (${(p.data.length - 2) / 2} bytes)</span>` : ""}` : "ETH transfer"}</span>
-      <span><button class="btn sm" data-ok="${i}">Approve</button> <button class="btn sm danger" data-no="${i}">Reject</button></span></div>`);
+    const d = decodeCall({ to: p.to, value: p.value, data: p.data }, { isContract: p.data.length > 2 ? await isContract(p.to) : undefined, account: acctAddr, holder: owner, trusted: [acctAddr, CONFIG.agents, CONFIG.reputation, CONFIG.renderer] });
+    rows.push(h("div", { class: `proposal risk-${d.risk}` },
+      h("div", { class: "proposal-head" },
+        h("span", {}, `#${i} → `, h("span", { class: "mono" }, p.to), ` · ${formatEther(p.value)} ETH · ${describe(d)}`),
+        d.risk === "low" ? null : h("span", { class: `badge ${d.risk === "high" ? "bad" : "warn"}` }, RISK[d.risk])),
+      d.args.length ? h("div", { class: "muted small" }, d.args.map((x) => `${x.label}: ${x.value}`).join(" · ")) : null,
+      d.flags.length ? h("ul", { class: "flags" }, d.flags.map((f) => h("li", { class: f.level }, f.text))) : null,
+      h("span", {}, h("button", { class: "btn sm", "data-ok": i }, "Approve"), " ", h("button", { class: "btn sm danger", "data-no": i }, "Reject"))));
   }
-  $("proposals").innerHTML = rows.join("") || "No pending proposals.";
+  $("proposals").replaceChildren(...(rows.length ? rows : ["No pending proposals."]));
 }
 
 function showOwnerArea() {
   const mine = signer && owner && signer.addressChecksum.toLowerCase() === owner.toLowerCase();
   $("ownerArea").hidden = !mine;
   $("modeCell").hidden = mine; // owners set the mode in the panel below, which already shows the current one
+  if (mine) consoleReady ??= startConsole();
+}
+
+// ---------------------------------------------------------------- the console (loads when the holder is here)
+let consoleReady = null; // a promise of the mounted console, once the holder is connected
+function startConsole() {
+  return import("./agent/console.js")
+    .then((m) => m.mountConsole({
+      get id() { return id; },
+      get acctAddr() { return acctAddr; },
+      get owner() { return owner; },
+      get signer() { return signer; },
+      get meta() { return meta; },
+      refresh,
+      walletAgrees,
+    }))
+    .catch((e) => {
+      console.warn(e);
+      $("consoleBody").textContent = "The console could not load. Reload the page to try again.";
+      return null;
+    });
 }
 
 // ---------------------------------------------------------------- owner actions
@@ -146,42 +202,15 @@ async function walletAgrees() {
   toast("Your wallet sees a different agent wallet than this page. Nothing was sent: reload the page and check the address.", true);
   return false;
 }
-let pendingLevel = 1;
 
+// choosing a mode only opens its pane; nothing is sent until the holder confirms there
 document.querySelectorAll(".mode").forEach((b) =>
   b.addEventListener("click", async () => {
-    pendingLevel = Number(b.dataset.l);
+    const lv = Number(b.dataset.l);
     document.querySelectorAll(".mode").forEach((x) => (x.classList.toggle("on", x === b), x.setAttribute("aria-pressed", String(x === b))));
-    let op;
-    try {
-      op = await (await account(acctAddr)).operator();
-    } catch (e) {
-      return readFailed(e);
-    }
-    $("operator").value = CONFIG.defaultOperator || (/^0x0{40}$/i.test(op) ? "" : op);
-    $("operator").hidden = Boolean(CONFIG.defaultOperator); // the confirmation below always shows the address anyway
-    $("modeOpts").hidden = false;
+    (await consoleReady)?.selectMode(lv);
   })
 );
-
-$("applyMode").onclick = async () => {
-  const { parseEther, isAddress, formatEther } = await eth();
-  const op = CONFIG.defaultOperator || $("operator").value.trim();
-  if (!isAddress(op)) return toast("The agent software address (0x…) is required.", true);
-  let limit;
-  try {
-    limit = parseEther($("limit").value.trim());
-  } catch {
-    return toast("Enter the daily limit as a number of ETH, like 0.05.", true);
-  }
-  // the human sees exactly who gets the power and how much per day, whatever the page pre-filled
-  if (!confirm(`${MODES[pendingLevel]} mode
-
-Agent software address: ${op}
-Daily limit: ${formatEther(limit)} ETH
-${pendingLevel === 1 ? "" : "\nThis address can act for the agent within that limit."}`)) return;
-  if (await send(`${MODES[pendingLevel]} mode`, () => acctW().then((a) => a.configure(op, pendingLevel, limit, DAY)))) refresh();
-};
 
 $("pauseBtn").onclick = async () => {
   const resume = Boolean($("pauseBtn").dataset.paused);
@@ -231,7 +260,6 @@ $("proposals").addEventListener("click", async (e) => {
   const ok = e.target.dataset.ok;
   const no = e.target.dataset.no;
   if (ok !== undefined) {
-    const { formatEther } = await eth();
     // the full target, checked by the human: a look-alike address must never be approved by habit
     if (!(await walletAgrees())) return;
     const read = async () => (await account(acctAddr, signer.provider)).proposalAt(ok); // through the wallet's own provider
@@ -241,11 +269,12 @@ $("proposals").addEventListener("click", async (e) => {
     } catch (e) {
       return readFailed(e);
     }
+    const d = decodeCall({ to: p.to, value: p.value, data: p.data }, { isContract: p.data.length > 2 ? await isContract(p.to) : undefined, account: acctAddr, holder: owner, trusted: [acctAddr, CONFIG.agents, CONFIG.reputation, CONFIG.renderer] });
     if (!confirm(`Approve proposal #${ok}?
 
 To: ${p.to}
-Value: ${formatEther(p.value)} ETH
-${p.data.length > 2 ? `Contract call ${p.data.slice(0, 10)} (${(p.data.length - 2) / 2} bytes)` : "ETH transfer"}`)) return;
+Value: ${fmtEth(p.value)} ETH
+${d.kind === "eth" ? "ETH transfer" : `Contract call ${describe(d)}`}${d.args.map((x) => `\n${x.label}: ${x.value}`).join("")}${d.flags.length ? `\n\nCheck before approving:\n${d.flags.map((f) => `- ${f.text}`).join("\n")}` : ""}`)) return;
     try {
       // what the wallet's node holds now must still be what the human just read
       const q = await read();

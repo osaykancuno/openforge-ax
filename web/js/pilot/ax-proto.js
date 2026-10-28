@@ -5,6 +5,9 @@
 
 export const PROTO_MAJOR = 1;
 export const PROTO_MINOR = 0;
+// Reserved, not built: minor 1 will add an "autonomous source" capability flag to INFO, for a future learned policy that
+// the holder taught (docs/13 §12). Such a policy is one more untrusted plan source: it still goes through validatePlan and
+// the executor, needs a human ARM gesture, and the watchdog and the STOP latch stay exactly as they are.
 
 // Custom 128-bit UUIDs (random base, not a Bluetooth SIG UUID). Characteristic n = base with 000n.
 const uuid = (n) => `7a3e000${n}-4f1b-4c2a-9d0e-5b6c7d8e9fa1`;

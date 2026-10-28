@@ -38,7 +38,7 @@ Say this plainly to the public.
 |---|---|---|
 | **Supply** | **1,024** (924 via OpenSea + 100 reserve) | Blue-chip scarcity and a manageable community (each agent has a real runtime cost). 1,024 = exactly the 32×32 callsign space: every callsign exists once |
 | **Mint** | **On OpenSea via SeaDrop** (`0x00005EA0…4bf5`) | Price, phases, allowlist and limits are managed in OpenSea Studio. No mint site to secure |
-| **Price** | **Allowlist 0.01 ETH, public 0.015 ETH**, max 3 per wallet | Low barrier for newcomers and robot builders. At most ~11 ETH net of OpenSea's 10% (924 sold, ~300 on the allowlist), so spending is prioritised (audit first, then infra) |
+| **Price** | **0.01024 ETH for everyone** (the allowlist only mints earlier), max 3 per wallet (user decision 2026-10-28: 1,024 agents) | Low barrier for newcomers and robot builders. At most ~8.5 ETH net of OpenSea's 10% (924 sold), so spending is prioritised (audit first, then infra) |
 | **Agent wallet** | Created **automatically at mint** | Zero steps for the user (~90k extra gas per token, paid at mint) |
 | **Default autonomy** | Manual (L1) | Safe for beginners: nothing happens without approval |
 | **Traits** | 8 categories: Class (11: 8 open platforms + AX-1 Rover, Desk, Walker), Core Model (4), Sensor (5), Finish (7), Frame (4), District (6), Faction (5), Augment (6) | ~1,108,800 trait combinations, plus a unique callsign per agent |

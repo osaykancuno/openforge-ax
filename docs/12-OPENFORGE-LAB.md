@@ -123,6 +123,6 @@ The Proving Grounds (`arena.html`) tests all 11 robots. The Synth Arm keeps its 
 ## 8. Phases
 
 1. **Now:** new look, lab home, Workbench (8 classes + AX-1), Phone Brain with twin mode and BLE bridge, firmware, docs.
-2. **Done (phase 2):** 11 on-chain classes (the 8 generic names kept, "inspired by" only off-chain; AX-1 Rover / Desk / Walker added, 31% of the collection); token art drawn from the `web/js/models/` robots (`art/token-render.mjs`); since 2026-10-28 each token is also an animated GIF (the metadata's `image`): a short gesture per class from `art/token/motion.mjs`, then a pause on the still pose, with no new trait; provenance hash covers those files. Still to do: redo the Sepolia rehearsal.
+2. **Done (phase 2):** 11 on-chain classes (the 8 generic names kept, "inspired by" only off-chain; AX-1 Rover / Desk / Walker added, 31% of the collection); token art drawn from the `web/js/models/` robots (`art/token-render.mjs`); since 2026-10-28 each token is also an animated GIF (the metadata's `image`): a short gesture per class from `web/js/models/motion.mjs` (shared with My IRL lab), then a pause on the still pose, with no new trait; provenance hash covers those files. Still to do: redo the Sepolia rehearsal.
 3. **Then:** first physical AX-1 Rover build by the team, then publish the measured BOM; the Desk body; signed mission results for more classes in the verifier.
 4. **Later:** AX-1 Walker policy (MuJoCo training, community-run), on-device vision and voice on the phone.

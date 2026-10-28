@@ -216,9 +216,9 @@ contract AgentAccount is
 
     // ------------------------------------------------------------------ levels
 
-    /// @notice Effective level (1 if the policy is not valid for the current holder).
+    /// @notice Effective level (1 if the policy is not valid for the current holder, or if there is no operator).
     function autonomyLevel() public view returns (uint8) {
-        if (_level == 0 || !_policyValid()) return 1;
+        if (_level == 0 || operator == address(0) || !_policyValid()) return 1; // no operator (revoked or never set): Manual
         return _level;
     }
 

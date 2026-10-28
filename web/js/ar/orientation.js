@@ -46,6 +46,12 @@ export function relativeQuat(q0, q) {
 
 /** Height of the phone above the surface the twin stands on, in metres: standing over the floor, or sitting at a table. */
 export const PHONE_HEIGHT = Object.freeze({ rover: 1.25, walker: 1.25, desk: 0.45 });
+// An agent's robot that is not an AX-1 body (key "agent:<robots.js id>") is 13 to 48 cm tall and stands on the floor, except the
+// desk-top ones: the Synth Arm, the Ghost Hand and the Fab Rig (a 3D printer) belong on a table.
+const DESK_TOP = new Set(["agent:so101", "agent:hand", "agent:fab"]);
+export const phoneHeightFor = (key) => (Object.hasOwn(PHONE_HEIGHT, key) ? PHONE_HEIGHT[key] : DESK_TOP.has(key) ? 0.45 : 1.25);
+/** True where the twin stands on a table rather than on the floor (the Desk and the desk-top robots). */
+export const onTable = (key) => phoneHeightFor(key) < 1;
 
 /** tan(half the field of view) along the long side of a phone's main back camera (about 26 mm equivalent). */
 export const CAMERA_TAN_LONG = 0.68;
