@@ -29,6 +29,21 @@ describe("Publishing: prepare-site, RPC origins, RPC fallbacks", () => {
     expect(read(launched, "_headers")).to.not.include("X-Robots-Tag: noindex\n/*").and.not.include("prepare-site.mjs without --index");
   });
 
+  it("_headers: one rule per path (Cloudflare keeps only the last), and the published /* rule keeps every security header", () => {
+    const paths = (text) => text.split(/\r?\n/).filter((l) => l && !/^\s/.test(l) && !l.startsWith("#"));
+    const dupes = (list) => list.filter((p, i) => list.indexOf(p) !== i);
+    expect(dupes(paths(fs.readFileSync(path.join(web, "_headers"), "utf8"))), "web/_headers").to.deep.equal([]);
+    for (const index of [false, true]) {
+      const out = path.join(tmp, `cf-${index}`);
+      P.prepareSite({ target: "cloudflare", out, index });
+      const text = read(out, "_headers");
+      expect(dupes(paths(text)), `published, index=${index}`).to.deep.equal([]);
+      const all = text.split(/\r?\n(?=\S)/).find((block) => /^\/\*\s*$/m.test(block.split(/\r?\n/)[0]));
+      for (const h of ["X-Frame-Options: DENY", "Strict-Transport-Security:", "Cross-Origin-Opener-Policy: same-origin", "frame-ancestors 'none'", "Permissions-Policy:"]) expect(all, h).to.include(h);
+      expect(all.includes("X-Robots-Tag: noindex"), "noindex until launch").to.equal(!index);
+    }
+  });
+
   it("github: no _headers, no sitemap, never indexed", () => {
     const out = path.join(tmp, "gh");
     P.prepareSite({ target: "github", out });

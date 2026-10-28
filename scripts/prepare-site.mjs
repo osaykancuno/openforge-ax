@@ -74,7 +74,12 @@ export function prepareSite({ target, out = join(root, "_site"), web = join(root
     if (!index) {
       writeFileSync(join(out, "robots.txt"), "User-agent: *\nDisallow: /\n");
       rmSync(join(out, "sitemap.xml"), { force: true });
-      writeFileSync(join(out, "_headers"), `${readFileSync(join(out, "_headers"), "utf8").replace(/\s*$/, "")}\n# not launched yet: no search-engine indexing anywhere (prepare-site.mjs without --index)\n/*\n  X-Robots-Tag: noindex\n`);
+      // into the existing "/*" rule: Cloudflare keeps one rule per path, so a second "/*" would replace the first and
+      // drop every security header in it
+      const headers = readFileSync(join(out, "_headers"), "utf8");
+      const all = /^\/\*[ \t]*\r?\n/m;
+      if (!all.test(headers)) throw new Error('web/_headers has no "/*" rule to carry the noindex header');
+      writeFileSync(join(out, "_headers"), headers.replace(all, (m) => `${m}  X-Robots-Tag: noindex\n`));
     }
   }
   return { out, vendored, demo };
