@@ -24,7 +24,7 @@ import { createXrCameraReader, createXrDepthContext } from "./vision/xr-camera.j
 import { createWorldObjects, displayName, toViewLabels, zoneHit } from "./vision/world-objects.js";
 
 await loadConfig();
-renderChrome("pilot"); // the same nav (sounds, music, dark, menu) and footer as every other page
+renderChrome("ar"); // the same nav (sounds, music, dark, menu) and footer as every other page; "In your room" is active
 
 const LIVE = new Set(["PLACING", "ARMED", "DRIVING", "LATCHED"]);
 const BANNER_CAMERA = "Camera view: the robot is not anchored to your floor (your browser has no WebXR AR).";

@@ -320,6 +320,7 @@ export function renderChrome(active, { wallet = walletByDefault(active) } = {}) 
       <a href="index.html" data-k="home">Lab</a>
       <a href="bench.html" data-k="bench">Workbench</a>
       <a href="pilot.html" data-k="pilot">Phone Brain</a>
+      <a href="ar.html" data-k="ar" title="AX-1's twin on your floor, in augmented reality (on a phone)">In your room</a>
       <a href="arena.html" data-k="arena">Proving Grounds</a>
       <a href="robot.html" data-k="robot">Robot Link</a>
       <a href="gallery.html" data-k="gallery">Gallery</a>

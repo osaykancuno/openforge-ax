@@ -36,6 +36,7 @@ const $ = (id) => document.getElementById(id);
 const STATIONS = [
   { id: "bench", title: "Workbench", line: "Take 11 robots apart, then test them", color: 0x4f7ea8, model: "bench", href: "bench.html" },
   { id: "pilot", title: "Phone Brain", line: "Your phone becomes AX-1's brain", color: 0xc8553d, model: "pilot", href: "pilot.html" },
+  { id: "ar", title: "In your room", line: "AX-1's twin on your floor, in AR on a phone", color: 0xe2b04a, model: "ar", href: "ar.html" },
   { id: "arena", title: "Proving Grounds", line: "Fly scored missions. Agent holders keep a record", color: 0x5f8a6e, model: "arena", href: "arena.html" },
   { id: "robot", title: "Robot Link", line: "Replay a run on a real SO-101", color: 0xe2b04a, model: "robot", href: "robot.html" },
   { id: "codex", title: "The Codex", line: "Start here: a 3D book in 8 pages", color: 0x5f8a6e, model: "codex", href: "codex.html" },

@@ -76,6 +76,25 @@ function coinProp() {
   return g;
 }
 
+/** "In your room": a phone held up and, in front of it, AX-1 Rover's twin on its terracotta placement ring (the AR page in small). */
+function arProp() {
+  const g = new THREE.Group();
+  const ring = at(torus(0.42, 0.024, "accent"), 0, 0.012, 0.12, g); // the floor ring the AR page draws where a tap places the Rover
+  ring.rotation.x = Math.PI / 2;
+  const phone = at(new THREE.Group(), -0.5, 0.42, -0.32, g);
+  phone.rotation.y = 0.55;
+  at(rbox(0.3, 0.6, 0.04, "graphite", 0.05), 0, 0, 0, phone);
+  at(rbox(0.25, 0.52, 0.01, "sky", 0.025), 0, 0, 0.022, phone); // the camera picture
+  at(rbox(0.09, 0.01, 0.01, "accent", 0.004), 0, -0.21, 0.028, phone);
+  const rover = buildRobot("ax1-rover");
+  const k = 0.72 / Math.max(1e-3, bounds(rover).max.y - bounds(rover).min.y); // the hero: taller than the phone
+  rover.group.scale.setScalar(k);
+  at(rover.group, 0.06, 0, 0.12, g);
+  g.userData.rover = rover;
+  g.userData.z = 0.12;
+  return g;
+}
+
 /** Each station's centrepiece: a robot rig (animated by `tick`) or a prop. Heights are normalised later. */
 const PIECES = {
   bench: { robot: "drone", height: 0.9, lift: 0.75, tick: (r, t) => (r.setSpin("prop", 6), (r.group.position.y = r.group.userData.y + Math.sin(t * 1.6) * 0.012), (r.group.rotation.y = Math.sin(t * 0.4) * 0.5)) },
@@ -108,6 +127,14 @@ const PIECES = {
     r.group.position.y = r.group.userData.y + b * 0.006;
   } },
   mint: { prop: coinProp, height: 1.05, tick: (p, t) => (p.userData.spin.rotation.y = t * 1.1) },
+  ar: { prop: arProp, height: 0.95, tick: (p, t) => {
+    const r = p.userData.rover;
+    const v = Math.cos(t * 0.9);
+    r.group.position.z = p.userData.z + Math.sin(t * 0.9) * 0.1; // rolls forward and back on its ring
+    r.setSpin("wheel-l", v * 0.8);
+    r.setSpin("wheel-r", v * 0.8);
+    r.face?.setLook(Math.sin(t * 0.5), 0);
+  } },
   lore: { robot: "fab", height: 1.25, tick: (r, t) => {
     const s = r.slides;
     s.head.position.x = Math.sin(t * 1.7) * 0.1;
