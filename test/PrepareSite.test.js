@@ -40,6 +40,8 @@ describe("Publishing: prepare-site, RPC origins, RPC fallbacks", () => {
       expect(dupes(paths(text)), `published, index=${index}`).to.deep.equal([]);
       const all = text.split(/\r?\n(?=\S)/).find((block) => /^\/\*\s*$/m.test(block.split(/\r?\n/)[0]));
       for (const h of ["X-Frame-Options: DENY", "Strict-Transport-Security:", "Cross-Origin-Opener-Policy: same-origin", "frame-ancestors 'none'", "Permissions-Policy:"]) expect(all, h).to.include(h);
+      // no Early Hints: a Link modulepreload header is fetched before the import map, so "three" fails on the 3D pages
+      expect(all, "! Link").to.match(/^ {2}! Link\r?$/m);
       expect(all.includes("X-Robots-Tag: noindex"), "noindex until launch").to.equal(!index);
     }
   });

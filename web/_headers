@@ -1,7 +1,11 @@
 # Security headers for Cloudflare Pages (the "! Header" detach lines are its syntax; other hosts may merge the
 # per-page policy with the default, which turns serial/bluetooth off: safe, but set them in the host's settings).
 # On other hosts, set the same headers in the host's settings. The CSP itself is a <meta> tag in each page.
+# "! Link": Cloudflare turns the pages' <link rel="modulepreload"> tags into an HTTP Link header (Early Hints). The browser
+# acts on it before it reads the page's import map, so every module that imports "three" fails to resolve and the 3D
+# pages (Proving Grounds, Robot Link, Codex, Bench) stay blank. The tags in <head>, after the import map, still preload.
 /*
+  ! Link
   X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'
   Cross-Origin-Opener-Policy: same-origin
