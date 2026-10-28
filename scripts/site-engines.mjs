@@ -103,11 +103,16 @@ export async function run({ engines = process.env.ENGINES, only = process.env.ON
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+  // On GitHub Actions every failure is also an annotation: run logs need a signed-in viewer, annotations do not
+  // (GET /repos/<owner>/<repo>/check-runs/<job id>/annotations), so a failing run can be read without an account.
+  const annotate = (title, text) => process.env.GITHUB_ACTIONS && console.log(`::error title=${title.replace(/[:,\r\n]/g, " ")}::${String(text).replace(/\r?\n/g, " | ").slice(0, 900)}`);
   const rows = await run().catch((e) => {
     console.error(`site-engines: ${e.message}`);
+    annotate("site-engines", e.message);
     process.exit(1);
   });
   const bad = rows.filter((r) => r.reasons.length);
+  for (const r of bad) annotate(`${r.profile} ${r.page}`, r.reasons.join(" | "));
   console.log(`\n${rows.length - bad.length}/${rows.length} ok`);
   if (bad.length) process.exit(1);
 }
