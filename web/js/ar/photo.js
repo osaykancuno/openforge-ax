@@ -6,7 +6,7 @@
 //
 // The maths at the top is pure (Node tests); the canvas and share parts touch the DOM only when called.
 
-export const SITE_URL = "https://osaykancuno.github.io/openforge-ax/";
+export const SITE_URL = "https://openforge-ax.tech/"; // the production domain: shared photos point here, whatever host served the page
 export const BRAND_LINE = "OpenForge AX · My IRL lab";
 export const JPEG_QUALITY = 0.9;
 export const MAX_SIDE = 1600; // px on the longer side: sharp on a phone, a few hundred KB

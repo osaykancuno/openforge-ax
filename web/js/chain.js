@@ -150,6 +150,8 @@ export const agents = async (runner) => new (await eth()).Contract(CONFIG.agents
 export const account = async (addr, runner) => new (await eth()).Contract(addr, ABI.account, runner ?? (await reader()));
 export const reputation = async (runner) => new (await eth()).Contract(CONFIG.reputation, ABI.reputation, runner ?? (await reader()));
 export const isDeployed = () => CONFIG.agents && !/^0x0{40}$/i.test(CONFIG.agents);
+/** True for an https link with a path after the host (x.com/handle, discord.gg/code), not a bare home page. */
+export const hasHandle = (url) => /^https:\/\/[^/]+\/[^/?#]+/.test(String(url ?? ""));
 
 // ---------------------------------------------------------------- wallet
 let signer = null;
@@ -379,13 +381,14 @@ export function renderChrome(active, { wallet = walletByDefault(active) } = {}) 
   }
 
   const foot = document.createElement("footer");
+  // only links that lead somewhere: the contract once one is deployed, a social account once it has a handle
+  const out = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener">${text}<span class="sr-only"> (opens in a new tab)</span></a>`;
+  const links = [`<a href="license.html">CC0</a>`, `<a href="#" id="serversLink">Servers${CONFIG.customServers ? " (yours)" : ""}</a>`];
+  if (isDeployed() && /^https:\/\//.test(CONFIG.explorer)) links.push(out(`${CONFIG.explorer}/address/${CONFIG.agents}`, "Contract"));
+  for (const [href, text] of [[CONFIG.social?.x, "X"], [CONFIG.social?.discord, "Discord"]]) if (hasHandle(href)) links.push(out(href, text));
   foot.innerHTML = `<div class="wrap">
     <div>OpenForge AX · an open robotics lab · CC0. No promise of returns.</div>
-    <div><a href="license.html">CC0</a> ·
-    <a href="#" id="serversLink">Servers${CONFIG.customServers ? " (yours)" : ""}</a> ·
-    <a href="${CONFIG.explorer}/address/${CONFIG.agents}" target="_blank" rel="noopener">Contract<span class="sr-only"> (opens in a new tab)</span></a> ·
-    <a href="${esc(CONFIG.social.x)}" target="_blank" rel="noopener">X<span class="sr-only"> (opens in a new tab)</span></a> ·
-    <a href="${esc(CONFIG.social.discord)}" target="_blank" rel="noopener">Discord<span class="sr-only"> (opens in a new tab)</span></a></div></div>`;
+    <div>${links.join(" ·\n    ")}</div></div>`;
   document.body.append(foot);
   let dlg;
   foot.querySelector("#serversLink").onclick = (e) => (e.preventDefault(), (dlg ??= serversDialog()).showModal());

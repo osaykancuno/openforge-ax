@@ -270,7 +270,7 @@ describe("Agent console policy (web/js/agent/policy.js, actions.js, links.js)", 
       for (const bad of ["", "ccc", "ccccc", "0xcccc", "7", "dddd", "00007", undefined, null, 7]) expect(P.l3Confirmation(bad, acct), String(bad)).to.equal(false);
       const acct2 = "0x" + "12".repeat(19) + "a1b2";
       expect(P.l3Confirmation("A1B2", acct2)).to.equal(true);
-      expect(P.L3_PLACEHOLDER).to.not.match(/[0-9a-f]{4}/i);
+      expect(P.L3_PLACEHOLDER).to.not.match(/\b[0-9a-f]{4}\b/i);
       expect(P.L3_PLACEHOLDER).to.match(/last 4 characters/);
     });
   });

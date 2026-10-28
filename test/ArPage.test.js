@@ -437,7 +437,7 @@ describe("AR page: Take a photo (photo.js)", () => {
         expect(L.box.y + L.box.h).to.be.at.most(h);
         expect(L.mark.size).to.be.below(L.box.h + 1);
         expect(L.title.text).to.equal("OpenForge AX · My IRL lab");
-        expect(L.url.text).to.equal("osaykancuno.github.io/openforge-ax/");
+        expect(L.url.text).to.equal("openforge-ax.tech/");
         expect(L.box.w * L.box.h).to.be.below(w * h * 0.12); // a small corner, never over the twin's middle
       }
       expect(PH.watermarkLayout({ w, h, corner: "br" }).box.x).to.be.above(PH.watermarkLayout({ w, h, corner: "bl" }).box.x);

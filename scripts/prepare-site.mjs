@@ -61,6 +61,7 @@ export function prepareSite({ target, out = join(root, "_site"), web = join(root
     }
   }
   for (const p of NEVER_PUBLISHED) rmSync(join(out, p), { recursive: true, force: true });
+  for (const f of readdirSync(out, { recursive: true })) if (/\.md$/i.test(f)) rmSync(join(out, f), { force: true }); // developer notes are not pages
   if (target === "github") {
     rmSync(join(out, "_headers"), { force: true });
     rmSync(join(out, "sitemap.xml"), { force: true });
