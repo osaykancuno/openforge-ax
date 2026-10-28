@@ -1,4 +1,4 @@
-// AX-1 in your room: the page. It probes the device, shows the start card (or "Open this on your phone"), and wires the
+// My IRL lab (AX-1 in AR): the page. It probes the device, shows the start card (or "Open this on your phone"), and wires the
 // view (ar-view.js: camera, WebXR, drawing) to the controller (ar-controller.js: every arming and stopping rule).
 // This file adds no rule of its own: it forwards what the person does and shows what the controller says.
 //
@@ -10,9 +10,14 @@ import { describeStep } from "../pilot/ai/tools.js";
 import { createTwinTransport, realTimers } from "../pilot/twin-transport.js";
 import { LINK } from "../pilot/drive-loop.js";
 import { applyTwinState } from "../pilot/twin-pose.js";
+import { stateChannels } from "../pilot/ax-proto.js";
+import { createGait } from "./gait.js";
 import { createWakeLock } from "../pilot/sensors.js";
 import { $, chip, el } from "../pilot/ui.js";
+import { qrArt } from "../qr.js";
 import { probeAr } from "./ar-caps.js";
+import { openQuickLook, quickLookSupported, usdzUrl } from "./quick-look.js";
+import { canShareFile, composePhoto, photoFileName, savePhoto, sharePhoto, toJpeg } from "./photo.js";
 import { BODY_NAMES, NEAR_STOP_M, STOP_GAP_M, createArController } from "./ar-controller.js";
 import { chipsFor } from "./chips.js";
 import { CAMERA_VIEW, createArView } from "./ar-view.js";
@@ -23,10 +28,13 @@ import { createXrCameraReader, createXrDepthContext } from "./vision/xr-camera.j
 import { createWorldObjects, displayName, toViewLabels, zoneHit } from "./vision/world-objects.js";
 
 await loadConfig();
-renderChrome("ar"); // the same nav (sounds, music, dark, menu) and footer as every other page; "In your room" is active
+renderChrome("ar"); // the same nav (sounds, music, dark, menu) and footer as every other page; "My IRL lab" is active
 
 const LIVE = new Set(["PLACING", "ARMED", "DRIVING", "LATCHED"]);
-const BANNER_CAMERA = "Camera view: the robot is not anchored to your floor (your browser has no WebXR AR).";
+// the camera view (no WebXR AR: iPhone, iPad, other browsers). With the motion sensors the twin stands on the floor and
+// stays put while the phone turns; nothing in a browser there follows the person's steps, so the page says so.
+const BANNER_CAMERA = "Camera view: the twin stands on your floor and stays put when you turn your phone. It does not follow your steps, and its size is approximate.";
+const BANNER_CAMERA_STILL = "Camera view: motion access is off, so the twin is drawn in front of the camera, not on your floor.";
 const NEEDS_AR = "Obstacle sensing needs Android Chrome AR";
 const body = document.body;
 
@@ -61,6 +69,20 @@ const extensions = []; // parser extensions (object intents); the controller's p
 const NO_CAMERA_ACCESS = "Object finding in AR needs camera access, which this browser did not give. Camera view can still tell you what it sees.";
 const world = createWorldObjects();
 const nowMs = () => globalThis.performance.now();
+
+// the Walker twin's walk cycle: the step offsets (gait.js) on top of the pose the bridge reports, paced by how far the
+// controller moved it this frame, so the legs settle back into that pose when it stops
+const gait = createGait();
+function walkLegs(rig, snap, dt, p) {
+  gait.step(dt, p.ds, p.dyaw);
+  if (!gait.amp) return;
+  const names = stateChannels(controller.body);
+  const pos = snap && snap.state && snap.state.positions;
+  for (const [joint, deg] of Object.entries(gait.offsets())) {
+    const i = names.indexOf(joint);
+    rig.set(joint, (pos && i >= 0 && i < pos.length ? pos[i] / 10 : 0) + deg);
+  }
+}
 const roverNow = () => (view && view.placed ? view.worldPose() : null);
 let looking = false; // "Look around" is on
 let lookToken = 0; // bumped on every start and stop: an old detector load never wins
@@ -119,6 +141,7 @@ if (view) {
       }
       const snap = controller.snapshot;
       applyTwinState(rig, snap, controller.body, p, 0);
+      if (controller.bodyKey === "walker") walkLegs(rig, snap, dt, p);
       if (rig.face) rig.face.setMood(snap && snap.link === LINK.DRIVING ? "happy" : snap && (snap.link === LINK.ARMED) ? "idle" : "alert");
       return p;
     },
@@ -307,30 +330,165 @@ function showCard() {
   show("arDesktop", false);
   if (!canRun || !view) {
     show("arDesktop", true);
-    $("arUrl").textContent = location.href.split("#")[0];
+    const url = location.href.split("#")[0];
+    const qr = qrArt(url); // drawn here, no network: the link never leaves this page
+    $("arQr").setAttribute("viewBox", qr.viewBox);
+    $("arQrPath").setAttribute("d", qr.modules);
+    $("arQrEyes").setAttribute("d", qr.eyes);
+    const { x, y, w } = qr.hole; // the AX-1 mark on a white pad, in the hole level H leaves for it
+    for (const [k, v] of Object.entries({ x, y, width: w, height: w, rx: w * 0.18 })) $("arQrPad").setAttribute(k, v);
+    $("arQrLogo").setAttribute("transform", `translate(${x + w * 0.06} ${y + w * 0.06}) scale(${(w * 0.88) / 100})`);
+    $("arCopy").onclick = async () => {
+      const msg = $("arCopyMsg");
+      try {
+        await navigator.clipboard.writeText(url);
+        msg.textContent = "Link copied. Send it to your phone.";
+        delete msg.dataset.tone;
+      } catch {
+        msg.textContent = "This browser would not copy the link. Scan the code instead.";
+        msg.dataset.tone = "warn";
+      }
+    };
     const none = caps.mode === "none" || Boolean(viewError);
     $("arDesktopTitle").textContent = none ? "AR cannot start here" : "Open this on your phone";
-    $("arDesktopWhy").textContent = viewError || (none ? `${caps.why} You can open this page on another phone:` : "AX-1 in your room uses your phone's camera to put the twin on your floor. Open this page on your phone:");
+    $("arDesktopWhy").textContent = viewError || (none ? `${caps.why} Scan this code with another phone:` : "My IRL lab uses your phone's camera to put the twin on your floor. Scan this code with your phone:");
     return;
   }
   show("arStart", true);
   const xr = caps.mode === "xr";
   const n = bodyName();
   $("arStartBtn").textContent = xr ? "Start AR" : "Start camera view";
-  const does = { rover: "drive it with the buttons", desk: "make it wave, nod and point with the buttons", walker: "pose it with the buttons (it does not walk)" }[bodyKey];
+  const does = { rover: "drive it with the buttons", desk: "make it wave, nod and point with the buttons", walker: "walk it and pose it with the buttons" }[bodyKey];
   $("arLead").textContent = xr
     ? `Meet the AX-1 ${n} as a digital twin in your own room. Point your phone at ${bodyKey === "desk" ? "a table or the floor" : "the ground"}, tap to place it, then ${does}. It is not a real robot. Camera pictures never leave this phone.`
-    : `Meet the AX-1 ${n} as a digital twin in front of your camera. Your browser has no WebXR AR, so it is not anchored to your floor. It is not a real robot.`;
+    : `Meet the AX-1 ${n} as a digital twin. Your browser has no WebXR AR, so the camera view is used: point at ${bodyKey === "desk" ? "a table" : "the floor"}, tap to place it, then ${does}. It stays put when you turn your phone but does not follow your steps. It is not a real robot. Camera pictures never leave this phone.`;
   $("arStep2").textContent = bodyKey === "desk" ? "Point at a table or the floor, then tap to put the Desk down." : `Point at the floor, then tap to put the ${n} down.`;
   $("arStep3").textContent =
-    bodyKey === "rover" ? "Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it." : `Tap a button: the ${n} does that move. STOP always stops it.`;
+    bodyKey === "rover" ? "Tap a button for a short move, or hold Forward, Back, Left or Right to keep moving. STOP always stops it." : bodyKey === "walker" ? "Tap Forward, Back, Left or Right for a few steps, or hold one to keep walking; the other buttons are poses. STOP always stops it." : `Tap a button: the ${n} does that move. STOP always stops it.`;
+  // photos with the room in AR need the camera picture: asked for only with this option (the camera view has it anyway)
+  show("arPhotosRow", xr);
+  show("arPhotosNote", xr);
   // object finding is for the Rover in v1
   show("arLookRow", bodyKey === "rover");
   show("arLookNote", bodyKey === "rover");
   if (bodyKey !== "rover") $("arLook").checked = false;
   $("arPlaceBtn").textContent = `Place the ${n} here`;
   $("arCanvas").setAttribute("aria-label", `The AX-1 ${n} twin, drawn over your camera picture`);
+  // iPhone and iPad: true floor placement through Apple's AR viewer, next to the camera view that drives it
+  const ql = QUICK_LOOK && !xr;
+  show("arQlRow", ql);
+  show("arQlNote", ql);
+  if (ql) prepareQuickLook(bodyKey);
 }
+
+// ================================================================ Take a photo (photo.js composes it; nothing is uploaded here)
+
+let photo = null; // { blob, file, url } of the photo on show
+let taking = false;
+
+function closePhoto() {
+  if (photo) URL.revokeObjectURL(photo.url);
+  photo = null;
+  show("arShot", false);
+  $("arShotImg").removeAttribute("src");
+  $("arShotMsg").textContent = "";
+}
+
+async function onPhoto() {
+  if (taking || !view || !view.mode) return;
+  taking = true;
+  $("arPhoto").setAttribute("aria-disabled", "true");
+  announce("Taking the photo…");
+  try {
+    const shot = await view.capture();
+    const blob = await toJpeg(composePhoto(shot));
+    closePhoto();
+    const name = photoFileName();
+    photo = { blob, file: new File([blob], name, { type: "image/jpeg" }), url: URL.createObjectURL(blob), name };
+    $("arShotImg").src = photo.url;
+    show("arShare", canShareFile(photo.file));
+    show("arShot", true);
+    const msg = $("arShotMsg");
+    msg.dataset.tone = shot.kind === "xr-nocam" ? "warn" : "";
+    msg.textContent =
+      shot.kind === "xr-nocam"
+        ? 'Your browser did not give this page the camera picture in AR, so the twin stands on paper. Tick "Photos show my room" before Start to have your room in it.'
+        : "Photo ready. It stays on this phone unless you share it.";
+    announce(msg.textContent);
+    ($("arShare").hidden ? $("arSave") : $("arShare")).focus();
+  } catch (e) {
+    announce(`The photo could not be taken. ${e && e.message ? e.message : "Try again."}`, true);
+  } finally {
+    taking = false;
+    $("arPhoto").removeAttribute("aria-disabled");
+  }
+}
+
+async function onShare() {
+  if (!photo) return;
+  const msg = $("arShotMsg");
+  try {
+    const r = await sharePhoto(photo.file);
+    if (r === "shared") msg.textContent = "Shared.";
+    else if (r === "cancelled") msg.textContent = "Not shared. You can share or save it again.";
+    else {
+      savePhoto(photo.blob, photo.name);
+      msg.textContent = "This browser cannot share files, so the photo was saved instead.";
+    }
+  } catch {
+    savePhoto(photo.blob, photo.name);
+    msg.textContent = "Sharing did not work here, so the photo was saved instead.";
+  }
+  msg.dataset.tone = "";
+}
+
+function onSave() {
+  if (!photo) return;
+  savePhoto(photo.blob, photo.name);
+  $("arShotMsg").textContent = "Saved. On iPhone, keep it from the preview that opens (Save to Photos).";
+  $("arShotMsg").dataset.tone = "";
+}
+
+if (view) {
+  $("arPhoto").addEventListener("click", onPhoto);
+  $("arShare").addEventListener("click", onShare);
+  $("arSave").addEventListener("click", onSave);
+  $("arShotClose").addEventListener("click", () => {
+    closePhoto();
+    $("arPhoto").focus();
+  });
+}
+
+// ================================================================ AR Quick Look (iPhone, iPad)
+
+const QUICK_LOOK = quickLookSupported();
+const qlReady = new Map(); // body -> blob URL of its USDZ model
+
+/** Makes the body's model ahead of the tap: Safari opens Quick Look only from the tap itself, with nothing awaited. */
+function prepareQuickLook(key) {
+  if (!qlReady.has(key)) usdzUrl(key).then((u) => qlReady.set(key, u), () => {});
+}
+
+async function onQuickLook() {
+  const key = bodyKey;
+  const msg = $("arStartMsg");
+  let url = qlReady.get(key);
+  if (!url) {
+    msg.textContent = "Making the 3D model…";
+    msg.dataset.tone = "";
+    try {
+      url = await usdzUrl(key);
+      qlReady.set(key, url);
+    } catch {
+      msg.textContent = "The 3D model could not be made on this phone. Use the camera view.";
+      msg.dataset.tone = "bad";
+      return;
+    }
+    msg.textContent = "";
+  }
+  openQuickLook($("arQlLink"), url, key);
+}
+if (QUICK_LOOK) $("arQlBtn").addEventListener("click", onQuickLook);
 
 /** The body picked on the start card: the view draws it, the chips and the texts follow. Never while a session runs. */
 function chooseBody(key) {
@@ -346,6 +504,7 @@ function chooseBody(key) {
 }
 
 function leaveLive(message) {
+  closePhoto();
   body.classList.remove("ar-live", "ar-xr");
   for (const id of ["arTop", "arHud", "arStop", "arBanner", "arHint"]) show(id, false);
   showCard();
@@ -380,7 +539,7 @@ function stateName() {
 
 /** The chip: what is ahead, unless something behind is nearer to being hit (reversing). */
 function obstacleText(u, back = lastObstacleBack) {
-  if (model.drives === false) return [model.sensing?.text || "", ""]; // the Desk and the Walker do not drive: no sensing
+  if (model.drives === false && !model.walks) return [model.sensing?.text || "", ""]; // the Desk does not move about: no sensing
   if (view && view.mode === "camera") return [NEEDS_AR, "warn"];
   const backNear = back && back.state === "blocked" && Number.isFinite(back.nearM) ? back.nearM : Infinity;
   const frontNear = u && u.state === "blocked" ? (Number.isFinite(u.nearM) ? u.nearM : 0) : Infinity;
@@ -496,7 +655,7 @@ function render() {
   show("arStop", live);
   syncLook();
   show("arBanner", live && view && view.mode === "camera");
-  if (view && view.mode === "camera") setText($("arBanner"), view.orientationOn ? BANNER_CAMERA : `${BANNER_CAMERA} Motion access is off, so the view stays still.`);
+  if (view && view.mode === "camera") setText($("arBanner"), view.orientationOn ? BANNER_CAMERA : BANNER_CAMERA_STILL);
   applyHint();
   const driving = st === "ARMED" && model.link === LINK.DRIVING;
   const link = driving ? ["Driving", "live"] : { PLACING: [`Place the ${bodyName()}`, "warn"], ARMED: [`${bodyName()} · Armed`, "ok"], LATCHED: ["Stopped · press ARM", "warn"] }[st] || ["Offline", ""];
@@ -514,10 +673,10 @@ function render() {
 function stateChanged(was, st) {
   if (st === "PLACING") {
     const camera = view && view.mode === "camera";
-    announce(`${camera ? `${BANNER_CAMERA} ` : ""}Place the ${bodyName()}: ${camera ? "tap the picture" : "point at the floor and tap"}, or press Place the ${bodyName()} here.`);
+    announce(`${camera ? `${view.orientationOn ? BANNER_CAMERA : BANNER_CAMERA_STILL} ` : ""}Place the ${bodyName()}: ${camera && !view.orientationOn ? "tap the picture" : "point at the floor and tap"}, or press Place the ${bodyName()} here.`);
     focusIfLost($("arPlaceBtn"));
   } else if (st === "ARMED" && (was === "PLACING" || was === "LATCHED")) {
-    announce(bodyKey === "rover" ? "Armed. Tap a button for a short move, or hold it to keep moving." : `Armed. Tap a button and the ${bodyName()} does that move.`);
+    announce(bodyKey === "rover" ? "Armed. Tap a button for a short move, or hold it to keep moving." : bodyKey === "walker" ? "Armed. Tap Forward, Back, Left or Right for a few steps, or hold one to keep walking." : `Armed. Tap a button and the ${bodyName()} does that move.`);
     focusIfLost($("arChips").querySelector("button") || $("arStop"));
   } else if (st === "LATCHED") {
     announce(was === "PLACING" ? `The ${bodyName()} is placed but not armed. Press ARM to move it.` : "Stopped. Press ARM to move again.", was !== "PLACING");
@@ -561,11 +720,12 @@ async function onStart() {
   $("arStartBtn").setAttribute("aria-disabled", "true"); // not disabled: a disabled button would drop the focus
   const mode = caps.mode;
   const wantObjects = $("arLook").checked;
+  const wantPhotos = $("arPhotos").checked;
   $("arStartMsg").textContent = mode === "xr" ? "Starting AR…" : "Opening the camera…";
   $("arStartMsg").dataset.tone = "";
   // nothing may be awaited before these two calls: the browser wants the tap that started them
   const oriP = mode === "camera" ? requestOrientation() : null;
-  const opened = mode === "xr" ? view.startXr({ wantObjects }) : view.startCamera({ orientation: oriP });
+  const opened = mode === "xr" ? view.startXr({ wantObjects, wantPhotos }) : view.startCamera({ orientation: oriP });
   try {
     const info = await opened;
     show("arStart", false);

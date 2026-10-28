@@ -95,11 +95,11 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
    - Budget about 0.01 ETH for retries. Optional: point `MAINNET_RPC_URL` at Flashbots Protect, which keeps the reveal out of the public mempool and does not charge for a missed block.
 2. 🤖 `npm run post-reveal -- mainnet` does steps 2–4 in one go:
    - it reads the seed;
-   - it generates the 1,024 images;
-   - with `PINATA_JWT` it pins them to IPFS; without it, it copies them to `web/images/` (publish `web/` right after, about 460 MB);
+   - it generates the 1,024 tokens: per token a still `<id>.png` and an animated `<id>.gif` (the metadata's `image`: the robot plays its class's gesture for 2.6 s, then rests 1.6 s). About 15 s per token with 3 browsers in parallel (`--jobs 3`): plan about 4 hours on this PC;
+   - with `PINATA_JWT` it pins them to IPFS; without it, it copies them to `web/images/` (publish `web/` right after, about 700 MB: ~600 MB of GIFs + ~100 MB of PNGs; that also fits Pinata's free 1 GB);
    - it sets the base URI;
    - it copies `rarity.json` to the site.
-   - It refuses an image folder that is not exactly `1.png … N.png`, and after pinning it checks three images by SHA-256 through the gateway.
+   - It refuses an image folder that is not exactly `1.png … N.png` + `1.gif … N.gif`, and after pinning it checks three tokens (still and GIF) by SHA-256 through the gateway.
    - If the base URI is not on-chain at the end (for example Safe calldata still to execute), it prints **NOT DONE** and exits with code 2. Do not refresh OpenSea or freeze until `baseURI()` shows the new value.
 3. —
 4. If the owner is the Safe, the script prints the calldata to send from the Safe.
@@ -108,7 +108,7 @@ How to send a call from the Safe: Safe app → New transaction → Transaction B
    - With site-hosted images, freezing ties every image to the domain forever, so it also needs `$env:FREEZE_HTTPS="yes"`.
    - Better: move the images to IPFS first (add `PINATA_JWT`, run `npm run post-reveal -- mainnet` again), then freeze. Nothing forces an early freeze.
    - It runs only if step 4 already set this CID, the reputation source is set and the renderer presentation is complete.
-   - It also downloads the first and the last image (`IPFS_GATEWAY`, default Pinata) and refuses to freeze unless both are served as PNGs.
+   - It also downloads the first and the last token's PNG and GIF (`IPFS_GATEWAY`, default Pinata) and refuses to freeze unless all are served with the right type.
    - It locks the renderer, then calls `freezeMetadata()`. From the Safe, execute the printed calls in order (lock → freezeMetadata), or as one batch.
 7. 🤖 `npm run web:build` copies `rarity.json` to the site (rarity-sortable gallery). Run `npm run site:check` and republish `web/`.
 

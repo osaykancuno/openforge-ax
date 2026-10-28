@@ -1,0 +1,35 @@
+# Every page of the site in the three browser engines people use (scripts/site-engines.mjs): Chromium (Chrome, Edge,
+# Android), Firefox (Gecko) and WebKit (Safari on macOS, and every browser on iPhone and iPad), on Linux. It runs on
+# pushes and pull requests that touch the site, and on demand. Free on a public repository.
+# Actions are pinned to a full commit SHA (the tag is the trailing comment); Node is the runner's own (no setup action).
+name: Engines
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", ".github/workflows/engines.yml"]
+  pull_request:
+    paths: ["web/**", "scripts/site-engines.mjs", "scripts/site-smoke.mjs", "scripts/serve.mjs", ".github/workflows/engines.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install the repo's tools and Playwright with its three browsers
+        run: |
+          node --version
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          npm i --no-save --legacy-peer-deps --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Every page in Chromium, Firefox and WebKit (desktop, Android, iPhone, iPad)
+        run: node scripts/site-engines.mjs

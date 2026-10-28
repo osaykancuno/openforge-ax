@@ -1,4 +1,4 @@
-// AX-1 in your room: the controller behind web/ar.html. No DOM, no three: the page (ar-view.js, ar.js) feeds it what the
+// My IRL lab (AX-1 in AR): the controller behind web/ar.html. No DOM, no three: the page (ar-view.js, ar.js) feeds it what the
 // phone sees (taps, voice, depth, visibility) and renders its `view`; every decision about the Rover lives here.
 //
 //   ready --start()--> starting --> placing --place(gesture)--> armed <--> latched
@@ -6,7 +6,8 @@
 //   armed --obstacle ahead | edge of the play area | AR blurred--> armed (hold: the plan is interrupted, wheels 0)
 //   latched --ARM button--> armed;   any --AR ended--> ready
 //
-// One body per session (start(mode, key)): the Rover, or the Desk / Walker, which move joints only.
+// One body per session (start(mode, key)): the Rover drives on wheels, the Walker twin walks (gait.js), the Desk moves
+// joints only.
 // The rules of the AI Pilot hold unchanged. Nothing here arms except place() (a tap on the floor) and arm() (the ARM
 // button): voice, chips, the model and the AI never reach them. Every motion goes plan -> executor -> guarded drive loop ->
 // twin transport -> bridge state machine -> AX_STATE; the guard only REFUSES forward drives that would hit something. The
@@ -20,6 +21,7 @@ import { VMAX, stepPose, wheelsFromState } from "../pilot/twin-pose.js";
 import { chipText, chipsFor } from "./chips.js";
 import { createArParser } from "./ar-parse.js";
 import { edgeAhead, isBackStep, isBackWheels, isForwardStep, isForwardWheels } from "./obstacle.js";
+import { WALK } from "./gait.js";
 
 export const STATES = { READY: "ready", STARTING: "starting", PLACING: "placing", ARMED: "armed", LATCHED: "latched" };
 export const CAMERA_SENSING = "Obstacle sensing needs Android Chrome AR";
@@ -41,10 +43,14 @@ const HOLD_STICK = { forward: [0, 1], back: [0, -1], left: [-0.6, 0], right: [0.
 const STOP_WORDS = /\b(stop|halt|freeze|brake|abort)\b/i; // anywhere in the sentence: "ok stop" stops at once
 const BLUR_MESSAGE = "AR is paused (something is on top of the camera view), so I stopped moving.";
 const EMPTY_AI = Object.freeze({ state: "idle", running: false, busy: false, messages: [], plan: null, progress: null });
-// The bodies the page offers: the Rover drives (odometry, obstacles, hold-to-drive); the Desk and the Walker move joints
-// only (no wheels: no odometry, no obstacle sensing, no hold). The Walker holds poses: it does not walk.
+// The bodies the page offers: the Rover drives on wheels (odometry from the bridge's wheel outputs); the Walker twin
+// walks: its moves are this controller's own leases (the real Walker's bridge has no gait yet, so the protocol has no
+// walking command), under the same rules: only when armed, held while a button is held, held at the edge of the play
+// area and before obstacles, ended by STOP. Both get obstacle sensing and hold-to-move. The Desk moves joints only.
 export const BODY_NAMES = Object.freeze({ rover: "Rover", desk: "Desk", walker: "Walker" });
-const STILL_TEXT = { desk: "Stays where you put it", walker: "Poses only · it does not walk" };
+const STILL_TEXT = { desk: "Stays where you put it" };
+/** A tap on the Walker's Forward / Back / Left / Right: one short walk (about two steps, or a 45° turn on the spot). */
+export const WALK_TAP_MS = 1000;
 
 const VOICE_ERRORS = {
   "not-allowed": "The microphone is not allowed for this page. Allow it in your browser's site settings, or use the buttons.",
@@ -74,7 +80,10 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   let mode = null; // "xr" | "camera"
   let bodyKey = "rover"; // fixed for a session: chosen before start(), changed only between sessions
   let body = P.bodyByKey("rover");
-  let drives = true; // a wheeled body: odometry, obstacle sensing, hold-to-drive
+  let drives = true; // a wheeled body: odometry from the bridge, obstacle sensing, hold-to-drive
+  let walks = false; // the Walker twin: odometry from its own walk leases, obstacle sensing, hold-to-walk
+  const moves = () => drives || walks;
+  const gait = { v: 0, w: 0, until: 0 }; // the walk lease: m/s forward, rad/s (positive turns right), clock time it ends
   const name = () => BODY_NAMES[bodyKey];
   let loop = null; // the REAL drive loop
   let guarded = null; // what the AI gets: the same loop, with holdFor guarded
@@ -96,7 +105,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   let playRadius = radius;
   let loopSig = "";
   const pose = { x: 0, z: 0, yaw: 0 }; // local odometry under the placement
-  const out = { x: 0, z: 0, yaw: 0, clamped: false }; // frame()'s result, reused
+  const out = { x: 0, z: 0, yaw: 0, clamped: false, ds: 0, dyaw: 0 }; // frame()'s result, reused
 
   const emit = () => {
     try {
@@ -108,13 +117,18 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     pose.z = 0;
     pose.yaw = 0;
   };
+  const stopWalk = () => {
+    gait.v = 0;
+    gait.w = 0;
+    gait.until = 0;
+  };
   /**
    * Metres from the bumper to the obstacle now (side "front" or "back"): the measured distance minus what the Rover drove
    * toward it since. Infinity: none.
    */
   const obstacleAhead = (side = "front") => {
     const o = side === "back" ? obstBack : obst;
-    if (!drives || mode !== "xr" || !o || o.state !== "blocked") return Infinity;
+    if (!moves() || mode !== "xr" || !o || o.state !== "blocked") return Infinity;
     const p = (side === "back" ? obstBackPose : obstPose) || pose;
     const driven = (pose.x - p.x) * Math.sin(p.yaw) + (pose.z - p.z) * Math.cos(p.yaw); // forward along the heading
     return o.nearM - (side === "back" ? -driven : driven);
@@ -122,6 +136,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   /** Blocked = too close to drive toward that side at speed v (m/s): the stop would end nearer than STOP_GAP_M. */
   const isBlocked = (v = 0, side = "front") => obstacleAhead(side) <= stopAt(v);
   const forwardSpeed = () => {
+    if (walks) return gait.v;
     if (!drives || !snap || snap.body !== body) return 0;
     const [l, r] = wheelsFromState(snap.state, body);
     return ((l + r) / 2000) * VMAX;
@@ -129,7 +144,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
   const edgeText = () => `I'm at the edge of my ${+playRadius.toFixed(2)} m play area.`;
 
   function sensing() {
-    if (!drives) return { level: "none", text: STILL_TEXT[bodyKey] || "" };
+    if (!moves()) return { level: "none", text: STILL_TEXT[bodyKey] || "" };
     if (mode === "camera") return { level: "off", text: CAMERA_SENSING };
     if (isBlocked(VMAX, "back") && !isBlocked(VMAX)) return { level: "blocked", text: STOP_BACK_TEXT }; // backed up to something
     if (!obst) return { level: "off", text: "" };
@@ -181,16 +196,42 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     });
   }
 
-  /** Ends hold-to-drive renewals (the wheels are zeroed by whoever called this). */
+  /** Ends hold-to-drive renewals (the wheels are zeroed by whoever called this; a walk lease ends here too). */
   function releaseHold() {
+    stopWalk();
     if (!pressing) return;
     clock.clearInterval(pressing.timer);
     pressing = null;
   }
 
+  /**
+   * One walk lease for the Walker twin: x turns (negative = left), y walks (negative = back), for `ms`. The same checks
+   * as the Rover's guarded holdFor: armed only, never toward a blocked side or past the edge of the play area.
+   */
+  function walkFor(ms, x, y) {
+    if (!walks || state !== STATES.ARMED || !loop) return false;
+    const active = snap && (snap.link === LINK.ARMED || snap.link === LINK.DRIVING);
+    if (!active) return false;
+    const v = y * WALK.SPEED;
+    if (y < 0 && isBlocked(-v, "back")) return api.hold(STOP_BACK_TEXT), false;
+    if (y > 0) {
+      if (isBlocked(v)) return api.hold(STOP_TEXT), false;
+      if (edgeAhead(pose, playRadius) < 0.01) return api.hold(edgeText()), false;
+    }
+    gait.v = v;
+    gait.w = y ? 0 : Math.sign(x) * WALK.TURN; // x < 0 = left: a negative yaw rate
+    gait.until = clock.now() + ms;
+    return true;
+  }
+
   /** Holds a move that would end nearer than STOP_GAP_M to an obstacle ahead (driving forward) or behind (reversing). */
   function checkObstacle() {
     if (state !== STATES.ARMED || !loop) return;
+    if (walks) {
+      if (gait.v > 0 && isBlocked(gait.v)) api.hold(STOP_TEXT);
+      else if (gait.v < 0 && isBlocked(-gait.v, "back")) api.hold(STOP_BACK_TEXT);
+      return;
+    }
     const step = ai && ai.running ? (ai.view.progress || {}).step : null;
     const w = loop.snapshot.wheels;
     if (isForwardWheels(w) || (!isBackWheels(w) && isForwardStep(step))) {
@@ -205,6 +246,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     if (ai) ai.onLoopChange(s);
     const active = s.link === LINK.ARMED || s.link === LINK.DRIVING;
     if (state === STATES.ARMED && !active) {
+      stopWalk();
       state = STATES.LATCHED; // the bridge latched, the loop stalled or the link dropped: nothing resumes
       message = s.message || `The ${name()} is stopped.`;
     }
@@ -269,6 +311,8 @@ export function createArController({ clock = realTimers, makeTransport = null, v
         body: bodyKey,
         name: name(),
         drives,
+        walks,
+        walking: walks && (gait.v !== 0 || gait.w !== 0),
         chips: chipsFor(bodyKey),
         odometry: { x: pose.x, z: pose.z, yaw: pose.yaw },
         ai: aiView,
@@ -285,6 +329,8 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       bodyKey = key;
       body = P.bodyByKey(key);
       drives = Boolean(P.BODIES[body] && P.BODIES[body].drive);
+      walks = key === "walker";
+      stopWalk();
       state = STATES.STARTING;
       mode = m === "camera" ? "camera" : "xr";
       playRadius = mode === "camera" ? Math.min(radius, 1.5) : radius;
@@ -397,6 +443,17 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     },
 
     chip(id) {
+      // the Walker's direction chips: one short walk, through the same checks as holding them
+      if (walks && Object.hasOwn(HOLD_STICK, id)) {
+        if (state !== STATES.ARMED) return Promise.resolve(null);
+        releaseHold();
+        if (ai && ai.running) ai.takeover("You took the controls.");
+        notice = "";
+        const [x, y] = HOLD_STICK[id];
+        walkFor(WALK_TAP_MS, x, y);
+        emit();
+        return Promise.resolve(null);
+      }
       const t = chipText(id, bodyKey);
       return t ? api.say(t, { source: "chip" }) : Promise.resolve(null);
     },
@@ -427,7 +484,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
     press(dir) {
       releaseHold();
       const xy = typeof dir === "string" && Object.hasOwn(HOLD_STICK, dir) ? HOLD_STICK[dir] : null;
-      if (!xy || !drives || !guarded || state !== STATES.ARMED) return false;
+      if (!xy || !moves() || !guarded || state !== STATES.ARMED) return false;
       if (ai && ai.running) ai.takeover("You took the controls.");
       if (seek && typeof seek.cancel === "function") {
         try {
@@ -436,7 +493,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       }
       notice = "";
       const lease = () => {
-        if (state === STATES.ARMED && guarded && guarded.holdFor(HOLD_LEASE_MS, xy[0], xy[1])) return true;
+        if (state === STATES.ARMED && (walks ? walkFor(HOLD_LEASE_MS, xy[0], xy[1]) : guarded && guarded.holdFor(HOLD_LEASE_MS, xy[0], xy[1]))) return true;
         releaseHold();
         return false;
       };
@@ -478,7 +535,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
 
     /** Interrupts the plan and zeroes the wheels, but the Rover STAYS armed (an obstacle, the edge, AR paused). */
     hold(reason) {
-      releaseHold();
+      releaseHold(); // also ends a walk lease
       notice = cleanSay(String(reason), 200);
       if (ai) ai.cancel(notice);
       if (loop) loop.setHeld(false);
@@ -491,7 +548,7 @@ export function createArController({ clock = realTimers, makeTransport = null, v
      * camera view has no sensing.
      */
     obstacle(update) {
-      if (mode !== "xr" || !drives) return; // the camera view and the bodies without wheels have no sensing
+      if (mode !== "xr" || !moves()) return; // the camera view and the Desk have no sensing
       if (update && typeof update === "object") {
         const near = Number.isFinite(update.nearM) ? update.nearM : Number.isFinite(update.distanceM) ? update.distanceM : 0;
         const o = { state: update.state, distanceM: update.distanceM ?? null, nearM: near, message: String(update.message || "") };
@@ -508,9 +565,34 @@ export function createArController({ clock = realTimers, makeTransport = null, v
       emit();
     },
 
-    /** Call every render frame with the seconds since the last. Advances the odometry from what the bridge reports. */
+    /**
+     * Call every render frame with the seconds since the last. Advances the odometry from what the bridge reports (the
+     * Rover) or from the walk lease (the Walker twin). out.ds / out.dyaw: what it moved this frame (the walk cycle uses it).
+     */
     frame(dt) {
       out.clamped = false;
+      out.ds = 0;
+      out.dyaw = 0;
+      if (walks && loop && dt > 0) {
+        if (state !== STATES.ARMED || clock.now() >= gait.until) stopWalk();
+        if (gait.v || gait.w) {
+          const d = Math.min(dt, 0.1);
+          const x0 = pose.x, z0 = pose.z, y0 = pose.yaw;
+          pose.yaw += gait.w * d;
+          pose.x += Math.sin(pose.yaw) * gait.v * d;
+          pose.z += Math.cos(pose.yaw) * gait.v * d;
+          const r = Math.hypot(pose.x, pose.z);
+          if (r > playRadius) {
+            pose.x *= playRadius / r;
+            pose.z *= playRadius / r;
+            out.clamped = r - playRadius > 1e-9;
+          }
+          out.ds = Math.sign(gait.v) * Math.hypot(pose.x - x0, pose.z - z0);
+          out.dyaw = pose.yaw - y0;
+          if (out.clamped) api.hold(edgeText());
+          else checkObstacle();
+        }
+      }
       if (drives && loop && snap && snap.body === body && dt > 0) {
         const [l, r] = wheelsFromState(snap.state, body);
         out.clamped = stepPose(pose, l, r, Math.min(dt, 0.1), { radius: playRadius });

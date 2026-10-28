@@ -38,3 +38,40 @@ export function orientationQuat(alpha, beta, gamma, screenAngle) {
 export function relativeQuat(q0, q) {
   return mul([-q0[0], -q0[1], -q0[2], q0[3]], q);
 }
+
+// ---------------------------------------------------------------- the floor in the camera view (iPhone, any phone without WebXR AR)
+// With the motion sensors the camera view knows the phone's real tilt (gravity), so the floor of the 3D scene lines up with
+// the real floor: the phone is assumed at a typical height above the surface and a tap's ray meets that floor. It follows
+// the phone's turning, not its steps (no ARKit/ARCore tracking in the browser here).
+
+/** Height of the phone above the surface the twin stands on, in metres: standing over the floor, or sitting at a table. */
+export const PHONE_HEIGHT = Object.freeze({ rover: 1.25, walker: 1.25, desk: 0.45 });
+
+/** tan(half the field of view) along the long side of a phone's main back camera (about 26 mm equivalent). */
+export const CAMERA_TAN_LONG = 0.68;
+
+/**
+ * cameraFovDeg({ videoW, videoH, viewW, viewH }) -> the vertical field of view (degrees) of the picture shown with
+ * `object-fit: cover` in a viewW x viewH box, so the 3D camera matches the real lens. null until the video has a size.
+ */
+export function cameraFovDeg({ videoW, videoH, viewW, viewH, tanLong = CAMERA_TAN_LONG }) {
+  if (!(videoW > 0 && videoH > 0 && viewW > 0 && viewH > 0)) return null;
+  const s = Math.max(viewW / videoW, viewH / videoH); // cover: the video is scaled up until it fills the box
+  const shownH = viewH / s; // video pixels visible from top to bottom
+  const tanHalf = (tanLong * shownH) / Math.max(videoW, videoH);
+  return (2 * Math.atan(tanHalf) * 180) / Math.PI;
+}
+
+/**
+ * floorHit(origin, dir, { floorY, maxM }) -> { x, z, dist } where the ray origin + t * dir meets the horizontal floor,
+ * or null when it points level or up, or meets the floor farther than maxM (horizontally) from the phone.
+ */
+export function floorHit(origin, dir, { floorY = 0, maxM = 4 } = {}) {
+  const [ox, oy, oz] = origin;
+  const [dx, dy, dz] = dir;
+  if (!(dy < -0.02) || !(oy > floorY)) return null;
+  const t = (floorY - oy) / dy;
+  const x = ox + dx * t, z = oz + dz * t;
+  const dist = Math.hypot(x - ox, z - oz);
+  return dist <= maxM ? { x, z, dist } : null;
+}

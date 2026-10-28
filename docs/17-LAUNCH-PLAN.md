@@ -108,7 +108,7 @@ missions completed, Phone Brain sessions, AI Pilot requests. Allowlist: pilots w
 visits, support response time, scam reports handled. Reveal: holders in Discord, holder missions, bounty ideas.
 Set baselines in week 1; no invented targets.
 
-### Week 3 beat: "AX-1 in your room" (AR twin, `web/ar.html`)
+### Week 3 beat: "My IRL lab" (AR twin, `web/ar.html`)
 It follows the "Why a phone?" thread (Day 10): the same phone, now with the twin in your room. It
 comes before the mint run-up, so it stays a free lab feature, and Week 4's "a reason a day" reuses it for eyes and ears.
 

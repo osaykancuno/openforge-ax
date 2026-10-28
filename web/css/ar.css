@@ -68,8 +68,27 @@ body.ar-xr .ar-overlay { position: fixed; inset: 0; width: 100%; height: 100%; b
 .ar-body input:disabled + span { opacity: 0.55; }
 @media (max-width: 360px) { .ar-bodies { grid-template-columns: 1fr; } }
 .ar-look { align-items: center; min-height: 44px; font-weight: 600; }
-.ar-url { margin: 0 0 8px; padding: 8px 10px; border: 1px dashed var(--control); border-radius: 10px; background: var(--paper); overflow-wrap: anywhere; user-select: all; }
+/* scanners want dark on light whatever the theme: fixed white paper and black modules, the quiet zone is in the viewBox */
+.ar-qr { display: block; width: min(220px, 60vw); height: auto; aspect-ratio: 1; margin: 6px auto 12px; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px var(--line-2); }
+.ar-qr-ink { fill: #23211e; } /* the brand ink, near black: full scanner contrast */
+.ar-qr-pad { fill: #fff; }
+@media (forced-colors: active) { .ar-qr { forced-color-adjust: none; } } /* a code in system colours may not scan */
+/* the phone card is one centred column: title, why, the code, Copy, the 3D twin note */
+.ar-desktop { text-align: center; width: min(100%, 460px); }
+.ar-desktop .pl-lead { margin-inline: auto; max-width: 38ch; }
+.ar-desktop .pl-row { justify-content: center; margin-top: 0; }
+.ar-desktop .pl-msg:empty { min-height: 0; margin: 0; }
 .ar-start .pl-row { margin-top: 12px; }
+/* the photo preview: between the top bar and STOP (which stays in reach), the photo shrinks to fit */
+.ar-shot {
+  position: fixed; z-index: 5; inset: calc(env(safe-area-inset-top, 0px) + 64px) 12px calc(env(safe-area-inset-bottom, 0px) + 104px);
+  width: auto; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: var(--card); box-shadow: var(--shadow); /* opaque: the controls behind it must not show through */
+}
+.ar-shot h2 { flex: none; }
+.ar-shot img { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; border-radius: 10px; }
+.ar-shot .pl-row, .ar-shot .pl-msg { flex: none; margin: 0; }
+.ar-shot .pl-btn { min-height: 44px; }
 .ar-start .pl-btn, .ar-desktop .pl-btn { min-height: 48px; }
 
 /* ---------------------------------------------------------------- driving HUD */

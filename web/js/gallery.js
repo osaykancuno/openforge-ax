@@ -1,4 +1,4 @@
-import { loadConfig, renderChrome, agents, isDeployed, tokenMeta, ipfs, attr, esc } from "./chain.js";
+import { loadConfig, renderChrome, agents, isDeployed, tokenMeta, ipfs, still, attr, esc } from "./chain.js";
 import { NAMES } from "./traits-data.js";
 
 await loadConfig();
@@ -22,7 +22,7 @@ function tile(id, meta) {
   const rank = rarity?.tokens?.[id - 1]?.rank;
   const [num, call = ""] = String(meta.name).split(" // ");
   return `<a class="tile${legend ? " legend" : ""}" href="agent.html?id=${Number(id)}">
-    <img loading="lazy" decoding="async" src="${esc(ipfs(meta.image))}" alt="${esc(meta.name)}">
+    <img loading="lazy" decoding="async" src="${esc(ipfs(still(meta.image)))}" alt="${esc(meta.name)}">
     <div class="meta"><b>${esc(num)}</b>${esc(call)}
     <div class="muted small">${esc(attr(meta, "Class") ?? "Dormant")}${rank ? ` · #${Number(rank)} rarity` : ""}</div></div></a>`;
 }

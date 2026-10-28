@@ -77,7 +77,7 @@ Images: `npm run assets` (or `npm run brand`) → `art/launch-assets/`.
 
 **Instagram / TikTok:** Hold it. The twin moves. / AX-1's 3D twin on my real floor, 23 cm tall: hold Forward, turn, spin. It stops about 5 cm before something in the way, going forward or back, on phones with ARCore depth sensing. / Free in the lab, link in bio. Android Chrome for AR; iPhone gets a camera view. / This is the twin, not a real robot. AX-1 firmware: experimental, untested on hardware. A real AX-1: planned.
 
-**Discord (#announcements):** **AX-1 in your room (new, free, no wallet).** Open `ar.html` on your phone and AX-1 Rover's 3D twin stands on your floor at real size (about 23 cm). Drive it with the buttons: tap for a short move, hold Forward, Back, Left or Right to keep moving.
+**Discord (#announcements):** **My IRL lab (new, free, no wallet).** Open `ar.html` on your phone and AX-1 Rover's 3D twin stands on your floor at real size (about 23 cm). Drive it with the buttons: tap for a short move, hold Forward, Back, Left or Right to keep moving.
 - Android Chrome, ARCore phone: anchored to your floor; on phones with the ARCore Depth API it stops for real obstacles.
 - iPhone: Safari has no WebXR AR, so you get a camera view: the buttons work, but no floor anchoring and no obstacle sensing.
 - Optional "Look around" labels 80 everyday object types on your phone, also in dim light; nothing leaves the phone. In a dark room obstacle sensing is less sure and says so.

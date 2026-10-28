@@ -396,27 +396,30 @@ function ax1Rover(r) {
 
 function ax1Desk(r) {
   const root = r.group;
+  // Clearances (checked in test/Models.test.js): a hanging arm ends 14 mm above the base, and the arms clear the torso's
+  // sides by 9 mm: the torso stands on the yaw servo's turntable, the shoulders sit at the top of the torso.
   const base = r.part(pivot(0, 0, 0, root), "Base (printed)", [0, 0, 0]);
-  at(cyl(0.1, 0.11, 0.035, "shell", 64), 0, 0.0175, 0, base);
-  at(torus(0.104, 0.004, "accent"), 0, 0.035, 0, base).rotation.x = Math.PI / 2;
-  const br = r.part(at(bridge(), 0, 0.037, -0.05, base), "ESP32 bridge", [0, 0.05, -0.1]);
+  at(cyl(0.1, 0.11, 0.025, "shell", 64), 0, 0.0125, 0, base);
+  at(torus(0.104, 0.004, "accent"), 0, 0.025, 0, base).rotation.x = Math.PI / 2;
+  const br = r.part(at(bridge(), 0, 0.027, -0.068, base), "ESP32 bridge", [0, 0.05, -0.1]);
   r.callout(br, "ESP32 bridge: BLE ⇄ bus servos", "brain");
-  const bat = r.part(at(battery(0.06, 0.02, 0.035), 0, 0.012, 0.05, base), "2S battery (inside the base)", [0, 0, 0.12]);
+  const bat = r.part(at(battery(0.06, 0.02, 0.035), 0, 0.011, 0.05, base), "2S battery (inside the base)", [0, 0, 0.12]);
   r.callout(bat, "2S Li-ion or 12 V USB-C", "power");
-  const yaw = r.joint("torso_yaw", pivot(0, 0.035, 0, base), "y", [-120, 120], 0);
-  const body = r.part(pivot(0, 0, 0, yaw), "Torso", [0, 0.03, 0]);
+  const yaw = r.joint("torso_yaw", pivot(0, 0.025, 0, base), "y", [-120, 120], 0);
+  at(cyl(0.034, 0.034, 0.025, "servo", 32), 0, 0.0125, 0, yaw); // the yaw servo's turntable: the torso stands on it
+  const body = r.part(pivot(0, 0.025, 0, yaw), "Torso", [0, 0.03, 0]);
   at(rbox(0.12, 0.11, 0.08, "graphite", 0.034), 0, 0.058, 0, body);
   at(rbox(0.07, 0.012, 0.082, "accent", 0.005), 0, 0.075, 0, body);
   r.callout(body, "7 bus servos (STS3215)", "actuator");
   for (const sx of [-1, 1]) {
     const s = sx < 0 ? "l" : "r";
-    const sh = r.joint(`${s}_shoulder`, pivot(sx * 0.07, 0.085, 0, body), "x", [-170, 40], 0, 1); // negative raises the arm forward
+    const sh = r.joint(`${s}_shoulder`, pivot(sx * 0.074, 0.1, 0, body), "x", [-170, 40], 0, 1); // negative raises the arm forward
     const arm = r.part(pivot(0, 0, 0, sh), "Arm", [sx * 0.07, 0, 0]);
     at(cyl(0.018, 0.018, 0.022, "servo", 24), sx * 0.006, 0, 0, arm).rotation.z = Math.PI / 2;
-    at(rbox(0.026, 0.055, 0.03, "shell", 0.012), sx * 0.012, -0.03, 0, arm);
-    const el = r.joint(`${s}_elbow`, pivot(sx * 0.012, -0.058, 0, arm), "x", [-120, 0], -20, 1);
-    at(rbox(0.024, 0.055, 0.028, "shell", 0.012), 0, -0.027, 0, el);
-    at(sphere(0.013, "accent"), 0, -0.058, 0, el);
+    at(rbox(0.026, 0.046, 0.03, "shell", 0.012), sx * 0.012, -0.025, 0, arm);
+    const el = r.joint(`${s}_elbow`, pivot(sx * 0.012, -0.048, 0, arm), "x", [-120, 0], -20, 1);
+    at(rbox(0.024, 0.046, 0.028, "shell", 0.012), 0, -0.022, 0, el);
+    at(sphere(0.013, "accent"), 0, -0.046, 0, el);
   }
   return neck(r, body, 0.113, [-100, 100], [-25, 35], 0.022);
 }
@@ -429,13 +432,15 @@ function ax1Walker(r) {
     const yaw = r.joint(`${s}_hip_yaw`, pivot(sx * 0.042, -0.022, 0, hips), "y", [-30, 30], 0);
     const roll = r.joint(`${s}_hip_roll`, pivot(0, -0.018, 0, yaw), "z", [-25, 25], 0, sx);
     at(servo(0.85), 0, 0, 0, roll).rotation.z = Math.PI / 2;
-    const pitch = r.joint(`${s}_hip_pitch`, pivot(0, -0.012, 0, roll), "x", [-90, 60], 0, -1);
+    // protocol signs (web/js/pilot/ax-proto.js): hip_pitch < 0 swings the leg forward, and the foot stays flat when
+    // hip_pitch + knee + ankle_pitch = 0 (checked in test/Models.test.js)
+    const pitch = r.joint(`${s}_hip_pitch`, pivot(0, -0.012, 0, roll), "x", [-90, 60], 0, 1);
     const thigh = r.part(pivot(0, 0, 0, pitch), "Leg", [sx * 0.06, 0, 0]);
     at(rbox(0.034, 0.08, 0.036, "shell", 0.013), 0, -0.045, 0, thigh);
     const knee = r.joint(`${s}_knee`, pivot(0, -0.088, 0, thigh), "x", [0, 130], 0, 1);
     at(cyl(0.017, 0.017, 0.038, "servo", 20), 0, 0, 0, knee).rotation.z = Math.PI / 2;
     at(rbox(0.03, 0.078, 0.032, "graphite", 0.012), 0, -0.042, 0, knee);
-    const ap = r.joint(`${s}_ankle_pitch`, pivot(0, -0.084, 0, knee), "x", [-60, 60], 0, -1);
+    const ap = r.joint(`${s}_ankle_pitch`, pivot(0, -0.084, 0, knee), "x", [-60, 60], 0, 1);
     const ar = r.joint(`${s}_ankle_roll`, pivot(0, -0.008, 0, ap), "z", [-25, 25], 0, sx);
     at(rbox(0.05, 0.014, 0.088, "accent", 0.006), 0, -0.007, 0.012, ar);
     if (s === "l") r.callout(pitch, "12 leg servos + 1 torso yaw", "actuator");

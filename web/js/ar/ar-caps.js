@@ -1,4 +1,4 @@
-// What this phone can do for "AX-1 in your room", decided once before the Start card is shown. Nothing here opens the
+// What this phone can do for "My IRL lab", decided once before the Start card is shown. Nothing here opens the
 // camera or the microphone: it only asks the browser what it has.
 //   xr       WebXR immersive-ar (Android Chrome with ARCore): the Rover stands on your real floor.
 //   camera   no WebXR AR (iPhone, Firefox...): the camera is the background and the Rover is placed in front of it.

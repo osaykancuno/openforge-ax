@@ -76,7 +76,7 @@ function coinProp() {
   return g;
 }
 
-/** "In your room": a phone held up and, in front of it, AX-1 Rover's twin on its terracotta placement ring (the AR page in small). */
+/** "My IRL lab": a phone held up and, in front of it, AX-1 Rover's twin on its terracotta placement ring (the AR page in small). */
 function arProp() {
   const g = new THREE.Group();
   const ring = at(torus(0.42, 0.024, "accent"), 0, 0.012, 0.12, g); // the floor ring the AR page draws where a tap places the Rover

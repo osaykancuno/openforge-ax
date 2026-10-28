@@ -120,7 +120,7 @@ describe("OpenForgeAgents - SeaDrop mint (OpenSea)", () => {
     await agents.setBaseURI("ipfs://CID/");
     meta = decodeUri(await agents.tokenURI(1));
     expect(meta.name).to.match(/^AX-0001 \/\/ \w+ \w+$/);
-    expect(meta.image).to.equal("ipfs://CID/1.png");
+    expect(meta.image).to.equal("ipfs://CID/1.gif"); // the animated token (1.png, the still, sits next to it)
     expect(meta.license).to.equal(CC0);
     expect(meta.background_color).to.match(/^[0-9a-f]{6}$/);
     const get = (n) => meta.attributes.find((a) => a.trait_type === n)?.value;

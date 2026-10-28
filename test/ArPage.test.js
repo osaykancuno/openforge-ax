@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const fs = require("node:fs");
 const path = require("node:path");
 
-// The AR page "AX-1 in your room" (web/ar.html, css/ar.css, js/ar/ar.js, js/ar/ar-view.js): source checks for the rules no
+// The AR page "My IRL lab" (web/ar.html, css/ar.css, js/ar/ar.js, js/ar/ar-view.js): source checks for the rules no
 // unit test can see in Node (a browser and a phone are needed for the behaviour; see the report of the builder).
 const root = path.join(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
@@ -42,7 +42,7 @@ function overlayHtml() {
 
 describe("AR page: ar.html", () => {
   it("has a title, a description and the lab-notebook head of the other app pages", () => {
-    expect(html).to.match(/<title>AX-1 in your room · OpenForge AX<\/title>/);
+    expect(html).to.match(/<title>My IRL lab · OpenForge AX<\/title>/);
     expect(html).to.match(/<meta name="description" content="[^"]{60,}">/);
     expect(html).to.match(/<meta name="viewport" content="[^"]*viewport-fit=cover/);
     expect(html).to.match(/<html lang="en">/);
@@ -87,7 +87,7 @@ describe("AR page: ar.html", () => {
     for (const re of [/<button\b/g, /<a\b/g, /<input\b/g, /<select\b/g, /<textarea\b/g]) {
       expect(count(inside, re), String(re)).to.equal(count(html, re));
     }
-    for (const id of ["arStop", "arArm", "arExit", "arChips", "arStartBtn", "arLook", "arHeard", "arPlan", "arObstacle", "arTwin", "arLink", "arHint", "arBanner", "arUrl"]) {
+    for (const id of ["arStop", "arArm", "arExit", "arChips", "arStartBtn", "arLook", "arHeard", "arPlan", "arObstacle", "arTwin", "arLink", "arHint", "arBanner", "arQr", "arCopy"]) {
       expect(inside, id).to.include(`id="${id}"`);
     }
     // the picture itself is not a control: video and canvas stay outside, behind it
@@ -190,7 +190,7 @@ describe("AR page: css/ar.css", () => {
     const radios = [...html.matchAll(/<input type="radio" name="arBody" value="(\w+)"( checked)?>/g)];
     expect(radios.map((m) => m[1])).to.deep.equal(["rover", "desk", "walker"]);
     expect(radios[0][2]).to.equal(" checked");
-    expect(html).to.match(/<b>Walker<\/b> Holds poses\. It does not walk\./);
+    expect(html).to.match(/<b>Walker<\/b> Walks on two legs and strikes poses\./);
     // nothing anywhere says the Walker walks
     for (const [name, src] of [["ar.html", html], ["ar.js", arJs], ["ar-view.js", viewJs]]) expect(src, name).to.not.match(/Walker[^."]{0,80}\bwalks\b/);
     // the body is chosen before the session: setBody never runs after the view started
@@ -257,7 +257,7 @@ describe("AR page: js/ar/ar.js and js/ar/ar-view.js", () => {
     expect(xr.slice(0, firstAwait)).to.not.match(/\bawait\b/);
     for (const f of ["hit-test", "dom-overlay", "light-estimation", "depth-sensing", "anchors", "camera-access"]) expect(xr).to.include(`"${f}"`);
     expect(xr).to.match(/requiredFeatures:\s*\["hit-test"\]/);
-    expect(xr).to.match(/wantObjects\s*\?\s*\["camera-access"\]\s*:\s*\[\]/);
+    expect(xr).to.match(/wantObjects \|\| wantPhotos \? \["camera-access"\] : \[\]/); // only when asked: object finding, or photos with the room
     expect(xr).to.match(/domOverlay:\s*\{\s*root:\s*overlay\s*\}/);
     // three must draw into the classic XRWebGLLayer: a projection layer the session did not ask for is never shown in AR
     // (Galaxy S24, Chrome). The session's renderState.layers is hidden before three reads it in setSession.
@@ -365,5 +365,132 @@ describe("AR page: js/ar/ar.js and js/ar/ar-view.js", () => {
     expect(viewJs).to.match(/from "\.\.\/models\/look\.js"/);
     expect(viewJs).to.not.match(/AudioContext|new Audio\(|\.play\(\)\.then[\s\S]{0,0}audio/);
     expect(arJs).to.not.match(/AudioContext|new Audio\(/);
+  });
+});
+
+describe("AR page: iPhone and iPad (Apple AR Quick Look, camera-view floor)", () => {
+  const qlJs = noComments(read("web/js/ar/quick-look.js"));
+  it("has a hidden rel=ar link holding an <img> (Safari opens Quick Look only then) and a visible button", () => {
+    expect(html).to.match(/<a rel="ar" id="arQlLink" hidden[^>]*><img [^>]*alt=""[^>]*><\/a>/);
+    expect(html).to.match(/<button class="pl-btn" id="arQlBtn" type="button">See it on my floor \(Apple AR\)<\/button>/);
+    expect(html).to.match(/<div class="pl-row pl-wrap" id="arQlRow" hidden>/);
+  });
+  it("loads the USDZ exporter only when a model is made, and opens the link at real size", () => {
+    expect(qlJs).to.not.match(/^import [^;]*USDZExporter/m);
+    expect(qlJs).to.match(/await import\("three\/addons\/exporters\/USDZExporter\.js"\)/);
+    expect(qlJs).to.include("#allowsContentScaling=0");
+    expect(qlJs).to.match(/relList\?\.supports\?\.\("ar"\)/);
+    expect(qlJs).to.match(/quickLookCompatible: true/);
+    expect(qlJs).to.match(/isMeshBasicMaterial/); // the unlit face becomes a standard material, or Quick Look drops it
+  });
+  it("makes the model before the tap and offers it only where Quick Look exists and WebXR AR does not", () => {
+    expect(arJs).to.match(/const ql = QUICK_LOOK && !xr;/);
+    expect(fnBody(arJs, "showCard")).to.include("prepareQuickLook(bodyKey)");
+    expect(fnBody(arJs, "onQuickLook")).to.include('openQuickLook($("arQlLink"), url, key)');
+  });
+  it("the camera view's floor mode: real tilt, a phone height, the lens's field of view, taps on the floor", () => {
+    expect(viewJs).to.match(/orientationQuat\(oriLatest\.a - oriA0, oriLatest\.b, oriLatest\.g, sa\)/);
+    expect(fnBody(viewJs, "enterFloorMode")).to.include("PHONE_HEIGHT[bodyKey]");
+    expect(fnBody(viewJs, "fitFov")).to.include("cameraFovDeg(");
+    expect(fnBody(viewJs, "onCanvasTap")).to.match(/e\.isTrusted === false/); // a scripted click never places
+    expect(arJs).to.include("It does not follow your steps");
+  });
+  it("the cross-engine smoke covers Chromium, Firefox and WebKit, with iPhone and iPad profiles", async () => {
+    const { PROFILES } = await import("../scripts/site-engines.mjs");
+    expect(new Set(PROFILES.map((p) => p.engine))).to.deep.equal(new Set(["chromium", "firefox", "webkit"]));
+    for (const d of ["iPhone 13", "iPad (gen 7)", "Pixel 7"]) expect(PROFILES.some((p) => p.device === d), d).to.equal(true);
+  });
+});
+
+describe("AR page: Take a photo (photo.js)", () => {
+  let PH;
+  before(async () => { PH = await import("../web/js/ar/photo.js"); });
+  const photoJs = noComments(read("web/js/ar/photo.js"));
+
+  it("coverCrop frames exactly what object-fit: cover shows", () => {
+    // a 720 x 1280 portrait video in a 390 x 844 screen: the full height, the sides trimmed
+    const c = PH.coverCrop({ srcW: 720, srcH: 1280, dstW: 390, dstH: 844 });
+    expect(c.sh).to.be.closeTo(1280, 1e-9);
+    expect(c.sw).to.be.closeTo((390 / 844) * 1280, 1e-9);
+    expect(c.sx).to.be.closeTo((720 - c.sw) / 2, 1e-9);
+    expect(c.sy).to.equal(0);
+    // a landscape camera image in a portrait photo: the middle strip
+    const d = PH.coverCrop({ srcW: 1280, srcH: 720, dstW: 600, dstH: 1000 });
+    expect(d.sh).to.equal(720);
+    expect(d.sw / d.sh).to.be.closeTo(0.6, 1e-9);
+    expect(d.sx).to.be.closeTo((1280 - d.sw) / 2, 1e-9);
+    expect(PH.coverCrop({ srcW: 0, srcH: 720, dstW: 1, dstH: 1 })).to.equal(null);
+  });
+
+  it("photoSize keeps the shape and caps the longer side; it never enlarges", () => {
+    expect(PH.photoSize(1170, 2532)).to.deep.equal({ w: Math.round(1170 * (1600 / 2532)), h: 1600 });
+    expect(PH.photoSize(800, 600)).to.deep.equal({ w: 800, h: 600 });
+  });
+
+  it("the brand badge stays inside the photo in every corner, with the mark, the name and the site", () => {
+    for (const [w, h] of [[1080, 1920], [1600, 900], [600, 600], [320, 568]]) {
+      for (const corner of ["bl", "br", "tl", "tr"]) {
+        const L = PH.watermarkLayout({ w, h, corner });
+        expect(L.box.x, `${w}x${h} ${corner}`).to.be.at.least(0);
+        expect(L.box.y).to.be.at.least(0);
+        expect(L.box.x + L.box.w).to.be.at.most(w);
+        expect(L.box.y + L.box.h).to.be.at.most(h);
+        expect(L.mark.size).to.be.below(L.box.h + 1);
+        expect(L.title.text).to.equal("OpenForge AX · My IRL lab");
+        expect(L.url.text).to.equal("osaykancuno.github.io/openforge-ax/");
+        expect(L.box.w * L.box.h).to.be.below(w * h * 0.12); // a small corner, never over the twin's middle
+      }
+      expect(PH.watermarkLayout({ w, h, corner: "br" }).box.x).to.be.above(PH.watermarkLayout({ w, h, corner: "bl" }).box.x);
+      expect(PH.watermarkLayout({ w, h, corner: "tl" }).box.y).to.be.below(PH.watermarkLayout({ w, h, corner: "bl" }).box.y);
+    }
+  });
+
+  it("the badge goes to the corner the twin covers least (bottom left on a tie)", () => {
+    expect(PH.pickCorner({ bl: 0, br: 0, tl: 0, tr: 0 })).to.equal("bl");
+    expect(PH.pickCorner({ bl: 200, br: 10, tl: 50, tr: 90 })).to.equal("br");
+    expect(PH.pickCorner({ bl: 30, br: 30, tl: 5, tr: 30 })).to.equal("tl");
+    expect(PH.pickCorner({})).to.equal("bl");
+  });
+
+  it("names the file by date and time", () => {
+    expect(PH.photoFileName(new Date(2026, 9, 28, 14, 30, 5))).to.equal("openforge-ax-my-irl-lab-20261028-143005.jpg");
+  });
+
+  it("shares a file with Web Share Level 2, says when the person cancels, and reports browsers that cannot", async () => {
+    const file = { name: "x.jpg" };
+    const calls = [];
+    const nav = (canShare, share) => ({ canShare, share: async (d) => (calls.push(d), share && share()) });
+    expect(await PH.sharePhoto(file, {})).to.equal("unsupported");
+    expect(await PH.sharePhoto(file, nav(() => false))).to.equal("unsupported");
+    expect(await PH.sharePhoto(file, nav(() => true))).to.equal("shared");
+    expect(calls[0].files).to.deep.equal([file]);
+    expect(calls[0].url).to.equal(PH.SITE_URL);
+    const abort = Object.assign(new Error("no"), { name: "AbortError" });
+    expect(await PH.sharePhoto(file, nav(() => true, () => { throw abort; }))).to.equal("cancelled");
+    let thrown = null;
+    await PH.sharePhoto(file, nav(() => true, () => { throw new Error("broken"); })).catch((e) => (thrown = e));
+    expect(thrown && thrown.message).to.equal("broken"); // the page then saves it instead
+    expect(PH.canShareFile(file, { canShare: () => { throw new Error("x"); }, share() {} })).to.equal(false);
+  });
+
+  it("page: a Take a photo button in the live top bar, a preview with Share, Save and Close, all inside #arOverlay", () => {
+    const inside = overlayHtml();
+    for (const id of ["arPhoto", "arShot", "arShotImg", "arShare", "arSave", "arShotClose", "arShotMsg", "arPhotos"]) expect(inside, id).to.include(`id="${id}"`);
+    expect(html).to.match(/<button class="pl-btn sm" id="arPhoto" type="button">Take a photo<\/button>/);
+    expect(html).to.match(/<p class="pl-msg" id="arShotMsg" role="status" aria-live="polite"><\/p>/);
+    expect(html).to.match(/<input type="checkbox" id="arPhotos" checked/);
+  });
+
+  it("source: the photo is drawn from the view's own frame, never uploaded, and falls back to saving", () => {
+    expect(fnBody(viewJs, "renderTwinLayer")).to.include("rt.isXRRenderTarget = true"); // the same tone mapping and sRGB as the screen
+    expect(fnBody(viewJs, "renderTwinLayer")).to.include('rt.texture.internalFormat = "RGBA8"'); // else sRGB is applied twice
+    expect(fnBody(viewJs, "takeXrShot")).to.match(/createXrCameraReader\(/);
+    expect(fnBody(viewJs, "takeXrShot")).to.include('"xr-nocam"');
+    expect(viewJs).to.match(/if \(shot\) takeXrShot\(frame, vp\);/);
+    expect(viewJs).to.match(/if \(shot\) takeCameraShot\(\);/);
+    expect(photoJs).to.not.match(/fetch\(|XMLHttpRequest|sendBeacon|WebSocket/);
+    expect(fnBody(arJs, "onShare")).to.include("savePhoto(photo.blob, photo.name)");
+    expect(fnBody(arJs, "leaveLive")).to.include("closePhoto()");
+    expect(fnBody(arJs, "onPhoto")).to.include("Photos show my room");
   });
 });

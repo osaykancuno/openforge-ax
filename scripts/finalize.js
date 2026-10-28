@@ -2,7 +2,8 @@
 //   IMAGES_CID=bafy... npx hardhat run scripts/finalize.js --network mainnet          (sets the base URI; then check OpenSea)
 //   IMAGES_CID=bafy... FREEZE=true npx hardhat run scripts/finalize.js --network ...  (locks the renderer and FREEZES: irreversible)
 // FREEZE refuses to run unless the base URI is already this CID, so nothing is frozen unchecked. It also GETs
-// <baseURI>1.png and <baseURI><supply>.png and needs HTTP 200 + PNG magic bytes on both (IPFS URIs are read through
+// the still and the animated image of the first and last token (<baseURI>1.png, 1.gif, <supply>.png, <supply>.gif) and needs
+// HTTP 200 + the right magic bytes on each (IPFS URIs are read through
 // IPFS_GATEWAY, default https://gateway.pinata.cloud/ipfs).
 // Without IPFS: BASE_URI=https://<site>/images/ serves the images from the website (npm run post-reveal does this
 // when there is no PINATA_JWT). Freezing an https base URI ties the images to that domain forever, so it also
@@ -12,16 +13,17 @@ const { ethers } = require("hardhat");
 require("./lib/nonce-guard");
 const fs = require("fs");
 
-/** First and last image must be served (HTTP 200) and be real PNGs, or the freeze would lock a broken base URI forever. */
+/** First and last token's PNG and GIF must be served (HTTP 200, real images), or the freeze would lock a broken base URI forever. */
 async function assertImagesServed(uri, supply, fetchImpl = fetch) {
   if (supply < 1) throw new Error("Nothing minted: there are no images to check");
-  const { fetchPng, gatewayBase } = await import("./lib/art-files.mjs");
+  const { fetchImage, gatewayBase, IMAGE_TYPES } = await import("./lib/art-files.mjs");
   const base = gatewayBase(uri, process.env.IPFS_GATEWAY);
-  for (const id of [...new Set([1, supply])]) {
-    const r = await fetchPng(`${base}${id}.png`, fetchImpl);
+  const names = [...new Set([1, supply])].flatMap((id) => IMAGE_TYPES.map((ext) => `${id}.${ext}`));
+  for (const name of names) {
+    const r = await fetchImage(`${base}${name}`, fetchImpl);
     if (!r.ok) throw new Error(`Refusing to freeze: ${r.reason}. Publish/pin the images and check them, then run again.`);
   }
-  console.log(`✔ ${base}1.png and ${base}${supply}.png are served (HTTP 200, PNG).`);
+  console.log(`✔ ${names.map((n) => base + n).join(", ")} are served (HTTP 200, PNG/GIF).`);
 }
 
 async function main() {

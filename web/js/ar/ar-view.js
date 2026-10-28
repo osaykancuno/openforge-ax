@@ -1,4 +1,4 @@
-// AX-1 in your room: the view. WebXR (immersive-ar) on Android Chrome, a camera view with a virtual camera everywhere
+// My IRL lab (AX-1 in AR): the view. WebXR (immersive-ar) on Android Chrome, a camera view with a virtual camera everywhere
 // else. It draws the Rover twin, finds the floor, reads the phone's depth for the obstacle tracker and reports what the
 // person did (tap, visibility, end). It decides nothing about driving: ar.js wires it to the controller, and the
 // controller owns every arming and stopping rule. This file never arms and never stops anything by itself.
@@ -10,7 +10,9 @@ import { makeRenderer, makeStage, disposeObject, PALETTE } from "../models/look.
 import { buildRobot, bounds } from "../models/robots.js";
 import { composePose, faceToward } from "../pilot/twin-pose.js";
 import { corridorSamples, createObstacleTracker, evaluateDepth, evaluateRays } from "./obstacle.js";
-import { orientationQuat, relativeQuat } from "./orientation.js";
+import { PHONE_HEIGHT, cameraFovDeg, floorHit, orientationQuat } from "./orientation.js";
+import { photoSize } from "./photo.js";
+import { createXrCameraReader } from "./vision/xr-camera.js";
 
 export const CAMERA_VIEW = { fov: 60, pos: [0, 1.25, 1.3], look: [0, 0.1, 0], radius: 1.5 }; // the virtual camera of the camera view
 const DEPTH_MS = 66; // obstacle evaluation from the phone's depth: about 15 Hz
@@ -22,7 +24,7 @@ const CAMERA_CB_MS = 100; // object finding looks at 10 Hz at most (the detector
 const BODY_LOOK = Object.freeze({
   rover: { name: "Rover", shadow: 0.4, target: 0.1, senses: true, foot: [[-0.113, -0.085], [0.113, -0.085], [0.113, 0.075], [-0.113, 0.075]] },
   desk: { name: "Desk", shadow: 0.4, target: 0.15, senses: false, foot: Array.from({ length: 24 }, (_, i) => [Math.cos((i / 24) * Math.PI * 2) * 0.11, Math.sin((i / 24) * Math.PI * 2) * 0.11]) },
-  walker: { name: "Walker", shadow: 0.5, target: 0.25, senses: false, foot: [[-0.075, -0.05], [0.075, -0.05], [0.075, 0.05], [-0.075, 0.05]] },
+  walker: { name: "Walker", shadow: 0.5, target: 0.25, senses: true, foot: [[-0.075, -0.05], [0.075, -0.05], [0.075, 0.05], [-0.075, 0.05]] },
 });
 const footGeometry = (key) => new THREE.BufferGeometry().setFromPoints(BODY_LOOK[key].foot.map(([x, z]) => new THREE.Vector3(x, 0.002, z)));
 const WARM_SCALE = 1e-4; // the Rover is drawn this small before it is placed, so its shaders are compiled before the drive loop runs
@@ -133,6 +135,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     cameraAccess: false, // camera-access granted (object finding inside AR)
     depthSensing: false, // the phone gave us CPU depth
     orientationOn: false, // camera view follows the phone's turning
+    floorMode: false, // camera view with the motion sensors: the 3D floor lines up with the real one, taps place on it
     lowLight: false, // AR light estimation says it is dark: obstacle sensing is more careful
     get floorY() {
       return placeRoot.position.y;
@@ -148,6 +151,7 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     setLabels,
     placeHere,
     diagnostics,
+    capture,
     startXr,
     startCamera,
     exit,
@@ -172,9 +176,11 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
   let pending = null; // a placement waiting for the first drawn frame with the Rover visible
   let hintText;
   let stream = null;
-  let oriQ0 = null;
   let oriLatest = null;
   let oriListener = null;
+  let oriA0 = null; // floor mode: the compass reading at the start, so the scene starts where the phone looks
+  let floorAim = null; // floor mode: { x, z } where the reticle meets the floor, or null
+  let fovKey = "";
   let pageUp = null;
   const cam = { x: 0, y: 0, z: 0 }; // the phone's position in the room (XR)
   const ray = { src: null, pending: false, dist: [], x: 0, z: 0, yaw: 0, t: 0, failed: false };
@@ -239,9 +245,10 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
       rig.group.rotation.y = p.yaw;
     }
     rig.update?.(dt, t / 1000);
-    // the Desk and the Walker: keep the lowest point on the floor (their models sit 9-11 mm below their origin, and the
-    // Walker's legs bend); every few frames, only at full size. The Rover sits on its wheels already.
-    if (bodyKey !== "rover" && placeRoot.scale.x === 1 && ++groundTick % 6 === 0) {
+    // the Desk and the Walker: keep the lowest point on the floor (the Walker's soles sit 11 mm below its origin, and the
+    // Walker's legs bend); the Desk every few frames, the Walker every frame (its feet lift while it walks), only at full
+    // size. The Rover sits on its wheels already.
+    if (bodyKey !== "rover" && placeRoot.scale.x === 1 && (bodyKey === "walker" || ++groundTick % 6 === 0)) {
       const low = bounds(rig).min.y - placeRoot.position.y;
       if (Number.isFinite(low) && Math.abs(low) > 0.001) {
         groundY -= low;
@@ -295,17 +302,19 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     pending = null;
     shadow.visible = false;
     dropAnchor();
-    placeRoot.visible = view.mode === "camera" || view.mode === "xr"; // in AR it waits at a tiny size (see WARM_SCALE)
+    placeRoot.visible = (view.mode === "camera" && !view.floorMode) || view.mode === "xr"; // in AR it waits at a tiny size (see WARM_SCALE); in floor mode the reticle shows the spot
     placeRoot.scale.setScalar(view.mode === "xr" ? WARM_SCALE : 1);
     resetTrackers();
   }
 
   // ---------------------------------------------------------------- WebXR
-  async function startXr({ wantObjects = false } = {}) {
+  async function startXr({ wantObjects = false, wantPhotos = false } = {}) {
     if (session || view.mode) throw new Error("AR is already running");
     const init = {
       requiredFeatures: ["hit-test"],
-      optionalFeatures: ["dom-overlay", "light-estimation", "depth-sensing", "anchors", ...(wantObjects ? ["camera-access"] : [])],
+      // camera access (the page may read the camera picture) only when the person asked for it: object finding, or
+      // photos that show the room
+      optionalFeatures: ["dom-overlay", "light-estimation", "depth-sensing", "anchors", ...(wantObjects || wantPhotos ? ["camera-access"] : [])],
       domOverlay: { root: overlay },
       depthSensing: { usagePreference: ["cpu-optimized", "gpu-optimized"], dataFormatPreference: ["luminance-alpha", "float32"] },
     };
@@ -397,6 +406,10 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
 
   function cleanupXr() {
     renderer.setAnimationLoop(null);
+    shot?.reject(new Error("AR closed before the photo was taken."));
+    shot = null;
+    photoReader?.close();
+    photoReader = null;
     try {
       hitSource?.cancel();
       ray.src?.cancel();
@@ -559,8 +572,9 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     updateAnchor(frame);
     updateLight();
     updateRig(dt, t);
-    if (view.placed && BODY_LOOK[bodyKey].senses) sense(frame, vp, t); // obstacles: the wheeled Rover only
+    if (view.placed && BODY_LOOK[bodyKey].senses) sense(frame, vp, t); // obstacles: the Rover and the walking Walker
     renderer.render(scene, camera);
+    if (shot) takeXrShot(frame, vp);
     if (debug) {
       dbg.frames++;
       dbg.calls = renderer.info.render.calls;
@@ -724,8 +738,12 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     camera.position.fromArray(CAMERA_VIEW.pos);
     camera.quaternion.copy(baseQ);
     view.orientationOn = granted === "granted" || granted === true;
-    oriQ0 = null;
+    // the floor mode needs the sensors' real tilt; it turns on with the first reading (desktops have none)
+    view.floorMode = false;
+    oriA0 = null;
     oriLatest = null;
+    floorAim = null;
+    fovKey = "";
     if (view.orientationOn) {
       oriListener = (e) => {
         if (e.alpha == null && e.beta == null && e.gamma == null) return;
@@ -754,6 +772,61 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     return { orientation: view.orientationOn };
   }
 
+  /** The first motion reading: from now on the 3D camera stands at a phone's height and tilts like the phone. */
+  function enterFloorMode() {
+    view.floorMode = true;
+    oriA0 = oriLatest.a;
+    camera.position.set(0, PHONE_HEIGHT[bodyKey], 0);
+    if (!view.placed && !pending) {
+      placeRoot.visible = false; // the reticle shows where it will stand
+      shadow.visible = false;
+    } else movePlacedAhead = true; // placed before the sensors answered: it stood at the phone's feet
+  }
+  let movePlacedAhead = false;
+
+  /** Floor mode, placed before it began: the twin moves 1 m ahead of where the phone looks, facing the person. */
+  function placeAhead() {
+    movePlacedAhead = false;
+    const d = camera.getWorldDirection(new THREE.Vector3());
+    const len = Math.hypot(d.x, d.z) || 1;
+    const p = { x: (d.x / len) * 1, z: (d.z / len) * 1 };
+    const info = { gesture: true, source: "tap", x: p.x, y: 0, z: p.z, yaw: faceToward(p, { x: 0, z: 0 }) };
+    moveTo(info);
+    if (pending) pending = info;
+  }
+
+  /** Floor mode: where the ray through a screen point (NDC) meets the floor, or null. */
+  const caster = new THREE.Raycaster();
+  const ndcV = new THREE.Vector2();
+  function floorAt(nx, ny) {
+    caster.setFromCamera(ndcV.set(nx, ny), camera);
+    const o = caster.ray.origin, d = caster.ray.direction;
+    return floorHit([o.x, o.y, o.z], [d.x, d.y, d.z], { maxM: 4 });
+  }
+
+  /** Floor mode: the 3D camera's field of view follows the real lens and the way the picture is cropped on screen. */
+  function fitFov() {
+    const vw = video.videoWidth, vh = video.videoHeight, cw = canvas.clientWidth, ch = canvas.clientHeight;
+    const k = `${vw}x${vh}/${cw}x${ch}`;
+    if (k === fovKey) return;
+    const fov = cameraFovDeg({ videoW: vw, videoH: vh, viewW: cw, viewH: ch });
+    if (!fov) return;
+    fovKey = k;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+
+  /** Floor mode: the reticle sits where the phone points (a little above the middle, clear of the controls). */
+  function updateFloorReticle() {
+    floorAim = floorAt(0, 0.15);
+    if (floorAim) {
+      reticle.matrix.makeTranslation(floorAim.x, 0, floorAim.z);
+      reticle.matrixWorldNeedsUpdate = true;
+    }
+    reticle.visible = !!floorAim;
+    if (!view.placed && !pending) say(floorAim ? `Tap to put the ${BODY_LOOK[bodyKey].name} here.` : `Point your phone down at the ${bodyKey === "desk" ? "table" : "floor"}.`);
+  }
+
   /**
    * The "Place the Rover here" button (keyboard, switch and screen-reader users): the same as a tap at the reticle in AR
    * (without an anchor: a button click has no XR frame) or on the picture in the camera view.
@@ -765,6 +838,25 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
 
   function onCanvasTap(e) {
     if (view.mode !== "camera" || (e && e.isTrusted === false)) return; // a scripted click is not a person's tap
+    if (view.floorMode) {
+      // where the finger touched the floor; the Place button (no pointer) uses the reticle
+      let p = floorAim;
+      if (e && Number.isFinite(e.clientX)) {
+        const r = canvas.getBoundingClientRect();
+        p = floorAt(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      }
+      if (!p) return say(`That is not the ${bodyKey === "desk" ? "table" : "floor"}. Point your phone down and tap it.`);
+      const info = { gesture: true, source: "tap", x: p.x, y: 0, z: p.z, yaw: faceToward({ x: p.x, z: p.z }, { x: 0, z: 0 }) };
+      if (view.placed) {
+        if (view.handlers.place?.(info) === false) return;
+        moveTo(info);
+        resetTrackers();
+        return;
+      }
+      moveTo(info);
+      pending = info;
+      return;
+    }
     const info = { gesture: true, source: "tap", x: 0, y: 0, z: 0, yaw: placeRoot.rotation.y };
     if (view.placed) {
       if (view.handlers.place?.(info) !== false) resetTrackers();
@@ -778,16 +870,108 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     const dt = step(t);
     if (oriLatest) {
       const sa = globalThis.screen?.orientation?.angle ?? globalThis.orientation ?? 0;
-      const q = orientationQuat(oriLatest.a, oriLatest.b, oriLatest.g, sa);
-      if (!oriQ0) oriQ0 = q;
-      const r = relativeQuat(oriQ0, q);
-      camera.quaternion.copy(baseQ).multiply(tmpQ.set(r[0], r[1], r[2], r[3]));
+      if (!view.floorMode) enterFloorMode();
+      // the real tilt (gravity) and the turn since the start: the scene's floor is the room's floor
+      const q = orientationQuat(oriLatest.a - oriA0, oriLatest.b, oriLatest.g, sa);
+      camera.quaternion.set(q[0], q[1], q[2], q[3]);
+      if (movePlacedAhead) placeAhead();
+    }
+    if (view.floorMode) {
+      fitFov();
+      updateFloorReticle();
     }
     updateRig(dt, t);
     renderer.render(scene, camera);
+    if (shot) takeCameraShot();
     afterRender(t, {});
   }
-  const tmpQ = new THREE.Quaternion();
+
+  // ---------------------------------------------------------------- photo ("Take a photo", photo.js composes it)
+  let shot = null; // { resolve, reject }: a photo waiting for the next drawn frame
+  let photoReader = null; // the WebXR camera image at photo size (sessions granted camera access only)
+
+  /**
+   * capture() -> Promise<{ w, h, twin, video, camera, kind }> from the next drawn frame: the twin's own layer (a canvas,
+   * transparent where nothing is drawn) and the room's picture: the live video in the camera view, the WebXR camera
+   * image in AR when the session has camera access ("xr"), else none ("xr-nocam": photo.js puts the twin on paper).
+   */
+  function capture() {
+    if (!view.mode) return Promise.reject(new Error("Start AR or the camera view first."));
+    if (shot) return Promise.reject(new Error("A photo is already being taken."));
+    return new Promise((resolve, reject) => {
+      shot = { resolve, reject };
+    });
+  }
+
+  /**
+   * The twin through `cam` into a w x h target we can read, then a canvas. Flagged as an XR target so three tone-maps and
+   * encodes it exactly as it does on screen, into a plain RGBA8 buffer (an sRGB texture format would encode it twice; a
+   * multisampled XR target without it reads back empty). Measured in the browser: identical to the screen's pixels.
+   */
+  function renderTwinLayer(cam, w, h) {
+    const rt = new THREE.WebGLRenderTarget(w, h, { samples: 4 });
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    rt.texture.internalFormat = "RGBA8";
+    rt.isXRRenderTarget = true;
+    const wasXr = renderer.xr.enabled;
+    const prev = renderer.getRenderTarget();
+    const px = new Uint8Array(w * h * 4);
+    const ui = [reticle, labelGroup].map((o) => [o, o.visible]); // the floor ring and the object labels are controls, not the photo
+    try {
+      for (const [o] of ui) o.visible = false;
+      renderer.xr.enabled = false;
+      renderer.setRenderTarget(rt);
+      renderer.clear();
+      renderer.render(scene, cam);
+      renderer.readRenderTargetPixels(rt, 0, 0, w, h, px);
+    } finally {
+      renderer.setRenderTarget(prev);
+      renderer.xr.enabled = wasXr;
+      for (const [o, v] of ui) o.visible = v;
+      rt.dispose();
+    }
+    const out = document.createElement("canvas");
+    out.width = w;
+    out.height = h;
+    const img = new ImageData(w, h);
+    const row = w * 4;
+    for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row); // GL rows run bottom-up
+    out.getContext("2d").putImageData(img, 0, 0);
+    return out;
+  }
+
+  function takeCameraShot() {
+    const s = shot;
+    shot = null;
+    try {
+      const { w, h } = photoSize(canvas.clientWidth * (globalThis.devicePixelRatio || 1), canvas.clientHeight * (globalThis.devicePixelRatio || 1));
+      s.resolve({ w, h, twin: renderTwinLayer(camera, w, h), video, camera: null, kind: "camera" });
+    } catch (e) {
+      s.reject(e);
+    }
+  }
+
+  function takeXrShot(frame, vp) {
+    const s = shot;
+    shot = null;
+    try {
+      const xv = vp && vp.views && vp.views[0];
+      const xrCam = renderer.xr.getCamera();
+      const c0 = xrCam && xrCam.cameras && xrCam.cameras[0];
+      if (!xv || !c0) throw new Error("AR has no view to photograph right now. Try again.");
+      const port = session.renderState.baseLayer?.getViewport(xv);
+      const { w, h } = photoSize(port?.width || canvas.width, port?.height || canvas.height);
+      const twin = renderTwinLayer(c0, w, h);
+      let cameraImage = null;
+      if (view.cameraAccess) {
+        photoReader = photoReader || createXrCameraReader(renderer.getContext(), session, { width: Math.max(w, h) });
+        cameraImage = photoReader.read(frame, xv);
+      }
+      s.resolve({ w, h, twin, video: null, camera: cameraImage, kind: cameraImage ? "xr" : "xr-nocam" });
+    } catch (e) {
+      s.reject(e);
+    }
+  }
 
   function stopTracks() {
     try {
@@ -800,6 +984,8 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
 
   function cleanupCamera() {
     renderer.setAnimationLoop(null);
+    shot?.reject(new Error("The camera view closed before the photo was taken."));
+    shot = null;
     stopTracks();
     canvas.removeEventListener("click", onCanvasTap);
     if (oriListener) removeEventListener("deviceorientation", oriListener);
@@ -807,8 +993,14 @@ export function createArView({ canvas, video, overlay, handlers = {}, debug = fa
     if (pageUp) document.removeEventListener("visibilitychange", pageUp);
     pageUp = null;
     oriLatest = null;
-    oriQ0 = null;
+    oriA0 = null;
+    floorAim = null;
+    movePlacedAhead = false;
     view.orientationOn = false;
+    view.floorMode = false;
+    reticle.visible = false;
+    camera.fov = CAMERA_VIEW.fov;
+    camera.updateProjectionMatrix();
     view.mode = null;
     unplace();
     placeRoot.visible = false;

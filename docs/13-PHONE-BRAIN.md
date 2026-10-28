@@ -281,7 +281,7 @@ model nothing leaves the page at all.
   `Permissions-Policy` token for it is set: the headers in `web/_headers` and `scripts/serve.mjs` are unchanged.
 - The turn is open loop (a timed spin), so the angle is approximate; there is no feedback from the robot.
 
-## 9b. AR twin ("AX-1 in your room")
+## 9b. AR twin ("My IRL lab")
 
 `ar.html` puts an AX-1 **twin** (never the real robot) in your room at real size and moves it with on-screen buttons
 through the same plan executor and drive loop as `pilot.html`. The start card picks the body: There is **no voice on this page for
@@ -290,12 +290,17 @@ now** (2026-10-28): it comes back later. Model servers are not used here.
 | Body | Height | In AR |
 |---|---|---|
 | **Rover** | 23 cm | Drives on the floor: tap or hold the direction buttons, obstacle sensing ahead and behind |
-| **Desk** | 29 cm | No wheels: wave, nod, point, shrug, turn the torso, look around, home. Sits on a table or the floor |
-| **Walker** | 42 cm | Poses only (stand, crouch, lean, twist, sway, torso turns). **It does not walk**: there is no gait |
+| **Desk** | about 30 cm | No wheels: wave, nod, point, shrug, turn the torso, look around, home. Sits on a table or the floor |
+| **Walker** | 42 cm | **The twin walks**: Forward, Back, Left, Right (tap for a few steps, hold to keep walking; turns on the spot with small steps), plus poses (stand, crouch, lean, twist). The walk is the twin's (`gait.js`): the real Walker's bridge has no gait yet |
 
-The body is fixed for a session (Exit, pick another, Start). The Desk and the Walker have no obstacle sensing and no
-hold-to-drive (their joints move to absolute, bounded angles; a tap is the whole move), and the drawing keeps their
-lowest point on the floor (their models sit 9–11 mm below their origin and the Walker's legs bend). Heights measured with
+The body is fixed for a session (Exit, pick another, Start). The Desk has no obstacle sensing and no hold-to-move (its
+joints move to absolute, bounded angles; a tap is the whole move). The Walker twin walks under the Rover's rules (only
+when armed, leases of 0.4 s renewed while a button is held, STOP latches, the edge of the play area and obstacles ahead
+or behind hold it, 0.12 m/s, 45°/s on the spot): its moves are the controller's own walk leases, because the protocol has
+no walking command (the real bridge has no gait), and its legs follow a step cycle paced by the distance it moved (hips,
+knees, ankles kept flat, hip and ankle roll for the weight shift, a little torso twist). The drawing keeps the lowest
+point of the Desk and the Walker on the floor (the Walker's soles sit 11 mm below its origin and its legs bend: every
+frame, as its feet lift; the Desk's base stands at its origin). Heights measured with
 `bounds()` on the same models.
 
 **Modes.** The page probes the phone and picks one:
@@ -303,8 +308,23 @@ lowest point on the floor (their models sit 9–11 mm below their origin and the
 | Mode | Where | What you get |
 |---|---|---|
 | **AR** | Android Chrome on ARCore phones (WebXR `immersive-ar`) | The twin anchored to the floor (hit-test, anchors, light estimation, shadow), obstacle sensing ahead and behind |
-| **Camera view** | iPhone and browsers without WebXR AR | The twin drawn over the live camera; not anchored to the floor, no obstacle sensing (the page says both) |
-| **Desktop** | No phone | "Open this on your phone" with the page address and a link to the 3D twin |
+| **Camera view** | iPhone, iPad and browsers without WebXR AR | With the motion sensors (iPhone asks once): the 3D floor lines up with the real one (the phone's tilt, a phone height of 1.25 m standing or 0.45 m over a table for the Desk, the lens's field of view), a reticle shows the floor and a tap places the twin there; it stays put when the phone turns but does not follow your steps, its size is approximate, no obstacle sensing (the page says so). Without motion access the twin is drawn in front of the camera |
+| **Apple AR (Quick Look)** | iPhone and iPad, next to the camera view | "See it on my floor (Apple AR)": a USDZ model of the chosen body made in the browser (`quick-look.js`), opened in Apple's own AR viewer: real size on the real floor with ARKit tracking; it is a model, so no driving there |
+| **Desktop** | No phone | "Open this on your phone" with a QR code (the AX-1 mark in the middle) and Copy the link, plus a link to the 3D twin |
+
+**Take a photo** (top bar, while live): one JPEG of the twin in the room, because a screenshot of AR is hard on a phone.
+The camera view draws the live video (cropped exactly as on screen) under the twin; WebXR AR draws the twin again from
+that frame's camera into a readable target (`ar-view.js` `renderTwinLayer`: the same tone mapping as the screen) over the
+WebXR camera image, which the page reads only when the person ticked **Photos show my room** on the start card (it asks
+for `camera-access`); without it the twin stands on paper and the page says why. A small badge (the smiling AX-1 mark,
+"OpenForge AX · My IRL lab" and the site) goes in the corner the twin covers least; the floor ring and labels are left
+out. Share uses the Web Share API with the file; where a browser cannot share files it saves the JPEG instead. Nothing
+is uploaded by the page (`photo.js`).
+
+**Platforms.** Android Chrome: full AR. iPhone/iPad (every browser there is WebKit): Apple AR to see it on the floor,
+the camera view to drive it. Desktop (Windows, macOS, Linux; Chrome, Edge, Firefox, Safari): the QR code and the 3D
+twin. `scripts/site-engines.mjs` loads every page in Chromium, Firefox and WebKit (desktop, Android, iPhone, iPad
+profiles); `.github/workflows/engines.yml` runs it on Linux.
 
 **Driving and safety.** The same rules as §9a, plus:
 

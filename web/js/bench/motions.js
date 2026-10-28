@@ -358,9 +358,11 @@ export function makeBipedPoser(rig, kind) {
     const torso = p.ankle - p.knee + p.lean; // world pitch of the pelvis/torso
     for (const s of ["l", "r"]) {
       const lift = s === "l" ? p.lift : 0;
-      setRaw(rig, `${s}_${J.hip}`, p.lean + lift);
+      // the lab pose's own pitch direction (the Walker model follows the protocol's signs, which are the opposite)
+      const pitch = walker ? -1 : null;
+      setRaw(rig, `${s}_${J.hip}`, p.lean + lift, pitch);
       setRaw(rig, `${s}_${J.knee}`, p.knee + 1.5 * lift);
-      setRaw(rig, `${s}_${J.ankle}`, p.ankle + 0.5 * lift);
+      setRaw(rig, `${s}_${J.ankle}`, p.ankle + 0.5 * lift, pitch);
       if (walker) {
         setRaw(rig, `${s}_hip_roll`, -p.shift, 1);
         setRaw(rig, `${s}_ankle_roll`, p.shift, 1);

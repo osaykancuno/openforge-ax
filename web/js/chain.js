@@ -147,8 +147,18 @@ const listeners = new Set();
 export const onWallet = (fn) => (listeners.add(fn), fn(signer));
 export const currentSigner = () => signer;
 
+/** A phone or tablet (iPadOS says Mac): browsers there take no wallet extensions. */
+const onPhone = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+/** MetaMask's own link: the app opens this same page in its built-in browser, where the wallet is (Android and iPhone). */
+export const metamaskLink = (loc = location) => `https://metamask.app.link/dapp/${loc.host}${loc.pathname}${loc.search}`;
+
 export async function connect() {
   if (!window.ethereum) {
+    if (onPhone() && location.protocol === "https:") {
+      toast("Opening this page in the MetaMask app (free): connect from there. No app yet? The link leads to its store page.");
+      location.href = metamaskLink();
+      return null;
+    }
     toast("No wallet found. Install MetaMask or Rabby (see the home page FAQ): it takes 2 minutes.", true);
     return null;
   }
@@ -254,6 +264,8 @@ export function decodeTokenURI(uri) {
 export const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 export const ipfs = (u) =>
   u?.startsWith("ipfs://") ? CONFIG.ipfsGateway + u.slice(7) : /^(https:\/\/|https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/|assets\/|demo-images\/)/.test(u || "") ? u : "assets/placeholder.png"; // https only (plain http: the local demo)
+/** A token's still: <id>.png sits next to the animated <id>.gif under the base URI (grids load the light one). */
+export const still = (u) => String(u ?? "").replace(/(\/\d+)\.gif$/i, "$1.png");
 export const attr = (meta, k) => meta?.attributes?.find((a) => a.trait_type === k)?.value;
 export const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
 

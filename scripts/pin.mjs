@@ -1,7 +1,7 @@
 // Uploads a folder to IPFS via Pinata and prints the CID.
 //   node scripts/pin.mjs art/out/images "openforge-images" [supply]   (PINATA_JWT in .env)
-// Refuses to pin a folder that is not exactly 1.png … <supply>.png (supply: argument, option, or ../rarity.json),
-// then fetches three images back through the gateway and compares sha256 with the local files.
+// Refuses to pin a folder that is not exactly 1.png … <supply>.png and 1.gif … <supply>.gif (supply: argument, option, or ../rarity.json),
+// then fetches three tokens' images back through the gateway and compares sha256 with the local files.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,7 @@ function supplyFor(dir, supply) {
 
 /**
  * Pins every file of `dir` as one folder; returns its CIDv1. Files are then at ipfs://<CID>/<file>.
- * The folder must be exactly 1.png … <supply>.png: anything else would be pinned forever under the base URI.
+ * The folder must be exactly 1.png … <supply>.png and 1.gif … <supply>.gif: anything else would be pinned forever under the base URI.
  */
 export async function pinFolder(dir, name = basename(dir), { supply, fetchImpl } = {}) {
   const jwt = process.env.PINATA_JWT;

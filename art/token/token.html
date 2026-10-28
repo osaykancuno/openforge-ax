@@ -44,12 +44,13 @@
 import * as THREE from "three";
 import { makeRenderer, makeStage, mat, disposeObject } from "/web/js/models/look.js";
 import { ROBOTS, buildRobot } from "/web/js/models/robots.js";
+import { createMotion } from "./motion.mjs";
 
 const W = 1000, H = 660;
 const art = document.getElementById("art");
 const canvas = document.getElementById("gl");
 const renderer = makeRenderer(canvas, { alpha: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(1);
+renderer.setPixelRatio(window.devicePixelRatio || 1); // 1 for the 1000 px still, 0.75 for the animated token's page
 renderer.setSize(W, H, false);
 renderer.setClearColor(0x000000, 0);
 const scene = new THREE.Scene();
@@ -61,6 +62,9 @@ floor.receiveShadow = true;
 scene.add(floor);
 const camera = new THREE.PerspectiveCamera(22, W / H, 0.01, 50);
 let current = null; // the token's robot + add-ons, freed before the next token
+let motion = null; // the token's gesture (art/token/motion.mjs)
+let face = null; // the AX-1 phone face, when the robot has one
+let faceHome = { look: [0, 0], mood: "idle" };
 
 // ---------------------------------------------------------------- trait tables (indices as in art/traits.mjs)
 /** Class index → robot id: the ROBOTS catalogue carries each robot's on-chain class. */
@@ -102,19 +106,23 @@ function paint(group, f) {
   });
 }
 
-/** The highest point of the posed robot (world space): antennas and halos sit on the robot, not on its bounding box. */
+/**
+ * The highest point of the posed robot (world space) and the mesh it belongs to: antennas and halos sit on the robot,
+ * not on its bounding box, and ride on that part when the robot moves.
+ */
 function topPoint(group) {
   const best = new THREE.Vector3(0, -Infinity, 0);
+  let mesh = null;
   const v = new THREE.Vector3();
   group.traverse((o) => {
     if (!o.isMesh || !o.geometry.attributes.position) return;
     const pos = o.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
-      if (v.y > best.y) best.copy(v);
+      if (v.y > best.y) best.copy(v), (mesh = o);
     }
   });
-  return best;
+  return { point: best, mesh };
 }
 
 /** A small add-on placed from the posed robot (world space). kind = Augment index, or "crown" for a Prime Construct. */
@@ -176,24 +184,33 @@ window.renderToken = async ({ id, t, info }) => {
   rig.home();
   const reach = 0.06 * t.frame; // Mk-I stands at home; each later frame leaves home a little more
   for (const [name, j] of Object.entries(rig.joints)) rig.set(name, j.home + (r() - 0.5) * reach * (j.max - j.min));
-  rig.face?.setMood?.(prime ? "happy" : "idle");
-  rig.face?.setLook?.(r() * 1.2 - 0.6, r() * 0.4 - 0.1);
-  rig.face?.tick?.(0.5);
+  const look0 = [r() * 1.2 - 0.6, r() * 0.4 - 0.1];
+  face = rig.face;
   paint(rig.group, prime ? GOLD : FINISH[t.finish]);
   const side = r() < 0.5 ? -1 : 1;
   rig.group.rotation.y = side * (0.35 + r() * 0.45);
   current.add(rig.group);
   rig.group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(rig.group);
-  const aug = augment(prime ? "crown" : t.augment, box, (prime ? GOLD : FINISH[t.finish]).trim, topPoint(rig.group));
+  const kind = prime ? "crown" : t.augment;
+  const top = topPoint(rig.group);
+  const aug = augment(kind, box, (prime ? GOLD : FINISH[t.finish]).trim, top.point);
   current.add(aug);
-  const all = new THREE.Box3().setFromObject(current);
+  // add-ons move with the robot: antennas are mounted on the part they stand on; the floating halo and crown, and the
+  // rest, go with the body (a halo on a finger or a propeller would tumble with it)
+  (kind === 1 && top.mesh ? top.mesh : rig.group).attach(aug);
+  // the camera frames the whole gesture, so nothing leaves the picture while the robot moves
+  motion = createMotion(robotId, rig, r);
+  const all = new THREE.Box3();
+  for (let i = 0; i <= motion.frames; i += 4) motion.pose(i), all.expandByObject(current);
+  motion.pose(0);
   const c = all.getCenter(new THREE.Vector3());
   const size = all.getSize(new THREE.Vector3());
   const radius = (Math.max(size.y, size.x / (W / H)) / 2) / Math.tan((camera.fov * Math.PI) / 360) * 1.22;
   camera.position.set(c.x, c.y + radius * 0.32, c.z + radius);
   camera.lookAt(c);
-  renderer.render(scene, camera);
+  faceHome = { look: look0, mood: prime ? "happy" : "idle" };
+  drawFrame(0);
 
   // ---------------------------------------------------------------- plate
   for (const n of art.querySelectorAll(".t, .frame")) n.remove();
@@ -216,8 +233,29 @@ window.renderToken = async ({ id, t, info }) => {
   el(`<div class="badge"><span style="background:${CORE_DOT[prime ? 3 : t.core]}"></span>${esc(info.District)}</div>`, "left:56px;top:96px");
   el(`<div class="badge"><span style="background:${prime ? "#b8902f" : FACTION[t.faction]}"></span>${esc(info.Faction)}</div>`, "right:56px;top:96px");
   if (prime) art.insertAdjacentHTML("beforeend", '<div class="frame"></div>');
-  await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); // layout and WebGL settle before the screenshot
-  return { robot: robotId };
+  await settle();
+  return { robot: robotId, frames: motion.frames };
+};
+
+const settle = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); // layout and WebGL settle before the screenshot
+
+/** Frame i of the token's gesture (0 = the still pose). The face gets its own clock, with one blink near the end. */
+function drawFrame(i) {
+  const f = motion.pose(i);
+  if (face) {
+    const [bx, by] = faceHome.look;
+    face.setLook(bx + (f.look?.[0] ?? 0), by + (f.look?.[1] ?? 0));
+    face.setMood(f.mood ?? faceHome.mood);
+    const s = i / motion.frames;
+    face.tick(i === 0 ? 0.5 : s > 0.86 && s < 0.93 ? 4.1 + (i % 2) * 0.05 : i / 20); // 4.1 s: inside the face's blink
+  }
+  renderer.render(scene, camera);
+}
+
+/** Draws frame i of the animated token (the plate stays as renderToken left it). */
+window.poseToken = async (i) => {
+  drawFrame(i);
+  await settle();
 };
 
 await Promise.all(["800 76px 'Inter Tight'", "500 22px Inter", "700 16px 'JetBrains Mono'"].map((f) => document.fonts.load(f)));

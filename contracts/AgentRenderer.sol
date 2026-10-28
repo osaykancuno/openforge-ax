@@ -265,7 +265,7 @@ contract AgentRenderer is Ownable2Step {
     function _image(uint256 id) private view returns (string memory) {
         string memory b = agents.baseURI();
         if (bytes(b).length == 0) return placeholderImage;
-        return string.concat(b, id.toString(), ".png");
+        return string.concat(b, id.toString(), ".gif"); // the animated token; <id>.png (the still) sits next to it
     }
 
     function _traitAttrs(Traits memory t) private pure returns (string memory a) {

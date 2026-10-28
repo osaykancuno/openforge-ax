@@ -1,8 +1,9 @@
 // The tap-to-say chips of the AR page, per body. A chip is a phrase the built-in parser already understands for that body,
 // said for the user: it goes through exactly the same path as any request (ar-parse -> plan card -> ARM gate -> executor),
 // so a chip can never move a twin that has not been armed. STOP is not a chip: it is its own big button.
-// `hold: true`: holding the chip keeps the Rover moving (controller.press), Rover direction chips only: the Desk and Walker
-// joints are absolute and bounded, a tap is the whole move.
+// `hold: true`: holding the chip keeps the Rover or the Walker moving (controller.press). The Walker's Forward, Back,
+// Left and Right are walk leases in the controller (its twin walks; the bridge has no walking command), not phrases.
+// The Desk's joints are absolute and bounded: a tap is the whole move.
 
 export const CHIPS_BY_BODY = Object.freeze({
   rover: Object.freeze([
@@ -25,14 +26,15 @@ export const CHIPS_BY_BODY = Object.freeze({
     { id: "home", label: "Home", say: "home" },
   ]),
   walker: Object.freeze([
+    { id: "forward", label: "Forward", say: "walk forward", hold: true },
+    { id: "back", label: "Back", say: "walk back", hold: true },
+    { id: "left", label: "Left", say: "turn left on the spot", hold: true },
+    { id: "right", label: "Right", say: "turn right on the spot", hold: true },
     { id: "stand", label: "Stand", say: "stand" },
     { id: "crouch", label: "Crouch", say: "crouch" },
     { id: "lean-left", label: "Lean left", say: "lean left" },
     { id: "lean-right", label: "Lean right", say: "lean right" },
     { id: "twist", label: "Twist", say: "twist" },
-    { id: "left", label: "Torso left", say: "turn left 30" },
-    { id: "right", label: "Torso right", say: "turn right 30" },
-    { id: "sway", label: "Sway", say: "lean left then lean right then stand" },
   ]),
 });
 

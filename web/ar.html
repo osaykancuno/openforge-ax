@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-bgMiZ5XudRc3ON+iOP7TJVjZSb2mE636fa8zgcfI2dE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AX-1 in your room · OpenForge AX</title>
+<title>My IRL lab · OpenForge AX</title>
 <meta name="description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
 <meta name="theme-color" content="#f4efe6">
 <link rel="icon" href="assets/pilot-icon.svg" type="image/svg+xml">
@@ -28,9 +28,14 @@
 <link rel="modulepreload" href="js/pilot/twin-transport.js">
 <link rel="modulepreload" href="js/pilot/drive-loop.js">
 <link rel="modulepreload" href="js/pilot/twin-pose.js">
+<link rel="modulepreload" href="js/pilot/ax-proto.js">
+<link rel="modulepreload" href="js/ar/gait.js">
 <link rel="modulepreload" href="js/pilot/sensors.js">
 <link rel="modulepreload" href="js/pilot/ui.js">
+<link rel="modulepreload" href="js/qr.js">
 <link rel="modulepreload" href="js/ar/ar-caps.js">
+<link rel="modulepreload" href="js/ar/quick-look.js">
+<link rel="modulepreload" href="js/ar/photo.js">
 <link rel="modulepreload" href="js/ar/ar-controller.js">
 <link rel="modulepreload" href="js/ar/chips.js">
 <link rel="modulepreload" href="js/ar/seek.js">
@@ -48,7 +53,6 @@
 <link rel="modulepreload" href="js/audio-buttons.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/servers.js">
-<link rel="modulepreload" href="js/pilot/ax-proto.js">
 <link rel="modulepreload" href="js/pilot/motions.js">
 <link rel="modulepreload" href="js/pilot/bridge-sim.js">
 <link rel="modulepreload" href="js/pilot/ai/ai-pilot.js">
@@ -66,7 +70,7 @@
 <!--seo-->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OpenForge AX">
-<meta property="og:title" content="AX-1 in your room · OpenForge AX">
+<meta property="og:title" content="My IRL lab · OpenForge AX">
 <meta property="og:description" content="See the AX-1 Rover twin in your own room through your phone's camera, and drive it with on-screen buttons. It is a digital twin, not a real robot: your camera pictures never leave the phone.">
 <meta name="twitter:card" content="summary_large_image">
 <!--/seo-->
@@ -78,7 +82,7 @@
 
   <!-- the dom-overlay root: in AR only this element stays on screen, so EVERY control lives inside it -->
   <div id="arOverlay" class="ar-overlay">
-    <noscript><p class="ar-panel ar-noscript">AX-1 in your room needs JavaScript. <a href="index.html">Back to the lab</a>.</p></noscript>
+    <noscript><p class="ar-panel ar-noscript">My IRL lab needs JavaScript. <a href="index.html">Back to the lab</a>.</p></noscript>
 
     <header class="ar-top" id="arTop" hidden>
       <span class="pl-chip ar-twin" id="arTwin" data-tone="live" title="A digital twin: nothing here is a real robot">TWIN</span>
@@ -86,6 +90,7 @@
       <span class="pl-chip" id="arObstacle" data-tone="">Obstacle sensing: waiting</span>
       <span class="pl-chip" id="arLookChip" role="status" aria-live="polite" hidden></span>
       <button class="pl-btn sm" id="arLookBtn" type="button" aria-pressed="false" hidden>Look around</button>
+      <button class="pl-btn sm" id="arPhoto" type="button">Take a photo</button>
       <button class="pl-btn sm ar-exit" id="arExit" type="button">Exit</button>
     </header>
 
@@ -100,14 +105,14 @@
 
     <!-- start card (before AR or the camera view begins) -->
     <section class="ar-panel ar-start" id="arStart" aria-labelledby="arTitle" hidden>
-      <p class="pl-label">FIG. 01 · <b>The twin, in your room</b></p>
-      <h1 id="arTitle">AX-1 in your room</h1>
+      <p class="pl-label">FIG. 01 · <b>The twin, in real life</b></p>
+      <h1 id="arTitle">My IRL lab</h1>
       <p class="pl-lead" id="arLead">Meet the AX-1 Rover as a <b>digital twin</b> on your own floor. Point your phone at the ground, tap to place it, then drive it with the buttons. It is not a real robot. Camera pictures never leave this phone.</p>
       <fieldset class="ar-bodies" id="arBodies">
         <legend class="pl-label">Choose a body</legend>
         <label class="ar-body"><input type="radio" name="arBody" value="rover" checked><span><b>Rover</b> Drives on the floor.</span></label>
         <label class="ar-body"><input type="radio" name="arBody" value="desk"><span><b>Desk</b> Sits on a table and waves. No wheels.</span></label>
-        <label class="ar-body"><input type="radio" name="arBody" value="walker"><span><b>Walker</b> Holds poses. It does not walk.</span></label>
+        <label class="ar-body"><input type="radio" name="arBody" value="walker"><span><b>Walker</b> Walks on two legs and strikes poses.</span></label>
       </fieldset>
       <ol class="ar-steps">
         <li>Allow the camera when asked.</li>
@@ -116,9 +121,17 @@
       </ol>
       <label class="pl-check ar-look" id="arLookRow"><input type="checkbox" id="arLook" aria-describedby="arLookNote"> Look around (find objects)</label>
       <p class="pl-small" id="arLookNote">Off by default. Turning it on downloads the object-finding model once (up to about 19 MB) and runs it on your phone. Nothing leaves the phone.</p>
+      <label class="pl-check ar-look" id="arPhotosRow" hidden><input type="checkbox" id="arPhotos" checked aria-describedby="arPhotosNote"> Photos show my room</label>
+      <p class="pl-small" id="arPhotosNote" hidden>For "Take a photo" in AR: lets this page read the camera picture when you take one. It stays on the phone unless you share it.</p>
       <div class="pl-row pl-wrap">
         <button class="pl-btn pl-primary" id="arStartBtn" type="button">Start</button>
       </div>
+      <!-- iPhone and iPad: Apple's AR viewer puts the twin on the real floor (js/ar/quick-look.js); the link needs an <img> -->
+      <div class="pl-row pl-wrap" id="arQlRow" hidden>
+        <button class="pl-btn" id="arQlBtn" type="button">See it on my floor (Apple AR)</button>
+        <a rel="ar" id="arQlLink" hidden tabindex="-1" aria-hidden="true"><img src="assets/pilot-icon.svg" alt="" width="1" height="1"></a>
+      </div>
+      <p class="pl-small" id="arQlNote" hidden>Apple AR shows the twin at its real size on your floor: walk around it. To drive it, use the camera view.</p>
       <p class="pl-msg" id="arStartMsg" role="status" aria-live="polite"></p>
     </section>
 
@@ -126,9 +139,30 @@
     <section class="ar-panel ar-desktop" id="arDesktop" aria-labelledby="arDesktopTitle" hidden>
       <p class="pl-label">FIG. 01 · <b>Best on a phone</b></p>
       <h1 id="arDesktopTitle">Open this on your phone</h1>
-      <p class="pl-lead" id="arDesktopWhy">AX-1 in your room uses your phone's camera. Open this page on your phone:</p>
-      <p class="pl-mono ar-url" id="arUrl"></p>
+      <p class="pl-lead" id="arDesktopWhy">My IRL lab uses your phone's camera. Scan this code with your phone:</p>
+      <svg class="ar-qr" id="arQr" role="img" aria-label="QR code with the AX-1 mark: it opens this page on your phone" xmlns="http://www.w3.org/2000/svg">
+        <path class="ar-qr-ink" id="arQrPath"/><path class="ar-qr-ink" id="arQrEyes"/>
+        <rect class="ar-qr-pad" id="arQrPad"/>
+        <!-- the smiling AX-1 mark (art/brand/mark.svg), 100 × 100, placed on the pad by ar.js -->
+        <g id="arQrLogo"><rect x="6" y="40" width="10" height="20" rx="3.5" fill="#23211e"/><rect x="84" y="40" width="10" height="20" rx="3.5" fill="#23211e"/><rect x="13" y="26" width="74" height="48" rx="11" fill="#23211e"/><path d="M32 50 q6 -8 12 0" fill="none" stroke="#f4efe6" stroke-width="3.6" stroke-linecap="round"/><path d="M56 50 q6 -8 12 0" fill="none" stroke="#f4efe6" stroke-width="3.6" stroke-linecap="round"/><rect x="44" y="61" width="12" height="3.6" rx="1.8" fill="#c8553d"/><rect x="35" y="79" width="30" height="6" rx="3" fill="#c8553d"/></g>
+      </svg>
+      <div class="pl-row pl-wrap">
+        <button class="pl-btn" id="arCopy" type="button">Copy the link</button>
+      </div>
+      <p class="pl-msg" id="arCopyMsg" role="status" aria-live="polite"></p>
       <p class="pl-small">No phone nearby? Drive the same Rover in the <a href="pilot.html">3D twin</a>.</p>
+    </section>
+
+    <!-- the photo just taken: share it, save it or close it (photo.js); nothing is uploaded by this page -->
+    <section class="ar-panel ar-shot" id="arShot" aria-labelledby="arShotTitle" hidden>
+      <h2 id="arShotTitle">Your photo</h2>
+      <img id="arShotImg" alt="Your photo of the AX-1 twin in your room, with the OpenForge AX mark">
+      <div class="pl-row pl-wrap">
+        <button class="pl-btn pl-primary" id="arShare" type="button">Share</button>
+        <button class="pl-btn" id="arSave" type="button">Save</button>
+        <button class="pl-btn" id="arShotClose" type="button">Close</button>
+      </div>
+      <p class="pl-msg" id="arShotMsg" role="status" aria-live="polite"></p>
     </section>
 
     <!-- placing: aim at the floor and tap -->

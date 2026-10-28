@@ -8,7 +8,7 @@ const path = require("node:path");
 // controller (state machine, STOP, guarded drive loop). No DOM, no three: the same fake clock and real twin bridge as the
 // AI Pilot tests, so every motion still goes drive loop -> twin transport -> bridge-sim.
 describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, controller", () => {
-  let P, D, TT, AP, TL, GR, EX, TP, CAPS, CH, ARP, OB, OR, AC;
+  let P, D, TT, AP, TL, GR, EX, TP, CAPS, CH, ARP, OB, OR, AC, GA;
   before(async () => {
     P = await import("../web/js/pilot/ax-proto.js");
     D = await import("../web/js/pilot/drive-loop.js");
@@ -20,6 +20,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
     TP = await import("../web/js/pilot/twin-pose.js");
     CAPS = await import("../web/js/ar/ar-caps.js");
     CH = await import("../web/js/ar/chips.js");
+    GA = await import("../web/js/ar/gait.js");
     ARP = await import("../web/js/ar/ar-parse.js");
     OB = await import("../web/js/ar/obstacle.js");
     OR = await import("../web/js/ar/orientation.js");
@@ -484,6 +485,46 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
     });
   });
 
+  // ================================================================ floor mode of the camera view (iPhone, phones without WebXR AR)
+  describe("orientation: the floor in the camera view", () => {
+    const deg = (t) => (2 * Math.atan(t) * 180) / Math.PI;
+    it("cameraFovDeg: a portrait video filling a portrait screen keeps the lens's long-side view", () => {
+      // 720 x 1280 in a 360 x 640 box: same shape, the whole height is shown
+      near(OR.cameraFovDeg({ videoW: 720, videoH: 1280, viewW: 360, viewH: 640 }), deg(OR.CAMERA_TAN_LONG), 1e-9);
+    });
+    it("cameraFovDeg: a taller screen crops the sides, not the height; a wider one crops the height", () => {
+      // 390 x 844 is taller than 9:16, so the height is still all shown
+      near(OR.cameraFovDeg({ videoW: 720, videoH: 1280, viewW: 390, viewH: 844 }), deg(OR.CAMERA_TAN_LONG), 1e-9);
+      // a square box cuts the 1280 px height down to 720: the view shrinks to 720 / 1280 of the long side
+      near(OR.cameraFovDeg({ videoW: 720, videoH: 1280, viewW: 500, viewH: 500 }), deg((OR.CAMERA_TAN_LONG * 720) / 1280), 1e-9);
+      // landscape phone, landscape video: the height is the short side
+      near(OR.cameraFovDeg({ videoW: 1280, videoH: 720, viewW: 1280, viewH: 720 }), deg((OR.CAMERA_TAN_LONG * 720) / 1280), 1e-9);
+    });
+    it("cameraFovDeg: null until the video and the box have a size", () => {
+      expect(OR.cameraFovDeg({ videoW: 0, videoH: 0, viewW: 360, viewH: 640 })).to.equal(null);
+      expect(OR.cameraFovDeg({ videoW: 720, videoH: 1280, viewW: 0, viewH: 640 })).to.equal(null);
+      expect(OR.cameraFovDeg({})).to.equal(null);
+    });
+    it("floorHit: a ray 45 degrees down from 1.25 m meets the floor 1.25 m ahead", () => {
+      const s = Math.SQRT1_2;
+      const h = OR.floorHit([0, 1.25, 0], [0, -s, -s]);
+      near(h.x, 0, 1e-9); near(h.z, -1.25, 1e-9); near(h.dist, 1.25, 1e-9);
+      const t = OR.floorHit([0, 0.45, 0], [s, -s, 0], { floorY: 0 }); // the Desk on a table, seen from 45 cm above
+      near(t.x, 0.45, 1e-9); near(t.dist, 0.45, 1e-9);
+    });
+    it("floorHit: level or upward rays, a camera under the floor and far hits give null", () => {
+      expect(OR.floorHit([0, 1.25, 0], [0, 0, -1])).to.equal(null);
+      expect(OR.floorHit([0, 1.25, 0], [0, 0.3, -0.95])).to.equal(null);
+      expect(OR.floorHit([0, -0.1, 0], [0, -1, 0])).to.equal(null);
+      expect(OR.floorHit([0, 1.25, 0], [0, -0.1, -0.995])).to.equal(null); // about 12 m away: beyond the 4 m default
+      expect(OR.floorHit([0, 1.25, 0], [0, -0.1, -0.995], { maxM: 20 }).dist).to.be.closeTo(12.44, 0.01);
+    });
+    it("PHONE_HEIGHT: standing over the floor for the Rover and Walker, sitting at a table for the Desk", () => {
+      expect(OR.PHONE_HEIGHT).to.deep.equal({ rover: 1.25, walker: 1.25, desk: 0.45 });
+      expect(Object.isFrozen(OR.PHONE_HEIGHT)).to.equal(true);
+    });
+  });
+
   // ================================================================ obstacle
   // matrices (column-major Float32Array(16), as WebXR hands them out) built here, independent of obstacle.js
   const M = {
@@ -840,13 +881,17 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
 
   // ================================================================ chips per body
   describe("chips per body", () => {
-    it("every Desk and Walker chip parses fully for its body, moves joints only, never holds; the Rover keeps its chips", () => {
+    it("every Desk and Walker chip parses fully for its body and moves joints only; the Walker's direction chips are walk leases", () => {
       expect(CH.CHIPS).to.deep.equal(CH.chipsFor("rover"));
       expect(CH.chipsFor("tank")).to.deep.equal(CH.CHIPS);
       for (const key of ["rover", "desk", "walker"]) {
         const chips = CH.chipsFor(key);
         expect(new Set(chips.map((c) => c.id)).size, key).to.equal(chips.length);
         for (const c of chips) {
+          if (key === "walker" && c.hold) {
+            expect(["forward", "back", "left", "right"], c.id).to.include(c.id); // the controller walks the twin: no phrase
+            continue;
+          }
           const r = GR.parseCommand(c.say, key, { userSpeed: 60 });
           expect(r.steps.length, `${key}/${c.id}`).to.be.greaterThan(0);
           expect(r.unknown, `${key}/${c.id}`).to.deep.equal([]);
@@ -858,6 +903,8 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
         }
         expect(CH.chipText(chips[0].id, key)).to.equal(chips[0].say);
       }
+      expect(CH.chipsFor("walker").filter((c) => c.hold).map((c) => c.id)).to.deep.equal(["forward", "back", "left", "right"]);
+      expect(CH.chipsFor("desk").some((c) => c.hold)).to.equal(false);
       expect(CH.chipsFor("rover").filter((c) => c.hold).map((c) => c.id)).to.deep.equal(["forward", "back", "left", "right"]);
       expect(CH.chipText("wave", "rover")).to.equal(null); // the Rover has no arms
       for (const c of CH.chipsFor("walker")) expect(c.label + c.say, c.id).to.not.match(/\bwalk/i);
@@ -1371,7 +1418,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       r.ctl.release();
     });
 
-    it("Desk and Walker: start(mode, key) connects that twin; no wheels, no sensing, no hold; chips move joints; STOP wins", async () => {
+    it("Desk (and the Walker's poses): start(mode, key) connects that twin; chips move joints; STOP wins", async () => {
       const make = (key) => {
         const clock = fakeClock();
         let made = null;
@@ -1389,8 +1436,9 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
         expect(r.ctl.body).to.equal(P.bodyByKey(key));
         expect(r.ctl.snapshot.body).to.equal(P.bodyByKey(key));
         expect(r.ctl.view.drives).to.equal(false);
+        expect(r.ctl.view.walks).to.equal(key === "walker");
         expect(r.ctl.view.name).to.equal(key === "desk" ? "Desk" : "Walker");
-        expect(r.ctl.view.sensing.level).to.equal("none");
+        expect(r.ctl.view.sensing.level).to.equal(key === "desk" ? "none" : "off");
         expect(r.ctl.view.chips).to.deep.equal(CH.chipsFor(key));
         // a chip while LATCHED: nothing moves, nothing arms
         const pos0 = r.ctl.snapshot.state ? r.ctl.snapshot.state.positions.slice() : null;
@@ -1406,12 +1454,14 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
         for (let t = 0; t < 1500; t += 33) await r.clock.advance(33);
         const moved = r.ctl.snapshot.state.positions;
         expect(moved.some((v, i) => pos0 && v !== pos0[i]), `${key} moved a joint`).to.equal(true);
-        // no hold, no sensing, no odometry
-        expect(r.ctl.press("forward")).to.equal(false);
-        r.ctl.obstacle({ state: "blocked", distanceM: 0.04, nearM: 0.04, message: "x" });
-        expect(r.ctl.view.sensing.level).to.equal("none");
-        for (let t = 0; t < 1000; t += 33) r.ctl.frame(0.033);
-        expect(r.ctl.pose).to.deep.equal({ x: 0, z: 0, yaw: 0 });
+        // the Desk: no hold, no sensing, no odometry (the Walker walks: its own test below)
+        if (key === "desk") {
+          expect(r.ctl.press("forward")).to.equal(false);
+          r.ctl.obstacle({ state: "blocked", distanceM: 0.04, nearM: 0.04, message: "x" });
+          expect(r.ctl.view.sensing.level).to.equal("none");
+          for (let t = 0; t < 1000; t += 33) r.ctl.frame(0.033);
+          expect(r.ctl.pose).to.deep.equal({ x: 0, z: 0, yaw: 0 });
+        }
         // STOP latches and freezes the joints
         await r.ctl.chip(key === "desk" ? "shrug" : "stand");
         await r.clock.advance(100);
@@ -1430,7 +1480,7 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       }
     });
 
-    it("the Walker never walks: a forward request gives no steps and says so", async () => {
+    it("the Walker twin walks only from its buttons: a typed or spoken 'forward' is no plan (the AI path has no walking)", async () => {
       const clock = fakeClock();
       const ctl = AC.createArController({ clock, makeTransport: (b) => TT.createTwinTransport({ body: b, clock, latencyMs: 0 }) });
       await ctl.start("xr", "walker");
@@ -1441,6 +1491,133 @@ describe("AR Rover twin: odometry, caps, chips, parser, obstacles, orientation, 
       expect(ctl.view.ai.plan).to.equal(null);
       expect(JSON.stringify(ctl.view.ai.messages)).to.contain("can't walk");
       await ctl.ended("Closed");
+    });
+
+    it("the Walker twin walks: armed only, a tap is a short walk, holding keeps it walking, release / STOP / obstacle / edge end it", async () => {
+      const clock = fakeClock();
+      const ctl = AC.createArController({ clock, makeTransport: (b) => TT.createTwinTransport({ body: b, clock, latencyMs: 0 }) });
+      const run = async (ms) => {
+        for (let t = 0; t < ms; t += 33) {
+          await clock.advance(33);
+          ctl.frame(0.033);
+        }
+      };
+      expect(await ctl.start("xr", "walker")).to.equal(true);
+      expect(ctl.view.walks).to.equal(true);
+      // latched: nothing walks
+      await ctl.chip("forward");
+      expect(ctl.press("forward")).to.equal(false);
+      await run(500);
+      expect(ctl.pose).to.deep.equal({ x: 0, z: 0, yaw: 0 });
+      // placing arms; a tap on Forward walks about WALK_TAP_MS of steps, then stops by itself
+      await ctl.place({ gesture: true });
+      await clock.advance(150);
+      expect(ctl.state).to.equal("armed");
+      await ctl.chip("forward");
+      expect(ctl.view.walking).to.equal(true);
+      let steps = 0;
+      for (let t = 0; t < 1500; t += 33) {
+        await clock.advance(33);
+        const f = ctl.frame(0.033);
+        if (f.ds > 0) steps++;
+      }
+      expect(steps).to.be.greaterThan(20);
+      expect(ctl.pose.z).to.be.closeTo((AC.WALK_TAP_MS / 1000) * GA.WALK.SPEED, 0.02);
+      expect(ctl.view.walking).to.equal(false);
+      // Back walks backwards; Left turns on the spot (negative yaw), without moving
+      const z1 = ctl.pose.z;
+      await ctl.chip("back");
+      await run(1200);
+      expect(ctl.pose.z).to.be.lessThan(z1 - 0.08);
+      const at = { x: ctl.pose.x, z: ctl.pose.z };
+      await ctl.chip("left");
+      await run(1200);
+      expect(ctl.pose.yaw).to.be.closeTo(-GA.WALK.TURN * (AC.WALK_TAP_MS / 1000), 0.05);
+      expect(Math.hypot(ctl.pose.x - at.x, ctl.pose.z - at.z)).to.be.below(1e-9);
+      // holding Forward keeps walking past one lease; release stops at once
+      ctl.place({ gesture: true }); // back to the placement, facing ahead
+      const zh = ctl.pose.z;
+      expect(ctl.press("forward")).to.equal(true);
+      await run(2000);
+      expect(ctl.pose.z - zh).to.be.closeTo(2 * GA.WALK.SPEED, 0.03);
+      ctl.release();
+      const zr = ctl.pose.z;
+      await run(500);
+      expect(ctl.pose.z).to.equal(zr);
+      // an obstacle ahead: Forward is refused with the stop text, Back still walks
+      ctl.obstacle({ state: "blocked", distanceM: 0.04, nearM: 0.04, message: "x" });
+      expect(ctl.press("forward")).to.equal(false);
+      expect(ctl.view.notice).to.equal(AC.STOP_TEXT);
+      expect(ctl.press("back")).to.equal(true);
+      ctl.release();
+      ctl.obstacle(null);
+      // walking into something seen ahead stops about STOP_GAP_M before it
+      ctl.place({ gesture: true });
+      ctl.obstacle({ state: "blocked", distanceM: 0.2, nearM: 0.2, message: "x" });
+      expect(ctl.press("forward")).to.equal(true);
+      await run(3000);
+      expect(0.2 - ctl.pose.z).to.be.within(AC.STOP_GAP_M - 0.005, AC.STOP_GAP_M + 0.03);
+      expect(ctl.view.walking).to.equal(false);
+      ctl.release();
+      ctl.obstacle(null);
+      // STOP while walking: latched, nothing walks until ARM
+      expect(ctl.press("back")).to.equal(true);
+      await run(300);
+      await ctl.stop("Stopped by you.");
+      const zs = ctl.pose.z;
+      await run(800);
+      expect(ctl.state).to.equal("latched");
+      expect(ctl.pose.z).to.equal(zs);
+      await ctl.chip("forward");
+      await run(500);
+      expect(ctl.pose.z).to.equal(zs);
+      await ctl.ended("Closed");
+    });
+
+    it("the Walker twin stops at the edge of its play area (1.5 m in the camera view, no sensing there)", async () => {
+      const clock = fakeClock();
+      const ctl = AC.createArController({ clock, makeTransport: (b) => TT.createTwinTransport({ body: b, clock, latencyMs: 0 }) });
+      await ctl.start("camera", "walker");
+      expect(ctl.view.sensing.text).to.equal(AC.CAMERA_SENSING);
+      await ctl.place({ gesture: true });
+      await clock.advance(150);
+      expect(ctl.press("forward")).to.equal(true);
+      for (let t = 0; t < 16000; t += 33) {
+        await clock.advance(33);
+        ctl.frame(0.033);
+      }
+      expect(Math.hypot(ctl.pose.x, ctl.pose.z)).to.be.within(1.38, 1.5); // the edge check measures from the front, as for the Rover
+      expect(ctl.view.notice).to.match(/edge of my 1\.5 m play area/);
+      expect(ctl.view.walking).to.equal(false);
+      ctl.release();
+      await ctl.ended("Closed");
+    });
+
+    it("gait: no offset at rest, legs in antiphase, feet flat, knees only bend, the cycle follows the distance", () => {
+      const zero = GA.gaitOffsets(1.2, 0, 0);
+      for (const v of Object.values(zero)) expect(Math.abs(v)).to.be.below(1e-12);
+      for (let ph = 0; ph < 2 * Math.PI; ph += 0.3) {
+        const o = GA.gaitOffsets(ph, 1, 0);
+        near(o.l_hip_pitch, -o.r_hip_pitch, 1e-9);
+        near(o.l_hip_pitch + o.l_knee + o.l_ankle_pitch, 0, 1e-9);
+        near(o.r_hip_pitch + o.r_knee + o.r_ankle_pitch, 0, 1e-9);
+        expect(o.l_knee).to.be.at.least(0);
+        expect(o.r_knee).to.be.at.least(0);
+        expect(Math.min(o.l_knee, o.r_knee)).to.be.below(1e-9); // one leg stands while the other swings
+        expect(Math.abs(o.l_hip_pitch)).to.be.at.most(GA.WALK.HIP + 1e-9);
+      }
+      // a full cycle every CYCLE_M of distance; turning on the spot steps too; the amplitude eases in and out
+      const g = GA.createGait();
+      for (let i = 0; i < 30; i++) g.step(0.033, 0.004, 0);
+      expect(g.amp).to.be.above(0.8);
+      near(g.phase, ((2 * Math.PI * 30 * 0.004) / GA.WALK.CYCLE_M) % (2 * Math.PI), 1e-9);
+      const ph = g.phase;
+      g.step(0.033, 0, 0.03);
+      expect(g.phase).to.be.above(ph);
+      expect(g.offsets().l_hip_yaw).to.not.equal(0);
+      for (let i = 0; i < 60; i++) g.step(0.033, 0, 0);
+      expect(g.amp).to.equal(0);
+      for (const v of Object.values(g.offsets())) expect(Math.abs(v)).to.be.below(1e-12);
     });
 
     it("the default play area is 3 m and says so", async () => {
